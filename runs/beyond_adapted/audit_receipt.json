@@ -1,0 +1,30 @@
+{
+  "status": "complete",
+  "steps_collected": 2469,
+  "surprises_stored": 2375,
+  "adaptation_steps": 64,
+  "initial_loss": 0.04691,
+  "final_loss": 0.00891,
+  "audit": {
+    "promoted": true,
+    "metrics": {
+      "survival_rate": 1.0,
+      "mean_dynamics_mse": 0.00978,
+      "epistemic_correlation": 0.349,
+      "episodes_tested": 10,
+      "total_steps": 1280
+    },
+    "criteria_passed": {
+      "survival": true,
+      "dynamics_mse": true,
+      "epistemic_calibration": true
+    },
+    "gate_thresholds": {
+      "min_survival_rate": 0.9,
+      "max_dynamics_mse": 0.045,
+      "min_scene_accuracy": 0.98,
+      "min_epistemic_correlation": 0.15
+    }
+  },
+  "artifact_path": "runs\\beyond_adapted\\ensemble_adapted.pt"
+}

@@ -223,3 +223,31 @@ def test_object_centric_scene_graph():
         assert "o agent_sphere" in content
         assert "v " in content
         assert "f " in content
+
+
+def test_unity_bridge_session():
+    """Verify Unity socket bridge server and client communication loop."""
+    from poseidon.unity_bridge import simulate_unity_session
+    res = simulate_unity_session(port=8099, steps=3)
+    assert res["handshake"]["status"] == "connected"
+    assert res["scene_objects_count"] >= 5
+    assert res["steps_completed"] == 3
+    assert res["final_action"] in ("rest", "forage", "drink", "shelter", "explore", "flee")
+
+
+def test_adaptation_cycle_fast():
+    """Verify surprise collection, fine-tuning, and audit execution."""
+    from poseidon.train_adaptation import run_adaptation_cycle
+    with tempfile.TemporaryDirectory() as tmpdir:
+        receipt = run_adaptation_cycle(
+            output_dir=tmpdir,
+            collect_episodes=3,
+            adaptation_steps=4,
+            batch_size=8,
+            base_seed=9000,
+        )
+        assert receipt["status"] == "complete"
+        assert receipt["steps_collected"] > 0
+        assert "audit" in receipt
+        assert Path(receipt["artifact_path"]).exists()
+
