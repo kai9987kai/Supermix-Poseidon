@@ -1,6 +1,11 @@
 # Supermix Poseidon
 
+[![Hugging Face](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Supermix--Poseidon-yellow)](https://huggingface.co/Kai9987kai/Supermix-Poseidon)
+[![GitHub](https://img.shields.io/badge/GitHub-Supermix--Poseidon-blue)](https://github.com/kai9987kai/Supermix-Poseidon)
+
 A local experimental model system that combines a newly trained **Tidal core**, a compact pretrained language model, explicit carrier memory, exact maths tools, and a deterministic survival environment. It produces basic PNG images, short animations, and OBJ/glTF models from a shared learned scene representation.
+
+The complete trained model suite, promoted DAgger checkpoint, configuration, evaluation receipts, and LoRA adapters are published on Hugging Face: [**Kai9987kai/Supermix-Poseidon**](https://huggingface.co/Kai9987kai/Supermix-Poseidon).
 
 Built for the supplied Snapdragon Windows PC: CPU only, bounded threads, no paid APIs. The 24 linked projects inform the architecture through documented source review; their code and checkpoints are not indiscriminately merged.
 
