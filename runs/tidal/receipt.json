@@ -1,0 +1,75 @@
+{
+  "completed_epochs": 3,
+  "contract": {
+    "batch_size": 256,
+    "config_hash": "9e22d1ef6950d1bae89dcb54cdb400ce6f991a4478ff966b764d3b530e20a247",
+    "examples": 120000,
+    "generators": {
+      "media.py": "d22539e40aaa22f7651e3e97b961f5f9c89d260fc32c4f4339d9b94d7d83c13e",
+      "world.py": "f64b06b9434827b8ad6ce84212d8a7c62648abefa70661283de8b281c0acdbee"
+    },
+    "learning_rate": 0.001,
+    "seed": 42,
+    "threads": 4
+  },
+  "data_tensor_sha256": "20937c06443d9a0a1c92c279f76d47f1982eee288fcc0aca638233a69caff0aa",
+  "dev": {
+    "action_accuracy": 0.915283203125,
+    "dynamics_mse": 0.004294609199860133,
+    "interpretation": "Controlled synthetic held-out groups; action agreement is not a survival result.",
+    "majority_action_accuracy": 0.746337890625,
+    "mean_expert_weights": [
+      0.03564658388495445,
+      0.21689845621585846,
+      0.3167998492717743,
+      0.4306550920009613
+    ],
+    "scene_attribute_accuracy": {
+      "color": 1.0,
+      "count": 1.0,
+      "motion": 1.0,
+      "scale": 1.0,
+      "shape": 1.0
+    },
+    "scene_exact_accuracy": 1.0,
+    "scene_examples": 4096,
+    "world_examples": 4096,
+    "zero_delta_mse": 0.02027680043829605
+  },
+  "elapsed_seconds_this_invocation": 31.218000000000757,
+  "examples_seen": 360000,
+  "global_step": 1407,
+  "limitations": [
+    "controlled synthetic scene vocabulary",
+    "simulator-specific policy",
+    "uncalibrated confidence",
+    "not a conversational or pixel-generating neural model"
+  ],
+  "parameters": 327230,
+  "schema": "poseidon-joint-training-v1",
+  "status": "completed",
+  "unique_training_examples": 120000,
+  "untrained_dev": {
+    "action_accuracy": 0.746337890625,
+    "dynamics_mse": 0.06227228534407914,
+    "interpretation": "Controlled synthetic held-out groups; action agreement is not a survival result.",
+    "majority_action_accuracy": 0.746337890625,
+    "mean_expert_weights": [
+      0.22657528519630432,
+      0.27785786986351013,
+      0.2739998996257782,
+      0.22156691551208496
+    ],
+    "scene_attribute_accuracy": {
+      "color": 0.133544921875,
+      "count": 0.388427734375,
+      "motion": 0.16748046875,
+      "scale": 0.34375,
+      "shape": 0.1884765625
+    },
+    "scene_exact_accuracy": 0.0,
+    "scene_examples": 4096,
+    "world_examples": 4096,
+    "zero_delta_mse": 0.02027680043829605
+  }
+}

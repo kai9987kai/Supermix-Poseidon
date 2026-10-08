@@ -1,0 +1,222 @@
+{
+  "accepted": true,
+  "contract": {
+    "batch_size": 256,
+    "config_hash": "9e22d1ef6950d1bae89dcb54cdb400ce6f991a4478ff966b764d3b530e20a247",
+    "examples": 120000,
+    "generators": {
+      "media.py": "d22539e40aaa22f7651e3e97b961f5f9c89d260fc32c4f4339d9b94d7d83c13e",
+      "world.py": "f64b06b9434827b8ad6ce84212d8a7c62648abefa70661283de8b281c0acdbee"
+    },
+    "learning_rate": 0.001,
+    "seed": 42,
+    "threads": 4
+  },
+  "dagger_states_collected": 30560,
+  "examples_seen": 769600,
+  "history": [
+    {
+      "aggregated_world_states": 67680,
+      "beta": 0.5,
+      "event": "round",
+      "executed_vs_teacher_disagreement": 0.07291666666666667,
+      "new_states": 7680,
+      "round": 1,
+      "train_metrics": {
+        "action_loss": 0.1216566264629364,
+        "dynamics_mse": 0.004748085048049688,
+        "loss": 0.13154855370521545,
+        "scene_loss": 0.0001475035387557
+      },
+      "validation": {
+        "1.0": {
+          "mean_reward": 25.712772994635078,
+          "mean_steps": 256.0,
+          "survival_rate": 1.0
+        },
+        "2.0": {
+          "mean_reward": 25.67002504407003,
+          "mean_steps": 256.0,
+          "survival_rate": 1.0
+        },
+        "4.0": {
+          "mean_reward": 20.742149278088956,
+          "mean_steps": 219.33333333333334,
+          "survival_rate": 0.7916666666666666
+        },
+        "mean_steps": 243.7777777777778,
+        "score": 0.9305555555555555
+      }
+    },
+    {
+      "aggregated_world_states": 75360,
+      "beta": 0.25,
+      "event": "round",
+      "executed_vs_teacher_disagreement": 0.0640625,
+      "new_states": 7680,
+      "round": 2,
+      "train_metrics": {
+        "action_loss": 0.09974777698516846,
+        "dynamics_mse": 0.004324402194470167,
+        "loss": 0.10862262547016144,
+        "scene_loss": 2.0418989151949063e-05
+      },
+      "validation": {
+        "1.0": {
+          "mean_reward": 25.707567905099115,
+          "mean_steps": 256.0,
+          "survival_rate": 1.0
+        },
+        "2.0": {
+          "mean_reward": 25.700903859764235,
+          "mean_steps": 256.0,
+          "survival_rate": 1.0
+        },
+        "4.0": {
+          "mean_reward": 24.989074385937617,
+          "mean_steps": 251.33333333333334,
+          "survival_rate": 0.9791666666666666
+        },
+        "mean_steps": 254.44444444444446,
+        "score": 0.9930555555555555
+      }
+    },
+    {
+      "aggregated_world_states": 83040,
+      "beta": 0.125,
+      "event": "round",
+      "executed_vs_teacher_disagreement": 0.049479166666666664,
+      "new_states": 7680,
+      "round": 3,
+      "train_metrics": {
+        "action_loss": 0.15864180028438568,
+        "dynamics_mse": 0.005259145051240921,
+        "loss": 0.16936348378658295,
+        "scene_loss": 2.7738349217543146e-06
+      },
+      "validation": {
+        "1.0": {
+          "mean_reward": 25.711230293806864,
+          "mean_steps": 256.0,
+          "survival_rate": 1.0
+        },
+        "2.0": {
+          "mean_reward": 25.68487233774351,
+          "mean_steps": 256.0,
+          "survival_rate": 1.0
+        },
+        "4.0": {
+          "mean_reward": 24.32395044821246,
+          "mean_steps": 246.625,
+          "survival_rate": 0.9583333333333334
+        },
+        "mean_steps": 252.875,
+        "score": 0.9861111111111112
+      }
+    },
+    {
+      "aggregated_world_states": 90560,
+      "beta": 0.0625,
+      "event": "round",
+      "executed_vs_teacher_disagreement": 0.08018617021276596,
+      "new_states": 7520,
+      "round": 4,
+      "train_metrics": {
+        "action_loss": 0.23122958838939667,
+        "dynamics_mse": 0.0035062602255493402,
+        "loss": 0.23842862248420715,
+        "scene_loss": 1.0389796898380155e-06
+      },
+      "validation": {
+        "1.0": {
+          "mean_reward": 25.72011555814487,
+          "mean_steps": 256.0,
+          "survival_rate": 1.0
+        },
+        "2.0": {
+          "mean_reward": 25.704623353918013,
+          "mean_steps": 256.0,
+          "survival_rate": 1.0
+        },
+        "4.0": {
+          "mean_reward": 16.4665926852344,
+          "mean_steps": 195.14583333333334,
+          "survival_rate": 0.4375
+        },
+        "mean_steps": 235.7152777777778,
+        "score": 0.8125
+      }
+    }
+  ],
+  "limitations": [
+    "teacher labels bound the target behaviour; DAgger reduces covariate shift, not teacher error",
+    "synthetic simulator only",
+    "model selection used validation seeds, not evaluate.py test seeds"
+  ],
+  "method": "DAgger (Ross et al. 2011), beta_i = 0.5^i",
+  "parent_checkpoint": "C:\\Users\\kai99\\Desktop\\Poseidon\\runs\\tidal\\core.pt",
+  "parent_sha256": "0cf5fc06fb757b3594b09aad5f181bd058c361ffa8b590721594f41c9cb630f1",
+  "parent_validation": {
+    "1.0": {
+      "mean_reward": 25.704374773844137,
+      "mean_steps": 256.0,
+      "survival_rate": 1.0
+    },
+    "2.0": {
+      "mean_reward": 25.644638463592766,
+      "mean_steps": 256.0,
+      "survival_rate": 1.0
+    },
+    "4.0": {
+      "mean_reward": 12.812773305770492,
+      "mean_steps": 188.875,
+      "survival_rate": 0.1875
+    },
+    "mean_steps": 233.625,
+    "score": 0.7291666666666666
+  },
+  "rounds": 4,
+  "schema": "poseidon-dagger-v1",
+  "seconds": 563.625,
+  "selected_round": 2,
+  "selected_validation": {
+    "1.0": {
+      "mean_reward": 25.707567905099115,
+      "mean_steps": 256.0,
+      "survival_rate": 1.0
+    },
+    "2.0": {
+      "mean_reward": 25.700903859764235,
+      "mean_steps": 256.0,
+      "survival_rate": 1.0
+    },
+    "4.0": {
+      "mean_reward": 24.989074385937617,
+      "mean_steps": 251.33333333333334,
+      "survival_rate": 0.9791666666666666
+    },
+    "mean_steps": 254.44444444444446,
+    "score": 0.9930555555555555
+  },
+  "status": "completed",
+  "teacher_validation": {
+    "1.0": {
+      "mean_reward": 25.721431172064836,
+      "mean_steps": 256.0,
+      "survival_rate": 1.0
+    },
+    "2.0": {
+      "mean_reward": 25.707679863647268,
+      "mean_steps": 256.0,
+      "survival_rate": 1.0
+    },
+    "4.0": {
+      "mean_reward": 25.545644385969183,
+      "mean_steps": 256.0,
+      "survival_rate": 1.0
+    },
+    "mean_steps": 256.0,
+    "score": 1.0
+  },
+  "validation_seeds": "(78 << 23) | [0, 48)"
+}

@@ -1,0 +1,7 @@
+{
+  "checkpoint": "runs/tidal_dagger/core.pt",
+  "parent_validation": 0.7291666666666666,
+  "reason": "DAgger candidate beat parent on validation seeds",
+  "selected_validation": 0.9930555555555555,
+  "sha256": "7175a06f495895de7e5f3708362df33476f0d2ff5a0f337886fab18889dad6df"
+}

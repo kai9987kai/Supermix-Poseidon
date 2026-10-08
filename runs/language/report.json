@@ -1,0 +1,13 @@
+{
+  "status": "completed",
+  "steps": 256,
+  "examples_seen": 512,
+  "unique_usable_records": 2048,
+  "tokens_seen": 42104,
+  "baseline_dev_loss": 0.9608790484212694,
+  "candidate_dev_loss": 0.9584874815739278,
+  "active_by_default": false,
+  "reason": "Candidate only: dev loss is not proof of better conversation or reasoning.",
+  "seconds_this_session": 608.6583119000006,
+  "data_hash": "b6a9a9e57f140ddfaad341dd8e0cdc6fdeee89eb0b6ade8798ddbc972d774b9a"
+}

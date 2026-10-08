@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Poseidon — Supermix Research</title><link rel="stylesheet" href="/style.css"></head>
+<body>
+<div class="app">
+  <aside class="rail"><a class="brand" href="/" aria-label="Poseidon home">Ψ</a><div class="rail-label">SUPER<br>MIX</div><span class="rail-line"></span><span class="vertical">EXPERIMENTAL SYSTEM / 001</span><span class="rail-dot"></span></aside>
+  <main>
+    <header><div class="eyebrow"><span class="dot"></span> LOCAL RESEARCH WORKBENCH</div><div id="connection" class="connection">Connecting…</div></header>
+    <section class="intro"><div><div class="edition">SUPERMIX / POSEIDON</div><h1>Ideas into worlds<span>.</span></h1><p>A shared experimental core for scenes and survival.<br>Language, memory, and verified tools alongside it.</p></div><div class="orb" aria-hidden="true"><div></div><i></i><b>Ψ</b><span>TIDAL CORE</span></div></section>
+    <div class="stats"><div><span>CORE</span><strong id="coreState">Awaiting checkpoint</strong></div><div><span>TRAINING EXPOSURES</span><strong id="exposures">—</strong></div><div><span>LANGUAGE CORPUS</span><strong id="corpus">—</strong></div><div><span>COMPUTE</span><strong>Local CPU <small>only</small></strong></div></div>
+    <div class="workspace">
+      <section class="studio panel">
+        <div class="panel-title"><span>01 / WORKSPACE</span><span class="tag">EXPERIMENTAL v0.1</span></div>
+        <div class="modes" role="tablist" aria-label="Capabilities">
+          <button class="selected" data-mode="chat" role="tab" aria-selected="true">Conversation</button><button data-mode="math" role="tab" aria-selected="false">Maths</button><button data-mode="image" role="tab" aria-selected="false">Image</button><button data-mode="video" role="tab" aria-selected="false">Motion</button><button data-mode="mesh" role="tab" aria-selected="false">3D</button><button data-mode="world" role="tab" aria-selected="false">Survival</button>
+        </div>
+        <div id="modeNote" class="mode-note">Local pretrained language model. Answers can be wrong; arithmetic is checked by a separate exact solver.</div>
+        <div id="messages" class="messages" aria-live="polite"><div class="welcome"><span class="wave">≈</span><h2>Start an exploration.</h2><p>Talk through a problem, compose a scene,<br>or put the learned policy into its world.</p><div class="suggestions"><button data-prompt="Explain why seasons change in two sentences.">Explain the seasons ↗</button><button data-prompt="3*x + 7 = 22" data-target="math">Solve an equation ↗</button><button data-prompt="Create two small cyan spheres with orbit motion." data-target="image">Compose a scene ↗</button></div></div></div>
+        <form id="promptForm"><div class="input-wrap"><textarea id="prompt" rows="2" maxlength="8000" aria-label="Prompt" placeholder="Ask Poseidon something…"></textarea><button id="send" type="submit" aria-label="Send prompt">↗</button></div><div class="input-footer"><span id="activity">Ready when you are</span><label>Seed <input id="seed" type="number" value="42" min="0" max="2147483647" aria-label="Generation seed"></label></div></form>
+      </section>
+      <aside class="inspector">
+        <section class="panel preview"><div class="panel-title"><span>02 / OBSERVATORY</span><span id="artifactType" class="tag">IDLE</span></div><div id="visual"><canvas id="worldCanvas" width="600" height="400" aria-label="World or scene preview"></canvas><div id="visualHint">The next scene starts here.</div></div><div id="timeline" hidden><button id="replay">Replay</button><input id="scrub" type="range" min="0" max="255" value="0" aria-label="Simulation step"><span id="tick">0</span></div><div id="artifactInfo" class="artifact-info">Images, short animations, and 3D meshes share five learned scene attributes. Four primitives, six colors, up to three objects.</div><div id="downloads" class="downloads"></div></section>
+        <section class="panel"><div class="panel-title"><span>03 / EXPERT ROUTING</span><span class="tag">4 EXPERTS</span></div><div id="routing" class="routing"><div><span>01</span><i><b></b></i><small>—</small></div><div><span>02</span><i><b></b></i><small>—</small></div><div><span>03</span><i><b></b></i><small>—</small></div><div><span>04</span><i><b></b></i><small>—</small></div></div><p class="micro">Learned mixture weights for the last scene request. Expert roles are not assigned human names.</p></section>
+        <details class="panel memory"><summary>04 / CARRIER MEMORY <span>+</span></summary><p class="micro">Save a fact explicitly. Exclude carriers to inspect retrieval changes. This external store does not update model weights.</p><textarea id="memoryText" maxlength="2000" rows="2" placeholder="A fact you want Poseidon to remember" aria-label="Memory text"></textarea><div class="memory-actions"><select id="carrier" aria-label="Memory carrier"><option value="episodic">Episodic</option><option value="body">Body</option><option value="habitat">Habitat</option><option value="social">Social</option></select><button id="remember">Save fact</button></div><div class="ablations"><span>Exclude:</span><label><input type="checkbox" value="episodic">Episode</label><label><input type="checkbox" value="body">Body</label><label><input type="checkbox" value="habitat">Habitat</label><label><input type="checkbox" value="social">Social</label></div><button id="recall" class="secondary">Inspect retrieval for current prompt</button><p id="memoryStatus" class="micro" role="status"></p></details>
+      </aside>
+    </div>
+    <details class="panel evidence"><summary>TRAINING & EVALUATION RECEIPTS <span>View evidence +</span></summary><p class="micro">Prepared rows, training exposures, and held-out accuracy are separate measurements. Repeated epochs count as repeated exposures. Candidate language adapters are inactive by default.</p><pre id="evidence">Waiting for local reports…</pre></details>
+    <footer><span>POSEIDON <b>/</b> SUPERMIX</span><span>Local inference · Synthetic environment · Measured claims</span><span>OCT 2026</span></footer>
+  </main>
+</div><script src="/app.js"></script>
+</body></html>

@@ -1,0 +1,60 @@
+{
+  "checkpoint": "C:\\Users\\kai99\\Desktop\\Poseidon\\runs\\tidal_dagger\\core.pt",
+  "data_sha256": "4dbeffbe36da79e430b5366d80d5a2eb0e91d5dc1f984b5af13bb3148cba2361",
+  "heads": {
+    "color": {
+      "dev_accuracy": 1.0,
+      "dev_ece_after": 2.759695053100586e-05,
+      "dev_ece_before": 2.759695053100586e-05,
+      "dev_nll_after": 2.7558269721339457e-05,
+      "dev_nll_before": 2.7558269721339457e-05,
+      "status": "degenerate: every dev prediction correct, NLL minimiser has no finite optimum",
+      "temperature": 1.0
+    },
+    "count": {
+      "dev_accuracy": 1.0,
+      "dev_ece_after": 2.8967857360839844e-05,
+      "dev_ece_before": 2.8967857360839844e-05,
+      "dev_nll_after": 2.8973434382351115e-05,
+      "dev_nll_before": 2.8973434382351115e-05,
+      "status": "degenerate: every dev prediction correct, NLL minimiser has no finite optimum",
+      "temperature": 1.0
+    },
+    "motion": {
+      "dev_accuracy": 1.0,
+      "dev_ece_after": 2.2172927856445312e-05,
+      "dev_ece_before": 2.2172927856445312e-05,
+      "dev_nll_after": 2.2190863091964275e-05,
+      "dev_nll_before": 2.2190863091964275e-05,
+      "status": "degenerate: every dev prediction correct, NLL minimiser has no finite optimum",
+      "temperature": 1.0
+    },
+    "scale": {
+      "dev_accuracy": 1.0,
+      "dev_ece_after": 1.537799835205078e-05,
+      "dev_ece_before": 1.537799835205078e-05,
+      "dev_nll_after": 1.535282535769511e-05,
+      "dev_nll_before": 1.535282535769511e-05,
+      "status": "degenerate: every dev prediction correct, NLL minimiser has no finite optimum",
+      "temperature": 1.0
+    },
+    "shape": {
+      "dev_accuracy": 1.0,
+      "dev_ece_after": 1.9252300262451172e-05,
+      "dev_ece_before": 1.9252300262451172e-05,
+      "dev_nll_after": 1.924090065585915e-05,
+      "dev_nll_before": 1.924090065585915e-05,
+      "status": "degenerate: every dev prediction correct, NLL minimiser has no finite optimum",
+      "temperature": 1.0
+    }
+  },
+  "method": "temperature-scaling (Guo et al. 2017)",
+  "scene_temperature": {
+    "color": 1.0,
+    "count": 1.0,
+    "motion": 1.0,
+    "scale": 1.0,
+    "shape": 1.0
+  },
+  "split": "dev"
+}

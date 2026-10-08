@@ -1,0 +1,77 @@
+{
+  "cache_sha256": "4dbeffbe36da79e430b5366d80d5a2eb0e91d5dc1f984b5af13bb3148cba2361",
+  "contract": {
+    "batch_size": 256,
+    "config_hash": "9e22d1ef6950d1bae89dcb54cdb400ce6f991a4478ff966b764d3b530e20a247",
+    "examples": 120000,
+    "generators": {
+      "media.py": "d22539e40aaa22f7651e3e97b961f5f9c89d260fc32c4f4339d9b94d7d83c13e",
+      "world.py": "f64b06b9434827b8ad6ce84212d8a7c62648abefa70661283de8b281c0acdbee"
+    },
+    "learning_rate": 0.001,
+    "seed": 42,
+    "threads": 4
+  },
+  "external_natural_media_examples": 0,
+  "generators": {
+    "media.py": "d22539e40aaa22f7651e3e97b961f5f9c89d260fc32c4f4339d9b94d7d83c13e",
+    "world.py": "f64b06b9434827b8ad6ce84212d8a7c62648abefa70661283de8b281c0acdbee"
+  },
+  "requested_training_examples": 120000,
+  "scene_group_overlap": 0,
+  "scene_split": "complete semantic tuples held out with stable hash, independent of wording seed",
+  "schema": "poseidon-joint-data-v1",
+  "seed": 42,
+  "source_type": "procedural scenes and synthetic simulator teacher trajectories",
+  "splits": {
+    "dev": {
+      "executed_action_counts": [
+        2769,
+        381,
+        478,
+        114,
+        131,
+        223
+      ],
+      "scene_rows": 4096,
+      "scene_semantic_groups": 90,
+      "teacher_action_counts": [
+        3057,
+        333,
+        453,
+        16,
+        63,
+        174
+      ],
+      "unique_scene_prompts": 4096,
+      "world_episodes": 22,
+      "world_transitions": 4096
+    },
+    "train": {
+      "executed_action_counts": [
+        40124,
+        5591,
+        7093,
+        1705,
+        2106,
+        3381
+      ],
+      "scene_rows": 60000,
+      "scene_semantic_groups": 697,
+      "teacher_action_counts": [
+        44309,
+        4991,
+        6677,
+        525,
+        1104,
+        2394
+      ],
+      "unique_scene_prompts": 60000,
+      "world_episodes": 313,
+      "world_transitions": 60000
+    }
+  },
+  "tensor_sha256": "20937c06443d9a0a1c92c279f76d47f1982eee288fcc0aca638233a69caff0aa",
+  "world_episode_overlap": 0,
+  "world_split": "disjoint episode seed namespaces"
+}
