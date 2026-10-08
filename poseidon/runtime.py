@@ -88,6 +88,10 @@ class Poseidon:
                     from .planning import ModelPredictivePlanner
                     controller = ModelPredictivePlanner(core)
                     backend_desc = "Tidal policy + dynamics head hybrid planner in TidePool"
+                elif planner in ("risk_aware", "uncertainty"):
+                    from .ensemble import UncertaintyAwarePlanner
+                    controller = UncertaintyAwarePlanner(core)
+                    backend_desc = "Supermix Beyond uncertainty-aware 3-model ensemble planner in TidePool"
                 else:
                     controller = core
                     backend_desc = "learned Tidal policy in TidePool"
