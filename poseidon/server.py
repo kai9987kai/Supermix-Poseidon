@@ -70,7 +70,7 @@ def make_handler(runtime, port):
                 if self.path == "/api/remember":
                     result = runtime.remember(payload.get("text"), payload.get("carrier", "episodic"))
                 else:
-                    result = runtime.respond(payload.get("prompt"), payload.get("mode", "chat"), payload.get("history"), payload.get("seed", 42), payload.get("disabled_carriers"))
+                    result = runtime.respond(payload.get("prompt"), payload.get("mode", "chat"), payload.get("history"), payload.get("seed", 42), payload.get("disabled_carriers"), planner=payload.get("planner", "policy"))
                     if "paths" in result:
                         result["links"] = {key: "/artifacts/"+Path(value).resolve().relative_to(runtime.root/"outputs").as_posix() for key,value in result["paths"].items()}
                 self.send_json(200, result)

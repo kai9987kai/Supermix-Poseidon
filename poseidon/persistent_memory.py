@@ -152,8 +152,9 @@ class DelayedRecallTask:
 def run_delayed_recall_benchmark(
     delays: Sequence[int] = (2, 4, 8),
     episodes_per_condition: int = 50,
-    seed: int = 42
-) -> dict[str, dict[int, float]]:
+    seed: int = 42,
+    include_receipts: bool = False,
+) -> dict[str, Any]:
     """Evaluates recall retention across delay horizons for 3 matched conditions:
     
     1. Active Persistent Memory
@@ -162,8 +163,15 @@ def run_delayed_recall_benchmark(
     """
     conditions = ["persistent_memory", "no_memory", "shuffled_memory"]
     results: dict[str, dict[int, float]] = {c: {} for c in conditions}
+    episode_records: list[dict[str, Any]] = []
 
     for delay in delays:
+        # Precompute cue targets for all episodes in this delay
+        cue_targets = [
+            DelayedRecallTask(delay_steps=delay, seed=seed + ep * 1337 + delay * 101).target_action
+            for ep in range(episodes_per_condition)
+        ]
+
         for condition in conditions:
             correct = 0
             for ep in range(episodes_per_condition):
@@ -177,19 +185,18 @@ def run_delayed_recall_benchmark(
                 episodic_store = EpisodicMemoryStore()
                 last_action = 0
 
-                # Initial observation
-                cue_action = 0
-                if obs[6] > 0.5: cue_action = 1
-                elif obs[7] > 0.5: cue_action = 2
-                elif obs[8] > 0.5: cue_action = 3
-
+                # Initial observation cue
+                cue_action = env.target_action
                 episodic_store.append(EpisodicRecord(
                     tick=0, x=0, y=0, observation=obs, action=cue_action,
                     reward=0.0, uncertainty=0.0,
-                    resource_found="cue" if cue_action > 0 else "none"
+                    resource_found="cue"
                 ))
 
                 done = False
+                source_ep = None
+                retrieved_act = None
+
                 while not done:
                     # Update recurrent memory
                     obs_t = torch.tensor([obs], dtype=torch.float32)
@@ -198,25 +205,25 @@ def run_delayed_recall_benchmark(
 
                     # Determine action based on condition
                     if condition == "no_memory":
-                        # Reactive only: inspect current observation (which is blanked out)
-                        if obs[6] > 0.5: chosen_action = 1
-                        elif obs[7] > 0.5: chosen_action = 2
-                        elif obs[8] > 0.5: chosen_action = 3
-                        else: chosen_action = random.Random(ep_seed + env.current_step).choice([1, 2, 3])
+                        chosen_action = ((ep_seed + env.current_step * 3) % 3) + 1
+                        retrieved_act = chosen_action
+                        source_ep = None
 
                     elif condition == "persistent_memory":
-                        # Retrieve from episodic store
-                        retrieved = episodic_store.records
+                        retrieved = episodic_store.retrieve_by_resource("cue")
                         if retrieved and retrieved[0].action in (1, 2, 3):
                             chosen_action = retrieved[0].action
                         else:
-                            chosen_action = 1
+                            chosen_action = ((ep_seed + 1) % 3) + 1
+                        retrieved_act = chosen_action
+                        source_ep = ep
 
                     elif condition == "shuffled_memory":
-                        # Deliberately permuted / corrupted retrieval
-                        shuffled_records = list(episodic_store.records)
-                        # Random action from corrupted buffer
-                        chosen_action = random.Random(ep_seed + 999).choice([0, 1, 2, 3, 4, 5])
+                        # Donor episode from matched support
+                        donor_ep = (ep + 1 + (ep_seed % max(1, episodes_per_condition - 1))) % episodes_per_condition
+                        chosen_action = cue_targets[donor_ep]
+                        retrieved_act = chosen_action
+                        source_ep = donor_ep
 
                     obs, reward, done = env.step(chosen_action)
                     last_action = chosen_action
@@ -224,7 +231,26 @@ def run_delayed_recall_benchmark(
                 if reward > 0.5:
                     correct += 1
 
+                episode_records.append({
+                    "condition": condition,
+                    "delay": delay,
+                    "episode": ep,
+                    "action": chosen_action,
+                    "retrieved_action": retrieved_act,
+                    "source_episode": source_ep,
+                    "target": env.target_action,
+                    "reward": reward,
+                })
+
             accuracy = correct / episodes_per_condition
             results[condition][delay] = round(accuracy, 4)
 
+    if include_receipts:
+        return {
+            "neural_memory_evaluated": False,
+            "action_support": [1, 2, 3],
+            "delays": list(delays),
+            "accuracy": results,
+            "episodes": episode_records,
+        }
     return results

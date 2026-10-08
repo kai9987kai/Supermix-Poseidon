@@ -258,14 +258,21 @@ class UncertaintyAwarePlanner:
             step2_fail_probs = fail_probs_t
             step2_uncertainties = disagreements_1
 
-        # 4. Risk-Sensitive Objective:
-        # a* = argmax [ E[R] - lambda * U(s, a) - beta * P(failure | a) ]
+        # 4. Risk-Sensitive Objective with Dynamic Attenuation (solves the Pessimism Trap)
         total_uncertainty = (disagreements_1 + 0.5 * step2_uncertainties)
         total_failure_risk = torch.max(fail_probs_t, step2_fail_probs)
 
+        # When vital reserves drop below critical threshold, attenuate risk penalty to prevent paralysis
+        obs_list = list(observation)
+        energy_lvl = obs_list[1] if len(obs_list) > 1 else 1.0
+        hydr_lvl = obs_list[2] if len(obs_list) > 2 else 1.0
+        vital_reserves = min(energy_lvl, hydr_lvl)
+        attenuation = min(1.0, max(0.15, vital_reserves / 0.35))
+        effective_unc_penalty = self.config.uncertainty_penalty * attenuation
+
         risk_adjusted_q = (
             q_values
-            - self.config.uncertainty_penalty * total_uncertainty
+            - effective_unc_penalty * total_uncertainty
             - self.config.failure_penalty * total_failure_risk
         )
 
