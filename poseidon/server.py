@@ -89,7 +89,15 @@ def make_handler(runtime, port):
                 try:
                     if path == "/api/jobs":
                         assert_source_current()
-                        self.send_json(202, runtime.submit_helm_experiment(payload))
+                        kind = payload.get("kind")
+                        if kind == "odysseus-experiment":
+                            self.send_json(202, runtime.submit_odysseus_experiment(payload))
+                        elif kind == "mco-experiment":
+                            self.send_json(202, runtime.submit_mco_experiment(payload))
+                        elif kind == "helm-experiment":
+                            self.send_json(202, runtime.submit_helm_experiment(payload))
+                        else:
+                            raise ValueError(f"Unknown experiment job kind: {kind}")
                     else:
                         if payload:
                             raise ValueError("Cancellation requires an empty object.")
@@ -103,19 +111,24 @@ def make_handler(runtime, port):
                 except RuntimeError as error:
                     self.send_json(409, {"error": str(error)})
                 return
-            if self.path not in ("/api/respond", "/api/remember", "/api/experiment", "/api/contrast-experiment", "/api/horizon-experiment", "/api/odyssey-experiment", "/api/helm-experiment"):
+            if self.path not in ("/api/respond", "/api/remember", "/api/experiment", "/api/contrast-experiment", "/api/horizon-experiment", "/api/odyssey-experiment", "/api/helm-experiment", "/api/odysseus-experiment", "/api/mco-experiment"):
                 self.send_json(404, {"error": "Not found"}); return
             if not busy.acquire(blocking=False):
                 self.send_json(409, {"error": "Poseidon is processing another request. Try again shortly."}); return
             try:
-                if self.path in ("/api/experiment", "/api/contrast-experiment", "/api/horizon-experiment", "/api/odyssey-experiment", "/api/helm-experiment"):
+                if self.path == "/api/mco-experiment":
+                    assert_source_current()
+                    result = runtime.mco_experiment()
+                elif self.path in ("/api/experiment", "/api/contrast-experiment", "/api/horizon-experiment", "/api/odyssey-experiment", "/api/helm-experiment", "/api/odysseus-experiment"):
                     if set(payload) - {"kind", "seed", "episodes", "max_steps", "scarcity"}:
                         raise ValueError("Unknown experiment setting.")
                     episodes, max_steps = payload.get("episodes", 4), payload.get("max_steps", 64)
                     if type(episodes) is not int or not 1 <= episodes <= 8 or type(max_steps) is not int or not 32 <= max_steps <= 256:
                         raise ValueError("Workbench experiments require 1–8 paired episodes and 32–256 steps.")
                     assert_source_current()
-                    if self.path == "/api/helm-experiment":
+                    if self.path == "/api/odysseus-experiment":
+                        result = runtime.odysseus_experiment(payload.get("seed", 133000001), episodes, max_steps, payload.get("scarcity", 2.5))
+                    elif self.path == "/api/helm-experiment":
                         result = runtime.helm_experiment(payload.get("seed", 112000001), episodes, max_steps, payload.get("scarcity", 2.5))
                     elif self.path == "/api/odyssey-experiment":
                         result = runtime.odyssey_experiment(payload.get("seed", 110000001), episodes, max_steps, payload.get("scarcity", 2.5))

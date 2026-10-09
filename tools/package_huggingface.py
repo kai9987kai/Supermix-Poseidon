@@ -28,6 +28,9 @@ ODYSSEY_EXPERIMENTS = (
     "3ed044592794f58c-29888499b43a.json",
     "50ce54c9e486ce8f-0fb6374e203a.json",
 )
+ODYSSEUS_EXPERIMENTS = (
+    "1521d677b6f2f75b-c4035a1005d3.json",
+)
 TRAJECTORY_AUDITS = {
     "8491880ca77a2dba-c7284642c7ab.json": "3ed044592794f58c-29888499b43a.json",
     "8b0e6f16a03ed340-a22ce43a85ac.json": "50ce54c9e486ce8f-0fb6374e203a.json",
@@ -51,7 +54,7 @@ def git(*args: str) -> str:
     return subprocess.check_output(["git", *args], cwd=ROOT, text=True, encoding="utf-8").strip()
 
 
-def model_card(revision: str, core_hash: str, atlas_hash: str, horizon_hash: str, contrast_hash: str, odyssey_hash: str, version: str, helm_hash: str = "") -> str:
+def model_card(revision: str, core_hash: str, atlas_hash: str, horizon_hash: str, contrast_hash: str, odyssey_hash: str, version: str, helm_hash: str = "", odysseus_hash: str = "") -> str:
     return f"""---
 language:
 - en
@@ -72,33 +75,23 @@ tags:
 - spatial-memory
 - cognitive-mapping
 - topological-navigation
+- bayesian-replenishment
+- empirical-transitions
+- memory-carrier-observatory
 - lora
 - cpu
 - experimental
 - synthetic-simulation
 ---
 
-# Supermix Poseidon v{version}: Helm history-conditioned critic
+# Supermix Poseidon v{version}: Odysseus & Memory Carrier Observatory (MCO)
 
-Version 0.6 adds a separately fitted CPU return critic with observed history,
-realized prediction-error feedback, observation-only/erased/yoked controls,
-disjoint selection and calibration, and actual 4/16-step branch receipts.
-Durable cancellable workbench jobs retain producer identity and deadlines.
-The core policy remains default; Helm is opt-in. See docs/HELM_DESIGN.md,
-docs/HELM_RESULTS.md and docs/research/README.md for measurements and the
-24-repository/current-research review. Small synthetic suites do not establish
-general capability, biological fidelity, safe improvement or future coverage.
-
-A CPU-local experimental system with a trained synthetic scene/control core,
-a separate pretrained conversation model, and an inspectable topological cognitive
-mapping & navigational memory system (**Odyssey Atlas**). The v0.5.1 patch fixes
-episode scarcity resets, reconstructs recorded cognitive maps, and records real
-16-step branch returns with independent replay. This release bundles matching
-runtime source, unchanged model artifacts and corrected evidence. It is a custom PyTorch application, not
-a Transformers model at the repository root.
+Version 0.7 introduces two foundational additions:
+1. **Odysseus Empirical Cognitive Navigator**: Online Bayesian replenishment estimation ($z=1.645$ LCB), empirical macro-action transition matrices $\\hat{{P}}(P_{{dest}} \\mid P_{{src}}, a)$, and physiological pre-transit stamina rest guards without altering the frozen Tidal core weights.
+2. **Memory Carrier Observatory (MCO)**: Full 16-subset causal factorial analysis across episodic, body, habitat, and social memory carriers paired with three falsifiable negative controls (`intact`, `shuffled`, `irrelevant`, `erased`) and query-invariant LOTO sensitivity across 1,024 independent trials.
 
 [Source commit](https://github.com/kai9987kai/Supermix-Poseidon/tree/{revision}) ·
-[Trajectory audit and results](docs/TRAJECTORY_AUDIT.md) · [Odyssey design](docs/ODYSSEY_DESIGN.md) · [Historical Odyssey results](docs/ODYSSEY_RESULTS.md) · [Release guide](docs/HUGGINGFACE_RELEASE.md)
+[Odysseus design](docs/ODYSSEUS_DESIGN.md) · [Odysseus results](docs/ODYSSEUS_RESULTS.md) · [MCO design](docs/MCO_DESIGN.md) · [MCO results](docs/MCO_RESULTS.md) · [Release guide](docs/HUGGINGFACE_RELEASE.md)
 
 ## Components and activation
 
@@ -108,6 +101,8 @@ a Transformers model at the repository root.
 | Supervised baseline | `runs/tidal/core.pt` | Comparison checkpoint, original embedded training state |
 | SmolLM2: 134,515,008 stored parameters | `models/language/model.safetensors` | Separate unchanged pretrained conversation backend |
 | LoRA: 61,440 parameters | `runs/language/adapter/` | Experimental candidate, inactive by default |
+| Odysseus Navigator | `outputs/odysseus/atlas.json` | Empirical macro-action transitions & Bayesian replenishment LCB, opt-in candidate |
+| Helm Critic v0.6 | `outputs/helm/atlas.json` | Fitted multi-horizon critic with observed history, opt-in candidate |
 | Odyssey Atlas v5 | `outputs/odyssey/atlas.json` | Spatial cognitive map and replenishment-decay waypoint planner, opt-in candidate |
 | Horizon Atlas v4 | `outputs/horizon/atlas.json` | Fitted multi-horizon return advantage, opt-in planner |
 | Contrast Atlas | `outputs/contrast/atlas.json` | Matched-action residual memory, opt-in candidate |
@@ -245,7 +240,7 @@ to avoid relicensing upstream artifacts as MIT.
 def package(output: Path, repo_id: str = REPO_ID) -> dict:
     sys.path.insert(0, str(ROOT))
     from poseidon import __version__
-    if __version__ != "0.6.0":
+    if __version__ != "0.7.0":
         raise ValueError(f"unsupported version {__version__}")
     if repo_id != REPO_ID:
         raise ValueError("this release card is bound to Kai9987kai/Supermix-Poseidon")
@@ -296,6 +291,19 @@ def package(output: Path, repo_id: str = REPO_ID) -> dict:
         name: verify_helm_receipt(stable_json(ROOT / "outputs/helm_experiments" / name)) for name in helm_names}
     if any(stable_json(ROOT / "outputs/helm_experiments" / name)["critic"]["sha256"] != helm_hash for name in helm_names):
         raise ValueError("Helm evaluation is bound to a different fitted critic")
+
+    from poseidon.odysseus import OdysseusAtlas
+    from poseidon.odysseus_experiment import verify_odysseus_receipt
+    from poseidon.mco import verify_mco_receipt
+    odysseus = OdysseusAtlas.load(core, ROOT / "outputs/odysseus/atlas.json")
+    odysseus_hash = odysseus.artifact["sha256"]
+    odysseus_experiment_verification = {
+        name: verify_odysseus_receipt(json.loads((ROOT / "outputs/odysseus_experiments" / name).read_text(encoding="utf-8")))
+        for name in ODYSSEUS_EXPERIMENTS
+    }
+    mco_experiment_verification = {
+        "RECEIPT.json": verify_mco_receipt(json.loads((ROOT / "outputs/mco_experiments/RECEIPT.json").read_text(encoding="utf-8")))
+    }
 
     experiment_verification = {name: load_and_verify(ROOT / "outputs/experiments" / name) for name in EXPERIMENTS}
     evidence_artifacts = load_artifacts(ROOT)
@@ -357,6 +365,8 @@ def package(output: Path, repo_id: str = REPO_ID) -> dict:
         "outputs/horizon/atlas.json", "outputs/horizon/fit_receipt.json",
         "outputs/odyssey/atlas.json", "outputs/odyssey/fit_receipt.json",
         "outputs/helm/atlas.json", "outputs/helm/fit_receipt.json",
+        "outputs/odysseus/atlas.json", "outputs/odysseus/fit_receipt.json",
+        "outputs/mco_experiments/RECEIPT.json",
         "models/language/manifest.json", "data/language/manifest.json",
         "data/language/SOURCE_CARD.md",
     ] + [f"models/language/{name}" for name in upstream["files"]]
@@ -365,6 +375,7 @@ def package(output: Path, repo_id: str = REPO_ID) -> dict:
     artifacts += [f"outputs/odyssey_experiments/{name}" for name in ODYSSEY_EXPERIMENTS]
     artifacts += [f"outputs/trajectory_audits/{name}" for name in TRAJECTORY_AUDITS]
     artifacts += [f"outputs/helm_experiments/{name}" for name in helm_names]
+    artifacts += [f"outputs/odysseus_experiments/{name}" for name in ODYSSEUS_EXPERIMENTS]
     for relative in artifacts:
         copy(relative)
     copy("docs/history/HF_MODEL_CARD_v0.1.md", "legacy/model-card-before-v0.2.md")
@@ -425,7 +436,7 @@ See runs/language/report.json, data/language/SOURCE_CARD.md and the root model c
         copy("runs/language/adapter/adapter_model.safetensors", directory + "/adapter_model.safetensors")
         write_json(output / directory / "adapter_config.json", adapter_config)
         (output / directory / "README.md").write_text(adapter_card, encoding="utf-8")
-    (output / "README.md").write_text(model_card(revision, core_hash, atlas_hash, horizon_hash, contrast_hash, odyssey_hash, __version__, helm_hash), encoding="utf-8")
+    (output / "README.md").write_text(model_card(revision, core_hash, atlas_hash, horizon_hash, contrast_hash, odyssey_hash, __version__, helm_hash, odysseus_hash), encoding="utf-8")
 
     if git("status", "--porcelain") or git("rev-parse", "HEAD") != revision:
         raise ValueError("source checkout changed while packaging")
@@ -437,8 +448,9 @@ See runs/language/report.json, data/language/SOURCE_CARD.md and the root model c
             raise ValueError(f"source artifact changed while packaging: {name}")
     if (sha256(core_path) != core_hash or
             sha256(ROOT / "outputs/atlas/atlas.json") != sha256(output / "outputs/atlas/atlas.json") or
-            sha256(ROOT / "outputs/odyssey/atlas.json") != sha256(output / "outputs/odyssey/atlas.json")):
-        raise ValueError("core, Atlas, or Odyssey changed while packaging")
+            sha256(ROOT / "outputs/odyssey/atlas.json") != sha256(output / "outputs/odyssey/atlas.json") or
+            sha256(ROOT / "outputs/odysseus/atlas.json") != sha256(output / "outputs/odysseus/atlas.json")):
+        raise ValueError("core, Atlas, Odyssey, or Odysseus changed while packaging")
 
     files = [{"path": p.relative_to(output).as_posix(), "size": p.stat().st_size, "sha256": sha256(p)}
              for p in sorted(output.rglob("*")) if p.is_file()]
@@ -453,6 +465,7 @@ See runs/language/report.json, data/language/SOURCE_CARD.md and the root model c
         "horizon_artifact_sha256": horizon_hash,
         "odyssey_artifact_sha256": odyssey_hash,
         "helm_artifact_sha256": helm_hash,
+        "odysseus_artifact_sha256": odysseus_hash,
         "upstream_language": upstream, "source_file_sha256": source_hashes,
         "release_transforms": {"README.md": "Hub model card; original becomes SOURCE_README.md",
                                ".gitignore": "Hub upload rules; original becomes SOURCE_GITIGNORE",
@@ -464,6 +477,8 @@ See runs/language/report.json, data/language/SOURCE_CARD.md and the root model c
         "odyssey_experiment_verification": odyssey_experiment_verification,
         "trajectory_audit_verification": trajectory_audit_verification,
         "helm_experiment_verification": helm_experiment_verification,
+        "odysseus_experiment_verification": odysseus_experiment_verification,
+        "mco_experiment_verification": mco_experiment_verification,
         "build_environment": {name: importlib.metadata.version(name) for name in
                               ("torch", "transformers", "peft", "safetensors", "numpy", "huggingface-hub")},
         "activation": {"core": "existing-dagger-selection", "language": "unchanged-upstream-base",
@@ -471,6 +486,8 @@ See runs/language/report.json, data/language/SOURCE_CARD.md and the root model c
                        "contrast": "opt-in-experiment", "horizon": "opt-in-experiment",
                        "odyssey": "opt-in-experiment",
                        "helm": "opt-in-experiment",
+                       "odysseus": "opt-in-experiment",
+                       "mco": "factual-observatory-benchmark",
                        "legacy_ensemble": "historical-unvalidated-not-loaded"},
     }
     write_json(output / "manifest.json", manifest)
@@ -480,7 +497,8 @@ See runs/language/report.json, data/language/SOURCE_CARD.md and the root model c
             "bytes": sum(row["size"] for row in files), "manifest_sha256": sha256(output / "manifest.json"),
             "core_sha256": core_hash, "atlas_artifact_sha256": atlas_hash,
             "contrast_artifact_sha256": contrast_hash, "horizon_artifact_sha256": horizon_hash,
-            "odyssey_artifact_sha256": odyssey_hash, "helm_artifact_sha256": helm_hash}
+            "odyssey_artifact_sha256": odyssey_hash, "helm_artifact_sha256": helm_hash,
+            "odysseus_artifact_sha256": odysseus_hash}
 
 
 def main() -> None:

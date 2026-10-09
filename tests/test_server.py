@@ -84,3 +84,15 @@ def test_odyssey_experiment_request_is_bounded_and_requires_checkpoint(server):
     assert error.value.code == 500
     assert "checkpoint" in json.load(error.value)["error"].lower()
 
+
+def test_odysseus_and_mco_experiment_request_validation(server):
+    url, _ = server
+    for settings in ({"episodes": 9}, {"max_steps": 1000}, {"episodes": True}, {"unknown": 1}):
+        with pytest.raises(HTTPError) as error:
+            post(url+"/api/odysseus-experiment", settings)
+        assert error.value.code == 400
+    with pytest.raises(HTTPError) as error:
+        post(url+"/api/odysseus-experiment", {"episodes": 1, "max_steps": 32})
+    assert error.value.code == 500
+    assert "checkpoint" in json.load(error.value)["error"].lower()
+

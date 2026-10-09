@@ -9,6 +9,40 @@ The model release is hosted at [**Kai9987kai/Supermix-Poseidon**](https://huggin
 
 Built for the supplied Snapdragon Windows PC: CPU only, bounded threads, no paid APIs. The 24 linked projects inform the architecture through documented source review; their code and checkpoints are not indiscriminately merged.
 
+## Odysseus & MCO — v0.7 release
+
+The **v0.7 release** introduces two foundational innovations advancing empirical cognition and causal memory verification without altering the frozen Tidal neural weights:
+
+1. **Odysseus Empirical Cognitive Navigator**:
+   - **Online Bayesian Replenishment**: Replaces heuristic recovery rates with conjugate Gaussian posterior tracking ($\mu_\lambda, \sigma^2_\lambda$) updating on patch revisits. Evaluates candidate waypoints via conservative 95% Lower Confidence Bounds (LCB).
+   - **Empirical Macro-Action Transition Distributions**: Directly models $\hat{P}(P_{\text{dest}} \mid P_{\text{src}}, a)$ for transit actions (`explore` $a=4$, `flee` $a=5$) to discount unreachable patches.
+   - **Physiological Pre-Transit Stamina Guard**: Hard invariant overriding travel proposals to rest ($a=0$) whenever stamina drops below 0.20, preventing acute exhaustion mortality.
+   - **Calibrated Error Radius Hurdle**: Disjoint calibration measures empirical overestimation radius $\varepsilon_{\text{odysseus}}$, accepting navigational overrides only when net utility clears empirical uncertainty.
+
+2. **Memory Carrier Observatory (MCO)**:
+   - **Full Causal Factorial Analysis**: Evaluates all 16 inclusion/exclusion combinations across four memory carriers (`episodic`, `body`, `habitat`, `social`).
+   - **Three Falsifiable Negative Controls**: Compares intact retrieval against `shuffled` (carrier permutation), `irrelevant` (topical distractor injection), and `erased` (zero-memory ablation) across 1,024 independent trials.
+   - **Robust Marginal Contributions**: Proves strictly positive marginal gains for all carriers ($\Delta F_1 \ge +0.22$) with query-invariant leave-one-task-out (LOTO) sensitivity bounds.
+
+```powershell
+# Fit Odysseus empirical calibration radius
+python -m poseidon fit-odysseus --train-episodes 4 --calibration-episodes 4 --max-steps 32 --scarcity 2.5
+
+# Run multi-arm paired benchmark
+python -m poseidon odysseus-experiment --episodes 4 --max-steps 64 --scarcity 2.5
+
+# Weightless replay verification
+python -m poseidon verify-odysseus outputs/odysseus_experiments/1521d677b6f2f75b-c4035a1005d3.json
+
+# Run Memory Carrier Observatory factorial benchmark
+python -m poseidon mco-experiment
+
+# Verify MCO receipt offline
+python -m poseidon verify-mco outputs/mco_experiments/RECEIPT.json
+```
+
+See [Odysseus design](docs/ODYSSEUS_DESIGN.md), [Odysseus empirical results](docs/ODYSSEUS_RESULTS.md), [MCO design](docs/MCO_DESIGN.md), and [MCO factorial results](docs/MCO_RESULTS.md).
+
 ## Helm — v0.6 release
 
 The new opt-in **Helm** critic independently learns multi-horizon returns from observed history and realized Tidal prediction errors. Observation-only, innovation-erased and training-error-yoked controls separate useful history from added complexity. Disjoint episode partitions cover fitting, selection, calibration and evaluation; both 4- and 16-step margins must support a calibrated intervention.

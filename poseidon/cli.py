@@ -11,7 +11,9 @@ def main():
         "horizon-fit", "horizon-experiment", "verify-horizon",
         "odyssey-fit", "odyssey-experiment", "verify-odyssey",
         "verify-evidence", "audit-trajectory", "verify-trajectory",
-        "fit-helm", "helm-experiment", "verify-helm"
+        "fit-helm", "helm-experiment", "verify-helm",
+        "fit-odysseus", "odysseus-experiment", "verify-odysseus",
+        "mco-experiment", "verify-mco",
     ])
     p.add_argument("prompt", nargs="?", default="")
     p.add_argument("--root", default=".")
@@ -20,7 +22,7 @@ def main():
     p.add_argument("--episodes", type=int, default=None)
     p.add_argument("--scarcity", type=float, default=None)
     p.add_argument("--adapter")
-    p.add_argument("--planner", choices=["policy", "mpc", "hybrid", "risk_aware", "uncertainty", "atlas", "contrast", "horizon", "odyssey", "helm"], default="policy", help="world simulation planner")
+    p.add_argument("--planner", choices=["policy", "mpc", "hybrid", "risk_aware", "uncertainty", "atlas", "contrast", "horizon", "odyssey", "helm", "odysseus"], default="policy", help="world simulation planner")
     p.add_argument("--max-steps", type=int, default=None)
     p.add_argument("--anchors", type=int, default=24)
     p.add_argument("--train-episodes", type=int, default=12)
@@ -35,11 +37,13 @@ def main():
                      "contrast-fit": 101000001, "contrast-experiment": 104000001,
                      "horizon-fit": 107000001, "horizon-experiment": 108000001,
                      "odyssey-fit": 109000001, "odyssey-experiment": 110000001,
-                     "fit-helm": 120000001, "helm-experiment": 123000001}
+                     "fit-helm": 120000001, "helm-experiment": 123000001,
+                     "fit-odysseus": 131000001, "odysseus-experiment": 133000001,
+                     "mco-experiment": 140000001}
     args.seed = args.seed if args.seed is not None else default_seeds.get(args.command, 42)
-    args.episodes = args.episodes if args.episodes is not None else (4 if args.command in ("experiment", "contrast-experiment", "horizon-experiment", "odyssey-experiment", "helm-experiment") else 100)
+    args.episodes = args.episodes if args.episodes is not None else (4 if args.command in ("experiment", "contrast-experiment", "horizon-experiment", "odyssey-experiment", "helm-experiment", "odysseus-experiment") else 100)
     args.scarcity = args.scarcity if args.scarcity is not None else (1.0 if args.command == "world" else 2.5)
-    args.calibration_episodes = args.calibration_episodes if args.calibration_episodes is not None else (8 if args.command in ("contrast-fit", "horizon-fit", "odyssey-fit", "fit-helm") else 6)
+    args.calibration_episodes = args.calibration_episodes if args.calibration_episodes is not None else (8 if args.command in ("contrast-fit", "horizon-fit", "odyssey-fit", "fit-helm", "fit-odysseus") else 6)
 
     if args.command == "verify-helm":
         from pathlib import Path
@@ -234,9 +238,61 @@ def main():
         print(json.dumps({key: value for key, value in receipt.items() if key != "calibration_anchor_rows"}, indent=2))
         return
 
-    if args.command in ("experiment", "contrast-experiment", "horizon-experiment", "odyssey-experiment", "helm-experiment"):
+    if args.command == "verify-mco":
+        from pathlib import Path
+        from .mco import verify_mco_receipt
+        target = Path(args.prompt) if args.prompt else (Path(args.root) / "outputs/mco_experiments/RECEIPT.json")
+        if not target.is_absolute():
+            target = Path(args.root) / target
+        data = json.loads(target.read_text(encoding="utf-8"))
+        print(json.dumps(verify_mco_receipt(data), indent=2))
+        return
+
+    if args.command == "mco-experiment":
         runtime = Poseidon(args.root)
-        if args.command == "helm-experiment":
+        result = runtime.mco_experiment()
+        print(json.dumps(result, indent=2))
+        return
+
+    if args.command == "verify-odysseus":
+        from pathlib import Path
+        from .odysseus_experiment import verify_odysseus_receipt
+        if not args.prompt:
+            p.error("verify-odysseus requires a receipt path")
+        path = Path(args.prompt)
+        if not path.is_absolute():
+            path = Path(args.root) / path
+        data = json.loads(path.read_text(encoding="utf-8"))
+        print(json.dumps(verify_odysseus_receipt(data), indent=2))
+        return
+
+    if args.command == "fit-odysseus":
+        from .odysseus import fit_odysseus
+        from pathlib import Path
+        if any(not 1 <= value <= 64 for value in (args.train_episodes, args.calibration_episodes)) or not 0 <= args.seed <= 2**63 - 2000100:
+            p.error("fit-odysseus needs 1–64 episodes per partition and room for disjoint calibration seeds")
+        runtime = Poseidon(args.root)
+        train_seeds = list(range(args.seed, args.seed + args.train_episodes))
+        cal_seeds = list(range(args.seed + 1000000, args.seed + 1000000 + args.calibration_episodes))
+        atlas, receipt = fit_odysseus(
+            runtime.core(),
+            train_seeds=train_seeds,
+            calibration_seeds=cal_seeds,
+            max_steps=args.max_steps if args.max_steps is not None else 64,
+            scarcity=args.scarcity,
+        )
+        directory = Path(args.root) / "outputs/odysseus"
+        directory.mkdir(parents=True, exist_ok=True)
+        atlas.save(directory / "atlas.json")
+        (directory / "fit_receipt.json").write_text(json.dumps(receipt, indent=2), encoding="utf-8")
+        print(json.dumps(receipt, indent=2))
+        return
+
+    if args.command in ("experiment", "contrast-experiment", "horizon-experiment", "odyssey-experiment", "helm-experiment", "odysseus-experiment"):
+        runtime = Poseidon(args.root)
+        if args.command == "odysseus-experiment":
+            experiment = runtime.odysseus_experiment
+        elif args.command == "helm-experiment":
             experiment = runtime.helm_experiment
         elif args.command == "odyssey-experiment":
             experiment = runtime.odyssey_experiment

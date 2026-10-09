@@ -25,6 +25,8 @@ class Poseidon:
         self._odyssey_stamp = None
         self._helm = None
         self._helm_stamp = None
+        self._odysseus = None
+        self._odysseus_stamp = None
         self._jobs = None
         self._jobs_lock = threading.Lock()
         self._candidate_status_snapshots = {}
@@ -105,6 +107,21 @@ class Poseidon:
     def helm_status(self):
         return self._candidate_status("helm")
 
+    def odysseus(self):
+        from .odysseus import OdysseusAtlas
+        path = self.root / "outputs/odysseus/atlas.json"
+        if not path.is_file():
+            raise RuntimeError("Odysseus Atlas is not fitted. Run python -m poseidon fit-odysseus first.")
+        core = self.core()
+        stamp = (self._core_stamp, path.stat().st_mtime_ns, path.stat().st_size)
+        if self._odysseus is None or self._odysseus_stamp != stamp:
+            self._odysseus = OdysseusAtlas.load(core, path)
+            self._odysseus_stamp = stamp
+        return self._odysseus
+
+    def odysseus_status(self):
+        return self._candidate_status("odysseus")
+
     def jobs(self):
         with self._jobs_lock:
             if self._jobs is None:
@@ -126,7 +143,7 @@ class Poseidon:
         from .world import _integer, _number
         if not isinstance(settings, dict) or set(settings) - {"kind", "seed", "episodes", "max_steps", "scarcity"}:
             raise ValueError("Unknown job setting.")
-        if settings.get("kind", "helm-experiment") != "helm-experiment":
+        if settings.get("kind") != "helm-experiment":
             raise ValueError("Unknown experiment job kind.")
         seed = _integer(settings.get("seed", 112000001), "seed", 0, 2**63 - 9)
         episodes = _integer(settings.get("episodes", 4), "episodes", 1, 8)
@@ -171,6 +188,103 @@ class Poseidon:
             return {key: result[key] for key in ("schema", "experiment_id", "summary", "paired", "rows", "risk_coverage", "limits") if key in result} | {
                 "artifact_url": "/artifacts/" + path.relative_to(self.root / "outputs").as_posix(),
                 "receipt_sha256": result["receipt_sha256"], "verification": verification, "replay": replay}
+        finally:
+            self.lock.release()
+
+    def submit_odysseus_experiment(self, settings):
+        from .provenance import assert_source_current
+        from .world import _integer, _number
+        if not isinstance(settings, dict) or set(settings) - {"kind", "seed", "episodes", "max_steps", "scarcity"}:
+            raise ValueError("Unknown job setting.")
+        if settings.get("kind") != "odysseus-experiment":
+            raise ValueError("Unknown experiment job kind.")
+        seed = _integer(settings.get("seed", 133000001), "seed", 0, 2**63 - 9)
+        episodes = _integer(settings.get("episodes", 4), "episodes", 1, 8)
+        max_steps = _integer(settings.get("max_steps", 64), "max_steps", 32, 256)
+        scarcity = _number(settings.get("scarcity", 2.5), "scarcity", .5, 4)
+        assert_source_current()
+        if not self.lock.acquire(blocking=False):
+            raise RuntimeError("Poseidon is processing another model operation. Try again shortly.")
+        try:
+            self.odysseus()
+        finally:
+            self.lock.release()
+        normalized = {"seed": seed, "episodes": episodes, "max_steps": max_steps, "scarcity": scarcity}
+        return self.jobs().submit("odysseus-experiment", normalized,
+            lambda progress: self.odysseus_experiment(**normalized, progress=progress), timeout_seconds=1800)
+
+    def odysseus_experiment(self, seed=133000001, episodes=4, max_steps=64, scarcity=2.5, progress=None):
+        from .odysseus_experiment import run_odysseus_experiment, verify_odysseus_receipt
+        from .experiments import write_receipt
+        from .provenance import assert_source_current
+        from .world import _integer, _number
+        seed = _integer(seed, "seed", 0, 2**63 - 65)
+        episodes = _integer(episodes, "episodes", 1, 64)
+        max_steps = _integer(max_steps, "max_steps", 16, 512)
+        scarcity = _number(scarcity, "scarcity", .5, 4)
+        def check(event):
+            assert_source_current()
+            if progress:
+                progress(event)
+        while not self.lock.acquire(timeout=.2):
+            check({"phase": "waiting-for-model"})
+        try:
+            check({"phase": "starting"})
+            seeds = list(range(seed, seed + episodes))
+            result = run_odysseus_experiment(self.core(), self.odysseus(), seeds=seeds,
+                max_steps=max_steps, scarcity=scarcity, progress=check)
+            check({"phase": "verifying"})
+            verification = verify_odysseus_receipt(result)
+            check({"phase": "publishing"})
+            path = write_receipt(result, self.root / "outputs/odysseus_experiments")
+            replay = next(episode for episode in result["episodes"] if episode["controller"] == "odysseus_calibrated")
+            return {key: result[key] for key in ("schema", "experiment_id", "summary", "paired", "limits") if key in result} | {
+                "artifact_url": "/artifacts/" + path.relative_to(self.root / "outputs").as_posix(),
+                "receipt_sha256": result["receipt_sha256"], "verification": verification, "replay": replay}
+        finally:
+            self.lock.release()
+
+    def submit_mco_experiment(self, settings=None):
+        from .provenance import assert_source_current
+        assert_source_current()
+        settings = settings or {}
+        if not isinstance(settings, dict) or set(settings) - {"kind"}:
+            raise ValueError("Unknown job setting.")
+        if settings.get("kind") != "mco-experiment":
+            raise ValueError("Unknown experiment job kind.")
+        return self.jobs().submit("mco-experiment", settings,
+            lambda progress: self.mco_experiment(progress=progress), timeout_seconds=1800)
+
+    def mco_experiment(self, progress=None):
+        import json
+        from .mco import run_mco_experiment, verify_mco_receipt
+        from .provenance import assert_source_current
+        def check(event):
+            assert_source_current()
+            if progress:
+                progress(event)
+        while not self.lock.acquire(timeout=.2):
+            check({"phase": "waiting-for-model"})
+        try:
+            check({"phase": "starting"})
+            receipt = run_mco_experiment(progress=check)
+            check({"phase": "verifying"})
+            verification = verify_mco_receipt(receipt)
+            check({"phase": "publishing"})
+            receipt_dir = self.root / "outputs/mco_experiments"
+            receipt_dir.mkdir(parents=True, exist_ok=True)
+            path = receipt_dir / "RECEIPT.json"
+            path.write_text(json.dumps(receipt, indent=2, sort_keys=True), encoding="utf-8")
+            return {
+                "schema": receipt["schema"],
+                "experiment_id": receipt["experiment_id"],
+                "best_subset": receipt["best_subset"],
+                "carrier_contributions": receipt["carrier_contributions"],
+                "condition_comparison": receipt["condition_comparison"],
+                "artifact_url": "/artifacts/" + path.relative_to(self.root / "outputs").as_posix(),
+                "receipt_sha256": receipt["receipt_sha256"],
+                "verification": verification,
+            }
         finally:
             self.lock.release()
 
@@ -266,6 +380,23 @@ class Poseidon:
             self._core_stamp = stamp
         return self._core
 
+    def mco_status(self):
+        relative = "outputs/mco_experiments/RECEIPT.json"
+        path = self.root / relative
+        if not path.is_file():
+            return {"ready": False, "path": relative}
+        try:
+            receipt = json.loads(path.read_text(encoding="utf-8"))
+            return {
+                "ready": receipt.get("status") == "completed",
+                "path": relative,
+                "receipt_sha256": receipt.get("receipt_sha256"),
+                "best_subset": receipt.get("best_subset"),
+                "carrier_contributions": receipt.get("carrier_contributions"),
+            }
+        except Exception as error:
+            return {"ready": False, "path": relative, "error": str(error)}
+
     def status(self):
         reports = {}
         for name, relative in [("core", "runs/tidal/receipt.json"), ("language", "runs/language/report.json"), ("evaluation", "runs/evaluation.json"), ("language_data", "data/language/manifest.json"), ("dagger", "runs/tidal_dagger/report.json"), ("calibration", "runs/calibration.json"), ("active_core", "runs/active_core.json")]:
@@ -290,7 +421,7 @@ class Poseidon:
             core_ready = active_core_path(self.root).is_file()
         except (ValueError, TypeError, OSError) as error:
             core_ready, core_error = False, str(error)
-        result = {"version": __version__, "name": "Supermix Poseidon", "language_ready": (self.root/"models/language/model.safetensors").exists(), "core_ready": core_ready, "atlas": self.atlas_status(), "contrast": self.contrast_status(), "horizon": self.horizon_status(), "odyssey": self.odyssey_status(), "helm": self.helm_status(), "reports": reports, "limits": "Experimental composite system. Controlled geometric media. Tool-assisted maths. Synthetic survival."} | source_status()
+        result = {"version": __version__, "name": "Supermix Poseidon", "language_ready": (self.root/"models/language/model.safetensors").exists(), "core_ready": core_ready, "atlas": self.atlas_status(), "contrast": self.contrast_status(), "horizon": self.horizon_status(), "odyssey": self.odyssey_status(), "helm": self.helm_status(), "odysseus": self.odysseus_status(), "mco": self.mco_status(), "reports": reports, "limits": "Experimental composite system. Controlled geometric media. Tool-assisted maths. Synthetic survival."} | source_status()
         if core_error:
             result["core_error"] = core_error
         return result
@@ -329,10 +460,14 @@ class Poseidon:
                 from .world_controls import rollout_with_decisions
                 _integer(max_steps, "max_steps", 1, 10000)
                 scarcity = _number(scarcity, "scarcity", .5, 4)
-                if planner not in ("policy", "mpc", "hybrid", "risk_aware", "uncertainty", "atlas", "contrast", "horizon", "odyssey", "helm"):
+                if planner not in ("policy", "mpc", "hybrid", "risk_aware", "uncertainty", "atlas", "contrast", "horizon", "odyssey", "helm", "odysseus"):
                     raise ValueError("Unknown survival planner.")
                 core = self.core()
-                if planner == "helm":
+                if planner == "odysseus":
+                    controller = self.odysseus()
+                    controller.reset(scarcity)
+                    backend_desc = "Odysseus empirical cognitive map + Bayesian replenishment in TidePool"
+                elif planner == "helm":
                     controller = self.helm()
                     controller.reset(scarcity=scarcity, max_steps=max_steps)
                     backend_desc = "Helm independently fitted multi-horizon critic with observed history and empirical abstention in TidePool"
