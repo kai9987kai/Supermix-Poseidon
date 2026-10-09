@@ -148,7 +148,7 @@ TidePool survival. Reported 100% results do not imply real-world generalization.
 Odyssey Atlas v0.5 constructs an episodic spatial and topological cognitive map
 strictly from 16-d observation streams without simulator cheats or global coordinate
 leakage. It tracks environmental replenishment dynamics
-($\\lambda_{food} = 0.007 / scarcity, \\lambda_{water} = 0.014 / scarcity$), plans
+($\\lambda_{{food}} = 0.007 / scarcity, \\lambda_{{water}} = 0.014 / scarcity$), plans
 multi-hop navigational routes via breadth-first search with physical travel cost
 penalties, enforces pre-transit rest guards when stamina < 0.20, and prioritizes
 shelters during impending storms. Under high environmental scarcity (4.0),
