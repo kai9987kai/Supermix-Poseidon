@@ -1,5 +1,12 @@
 # Odyssey: Local v0.5 Empirical Measurements
 
+These are historical v0.5.0 measurements. The v0.5.1 trajectory audit found that
+all 12 Odyssey-arm episodes in the scarcity-4 receipt reset their map setting to
+2.5. Their simulated world still used scarcity 4.0. The reset is now corrected;
+these numbers should not be presented as measurements of the corrected planner.
+The original branch audit executes one step, despite its former multi-horizon
+label. See [the stricter audit and actual multi-step returns](TRAJECTORY_AUDIT.md).
+
 This document presents the official local CPU evaluation measurements for Poseidon v0.5 **Odyssey: Spatial Cognitive Mapping & Navigational Memory**. Across two independent 10-controller audit suites (80 episodes, 5,021 transitions, and 30,126 counterfactual branches replayed), Odyssey demonstrated the tangible benefits of spatial topological mapping and goal-directed navigational memory under resource scarcity.
 
 All benchmarks and counterfactual branch audits were conducted deterministically on 9 October 2026 on the local CPU runtime without modifying frozen neural checkpoint weights.
@@ -53,7 +60,7 @@ Under severe scarcity, environmental renewal is choked by $4\times$. Tiles empty
 1. **Highest Episode Reward Achieved**: `odyssey_ungated` achieved a **+0.04042 mean reward gain over the policy baseline**, outperforming Neural MPC (+0.0371), Contrast (+0.0029), and task heuristics (-0.0536).
 2. **Cognitive Exploration**: Odyssey mapped an average of **12.25 to 13.0 unique patches per episode**, building a rich topological graph of discovered food, water, and shelter clusters.
 3. **Seed-Level Superiority**: On seed `112000004`, `odyssey_ungated` delivered a **+0.1127 reward gain**, and on seed `112000002` a **+0.0988 reward gain**.
-4. **Calibrated Safety**: When uncertainty is present, calibrated `odyssey` backs off gracefully to the incumbent policy without causing regressions or instability.
+4. **Observed fallback**: Calibrated `odyssey` retained the policy on these seeds. This is not a safety guarantee; some heuristic override paths bypass its margin gate.
 
 ---
 
@@ -76,7 +83,7 @@ Under severe scarcity, environmental renewal is choked by $4\times$. Tiles empty
 | `heuristic` | **100%** | 64.0 | 6.5642 | 0.00000 | 0.0 | 0.1330 |
 | `random` | 25% | 47.5 | -0.1983 | -6.76250 | 0.0 | 0.4447 |
 
-In moderate scarcity, the base policy is already optimal (achieving 100% survival and 6.564 reward). Odyssey dynamically tracks 8.5 patches in memory while maintaining zero regressions.
+In this moderate-scarcity sample, policy survived all four episodes and achieved mean reward 6.564. Odyssey tracked 8.5 patches on average and matched the observed returns. Optimality was not established.
 
 ---
 

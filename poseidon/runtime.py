@@ -246,6 +246,7 @@ class Poseidon:
                 core = self.core()
                 if planner == "odyssey":
                     controller = self.odyssey()
+                    controller.reset(scarcity)
                     backend_desc = "Odyssey cognitive topological mapping + navigational memory in TidePool"
                 elif planner == "horizon":
                     controller = self.horizon()

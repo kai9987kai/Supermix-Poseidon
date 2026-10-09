@@ -429,7 +429,7 @@ class OdysseyAtlas:
 
     def reset(self, scarcity: float | None = None) -> None:
         """Reset the episodic cognitive map for a new episode."""
-        self.cognitive_map.reset(scarcity or self.config.scarcity)
+        self.cognitive_map.reset(self.cognitive_map.scarcity if scarcity is None else scarcity)
         self._last_progress = -1.0
         self._step_counter = 0
 

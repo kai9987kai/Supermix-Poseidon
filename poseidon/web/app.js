@@ -35,6 +35,12 @@ function inspectDecision(event){
   const decision=event?.decision,candidates=decision?.candidates;
   $('#decisionPanel').hidden=!Array.isArray(candidates);
   if(!Array.isArray(candidates))return;
+  const returns=decision.backend==='horizon-atlas-v4'||decision.backend==='odyssey-atlas-v5';
+  $('#decisionHeading').textContent=returns?'Return advantages at the replay step':'Candidate futures at the replay step';
+  const candidateTable=$('#decisionCandidates').closest('table');
+  candidateTable.querySelector('caption').textContent=returns?'Estimated multi-step reward advantages and local action filters. Empirical radii describe calibration; heuristic overrides can bypass the margin gate.':'One-step predictions and paired action advantage over the policy action. Calibration is descriptive and does not guarantee safety.';
+  const headers=returns?['Action','Return advantage','Local filter','Policy probability','Distance','Fitted support','Advantage radius','Return margin','Executed','Reason']:['Action','Health','Energy','Hydration','Vital error radius','Distance','Within budget','Point advantage','Advantage radius','Paired margin'];
+  candidateTable.querySelectorAll('thead th').forEach((cell,i)=>cell.textContent=headers[i]);
   const nameFor=action=>candidates.find(row=>row.action===action)?.action_name||actionNames[action]||'—';
   const reason=decision.fallback_reason?decision.fallback_reason.replaceAll('_',' '):decision.override_accepted?'empirical advantage cleared the margin':'incumbent action retained';
   $('#decisionMeta').textContent=controllerName(episode?.controller||episode?.planner||episode?.backend)+' · step '+(frame+1)+' · executed '+nameFor(decision.action)+' · policy '+nameFor(decision.policy_action)+' · proposed '+nameFor(decision.proposed_action??decision.action)+' · '+reason;
@@ -44,6 +50,7 @@ function inspectDecision(event){
   if(numeric(decision.point_advantage))evidenceValue('Proposed action advantage',signed(decision.point_advantage));
   if(numeric(decision.advantage_error_radius))evidenceValue('Paired calibration radius',decimal(decision.advantage_error_radius,4));
   if(numeric(decision.empirical_advantage_margin))evidenceValue('Paired empirical margin',signed(decision.empirical_advantage_margin));
+  if(returns&&numeric(decision.margin))evidenceValue('Return margin',signed(decision.margin));
   $('#decisionCandidates').replaceChildren();
   const incumbent=candidates.find(row=>row.action===decision.policy_action);
   for(const row of candidates){
@@ -55,7 +62,7 @@ function inspectDecision(event){
     const proposed=row.action===(decision.proposed_action??decision.action);
     const radius=numeric(row.advantage_error_radius)?row.advantage_error_radius:proposed?decision.advantage_error_radius:undefined;
     const margin=numeric(row.empirical_advantage_margin)?row.empirical_advantage_margin:proposed?decision.empirical_advantage_margin:undefined;
-    const values=[...Array.from({length:3},(_,i)=>percentage(prediction[i])),decimal(row.error_radius,4),decimal(row.support_distance,3),row.trusted===true?'Yes':'No',signed(pointAdvantage),decimal(radius,4),signed(margin)];
+    const values=returns?[signed(row.advantage),row.safe===true?'Pass':'Reject',percentage(row.policy_probability),decimal(decision.support_distance,3),decision.supported===true?'Yes':'No',decimal(decision.advantage_error_radius,4),proposed?signed(decision.margin):'—',row.action===decision.action?'Yes':'No',row.action===decision.action?readable(decision.fallback_reason):'—']:[...Array.from({length:3},(_,i)=>percentage(prediction[i])),decimal(row.error_radius,4),decimal(row.support_distance,3),row.trusted===true?'Yes':'No',signed(pointAdvantage),decimal(radius,4),signed(margin)];
     for(const value of values){const td=document.createElement('td');td.textContent=value;tr.append(td);}
     $('#decisionCandidates').append(tr);
   }
@@ -159,20 +166,30 @@ function showPredictionComparison(comparison){
 }
 function showExperiment(data){
   currentExperiment=data;
+  const returns=data.schema==='poseidon-horizon-experiment-v1'||data.schema==='poseidon-odyssey-experiment-v1';
   const summary=$('#experimentSummary'),paired=$('#experimentPaired');
   summary.replaceChildren();paired.replaceChildren();
   for(const [arm,row]of Object.entries(data.summary||{})){
     if(!row||typeof row!=='object'||Array.isArray(row))continue;
-    const audit=row.counterfactual_audit,overrides=numeric(row.overrides)?row.overrides+' / '+percentage(row.override_rate):percentage(row.override_rate);
-    summary.append(resultRow([controllerName(arm),numeric(row.episodes)?row.episodes:'—',percentage(row.survival_rate),decimal(row.mean_steps,1),decimal(row.mean_reward,3),decimal(row.mean_decision_ms??row.mean_latency_ms,2),percentage(row.fallback_rate),overrides,signed(audit?.mean_actual_advantage_at_overrides),decimal(row.mean_prediction_mse,5)],arm));
+    const audit=row.counterfactual_audit;
+    const outcomeRows=Array.isArray(data.rows)?data.rows.filter(item=>item.arm===arm):[];
+    const count=numeric(row.overrides)?row.overrides:outcomeRows.length&&outcomeRows.every(item=>numeric(item.overrides))?outcomeRows.reduce((sum,item)=>sum+item.overrides,0):undefined;
+    const rate=numeric(row.override_rate)?row.override_rate:numeric(row.mean_steps)&&row.mean_steps>0&&numeric(row.episodes)?count/(row.mean_steps*row.episodes):undefined;
+    const overrides=numeric(count)?count+' / '+percentage(rate):percentage(rate);
+    const branchGain=numeric(audit?.mean_actual_advantage_at_overrides)?audit.mean_actual_advantage_at_overrides:count?outcomeRows.reduce((sum,item)=>sum+(item.counterfactual_audit?.mean_actual_advantage_at_overrides??0)*(item.overrides??0),0)/count:undefined;
+    const latency=returns&&row.mean_steps>0?row.mean_decision_ms/row.mean_steps:row.mean_decision_ms??row.mean_latency_ms;
+    summary.append(resultRow([controllerName(arm),numeric(row.episodes)?row.episodes:'—',percentage(row.survival_rate),decimal(row.mean_steps,1),decimal(row.mean_reward,3),decimal(latency,2),percentage(row.fallback_rate),overrides,signed(branchGain),decimal(row.mean_prediction_mse,5),decimal(row.mean_discovered_patches,2)],arm));
   }
   for(const [arm,row]of Object.entries(data.paired||{})){
     if(!row||typeof row!=='object'||Array.isArray(row))continue;
     const interval=Array.isArray(row.ci95)&&row.ci95.length===2?'['+signed(row.ci95[0])+', '+signed(row.ci95[1])+']':'—';
-    paired.append(resultRow([controllerName(arm),signed(row.mean_reward_delta),interval,[row.wins,row.ties,row.losses].map(x=>numeric(x)?x:'—').join(' / ')],arm));
+    const outcomes=Array.isArray(row.per_seed)?row.per_seed.map(item=>item.reward_delta??item.reward_diff).filter(numeric):[];
+    const counts=[row.wins??outcomes.filter(value=>value>1e-10).length,row.ties??outcomes.filter(value=>Math.abs(value)<=1e-10).length,row.losses??outcomes.filter(value=>value< -1e-10).length];
+    const name=arm.replace(/_vs_policy$/,'');
+    paired.append(resultRow([controllerName(name),signed(row.mean_reward_delta??row.mean_reward_diff),interval,counts.map(x=>numeric(x)?x:'—').join(' / ')],name));
   }
   $('#pairedHeading').textContent='Paired reward differences vs learned policy';
-  $('#pairedCaption').textContent='Each controller minus the policy on the same seed; intervals are reported by the experiment.';
+  $('#pairedCaption').textContent='Each controller minus policy on the same seed. '+(returns?'This protocol provides no uncertainty interval.':'Intervals are reported by the experiment.');
   showPredictionComparison(data.prediction_comparison);
   const verification=data.verification;
   const replayedEpisodes=verification?.episodes_replayed??verification?.episodes;
@@ -184,6 +201,7 @@ function showExperiment(data){
   const limits=$('#experimentLimits');limits.replaceChildren();
   const items=Array.isArray(data.limits)?data.limits:data.limits&&typeof data.limits==='object'?Object.entries(data.limits).map(([key,value])=>key+': '+String(value)):data.limits?[String(data.limits)]:[];
   for(const value of items){const item=document.createElement('li');item.textContent=typeof value==='string'?value:JSON.stringify(value);limits.append(item);}
+  if(returns){const item=document.createElement('li');item.textContent='Branch utility gain covers one-step reserve utility. Decision return scores estimate multi-step reward; these measures have different units.';limits.append(item);}
   $('#experimentResults').hidden=false;
 }
 $('#experimentForm').onsubmit=async event=>{

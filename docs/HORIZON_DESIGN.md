@@ -1,6 +1,6 @@
 # Horizon Atlas design
 
-Horizon Atlas is an opt-in multi-horizon advantage controller for Poseidon's synthetic TidePool world. It complements the frozen Tidal core with an associative memory of multi-step discounted returns under core policy execution, models action return advantages over a lookahead horizon \(H = 16\), protects against environmental resource depletion traps, and gates interventions using empirical advantage error bounds calibrated on held-out episodes.
+Horizon Atlas is an opt-in multi-horizon advantage controller for Poseidon's synthetic TidePool world. It complements the frozen Tidal core with an associative memory of multi-step undiscounted returns under core policy execution, models action return advantages over a lookahead horizon \(H = 16\), applies observable resource-depletion guards, and gates interventions using descriptive error radii from held-out episodes.
 
 The learned Tidal core remains the default controller. Fitting and running Horizon Atlas do not alter neural checkpoint weights, modify the active-core pointer, or promote a candidate.
 
@@ -26,7 +26,7 @@ While Contrast Atlas achieved a 2.5% reduction in transition prediction MSE and 
 ## 2. Multi-Horizon Advantage Modeling
 
 ### Trajectory Returns
-For an observation $o_t$ at step $t$ in episode $\tau$, the actual discounted multi-step return under core policy execution over horizon $H$ with discount factor $\gamma \in (0, 1]$ is:
+For an observation $o_t$ at step $t$ in episode $\tau$, the implementation uses undiscounted multi-step return under core policy execution over horizon $H$. In the notation below, $\gamma=1$; no configurable discount is applied:
 \[
 G_t^{(H)} = \sum_{k=0}^{H-1} \gamma^k r_{t+k}
 \]
@@ -35,7 +35,7 @@ where $r_{t+k}$ is the scalar survival reward received from the environment at s
 ### Counterfactual Action Return and Advantage
 At anchor snapshot $S_t$, taking action $a \in \{0, \dots, 5\}$ transitions the environment to $S'_{t+1} = \text{step}(S_t, a)$, yielding immediate reward $r_0(a)$ and next observation $o'_{1}(a)$. Subsequent steps $k = 1, \dots, H-1$ follow the frozen core policy:
 \[
-a_k \sim \pi_{\text{core}}(\cdot \mid o_k), \quad S'_{t+k+1} = \text{step}(S'_{t+k}, a_k)
+a_k = \arg\max_a \pi_{\text{core}}(a \mid o_k), \quad S'_{t+k+1} = \text{step}(S'_{t+k}, a_k)
 \]
 The cumulative $H$-step trajectory return for action $a$ is:
 \[
@@ -87,7 +87,7 @@ Each record in the memory stores:
 - `observation`: normalized 16-dimensional observation vector $o$.
 - `action`: the initial branch action $a \in \{0, \dots, 5\}$.
 - `policy_action`: incumbent action $p$.
-- `multi_step_return`: the measured $H$-step discounted return $Q^{(H)}(o, a)$.
+- `multi_step_return`: the measured $H$-step undiscounted return $Q^{(H)}(o, a)$.
 - `advantage`: the relative advantage $A^{(H)}(o, a) = Q^{(H)}(o, a) - Q^{(H)}(o, p)$.
 - `survived_horizon`: boolean indicating survival through $H$ steps.
 

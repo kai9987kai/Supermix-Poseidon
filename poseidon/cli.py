@@ -9,7 +9,8 @@ def main():
         "beyond-benchmark", "beyond-circuits", "beyond-memory", "beyond-moe", "beyond-scene",
         "atlas-fit", "experiment", "verify-experiment", "contrast-fit", "contrast-experiment", "verify-contrast",
         "horizon-fit", "horizon-experiment", "verify-horizon",
-        "odyssey-fit", "odyssey-experiment", "verify-odyssey"
+        "odyssey-fit", "odyssey-experiment", "verify-odyssey",
+        "verify-evidence", "audit-trajectory", "verify-trajectory"
     ])
     p.add_argument("prompt", nargs="?", default="")
     p.add_argument("--root", default=".")
@@ -24,6 +25,10 @@ def main():
     p.add_argument("--train-episodes", type=int, default=12)
     p.add_argument("--selection-episodes", type=int, default=8)
     p.add_argument("--calibration-episodes", type=int, default=None)
+    p.add_argument("--parent", help="parent experiment receipt for verify-trajectory")
+    p.add_argument("--stride", type=int, default=32, help="regular trajectory-audit anchor interval")
+    p.add_argument("--horizon", type=int, default=16, help="trajectory-audit return horizon")
+    p.add_argument("--max-anchors", type=int, default=256, help="trajectory-audit anchor budget")
     args = p.parse_args()
     default_seeds = {"atlas-fit": 81000001, "experiment": 93000001,
                      "contrast-fit": 101000001, "contrast-experiment": 104000001,
@@ -33,6 +38,34 @@ def main():
     args.episodes = args.episodes if args.episodes is not None else (4 if args.command in ("experiment", "contrast-experiment", "horizon-experiment", "odyssey-experiment") else 100)
     args.scarcity = args.scarcity if args.scarcity is not None else (1.0 if args.command == "world" else 2.5)
     args.calibration_episodes = args.calibration_episodes if args.calibration_episodes is not None else (8 if args.command in ("contrast-fit", "horizon-fit", "odyssey-fit") else 6)
+
+    if args.command in ("verify-evidence", "audit-trajectory", "verify-trajectory"):
+        from pathlib import Path
+        from .trajectory_audit import load_json, load_artifacts, verify_parent, collect, verify_audit, save_audit
+        if not args.prompt:
+            p.error(f"{args.command} requires an evidence path")
+        root = Path(args.root)
+        def resolve(value):
+            path = Path(value)
+            return path if path.is_absolute() else root / path
+        evidence = load_json(resolve(args.prompt))
+        artifacts = load_artifacts(root)
+        if args.command == "verify-evidence":
+            result = verify_parent(evidence, artifacts)
+        elif args.command == "verify-trajectory":
+            if not args.parent:
+                p.error("verify-trajectory requires --parent with its experiment receipt")
+            result = verify_audit(evidence, load_json(resolve(args.parent)), artifacts)
+        else:
+            bundle = collect(Poseidon(root).core(), evidence, artifacts,
+                             stride=args.stride, horizon=args.horizon, max_anchors=args.max_anchors)
+            verification = verify_audit(bundle, evidence, artifacts)
+            path = save_audit(bundle, root / "outputs/trajectory_audits")
+            result = {"path": str(path), "experiment_id": bundle["experiment_id"],
+                      "summary": bundle["summary"], "parent_verification": bundle["parent_verification"],
+                      "verification": verification, "limits": bundle["limits"]}
+        print(json.dumps(result, indent=2))
+        return
 
     if args.command in ("verify-experiment", "verify-contrast", "verify-horizon", "verify-odyssey"):
         from pathlib import Path

@@ -1,5 +1,12 @@
 # Horizon Atlas: local v0.4 empirical measurements
 
+Scope clarification: the fitted labels use undiscounted H-step returns, but the
+original experiment's six-branch audit executes only one step and scores reserve
+utility. Its margin-exceedance statistic mixes different units and does not
+validate multi-step return-error coverage. Actual H-step intervention receipts
+are available through the [trajectory audit](TRAJECTORY_AUDIT.md). Observed
+episode returns below remain historical simulator measurements.
+
 This document presents the official local CPU evaluation measurements for Poseidon v0.4 **Horizon Atlas**. Across two independent 8-seed audit suites (72 episodes and >50,000 audited branches each), Horizon Atlas resolved the open question posed at the conclusion of v0.3 ([`CONTRAST_RESULTS.md`](CONTRAST_RESULTS.md)): can multi-step return advantage improve policy episode reward under severe environmental scarcity?
 
 Under high scarcity ($scarcity = 4.0$), un-gated multi-horizon trajectory guidance achieved a **+0.01140 mean episode reward delta over the learned Tidal policy baseline** (with 4 wins, 1 tie, and single-seed reward gains reaching up to **+0.0523**), outperforming Neural MPC ($-0.0101$) and task heuristics ($-0.0166$). When uncertainty is high, calibrated Horizon Atlas enforces an empirical safety margin, gracefully preserving incumbent policy stability with 0 regressions, 0 deaths, and 100% survival.

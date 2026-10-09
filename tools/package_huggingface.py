@@ -25,7 +25,13 @@ HORIZON_EXPERIMENTS = (
 ODYSSEY_EXPERIMENTS = (
     "cdaf779874a04de6-7dc45ea640b3.json",
     "e492031f870f05da-c9ba9d72f3be.json",
+    "3ed044592794f58c-29888499b43a.json",
+    "50ce54c9e486ce8f-0fb6374e203a.json",
 )
+TRAJECTORY_AUDITS = {
+    "8491880ca77a2dba-c7284642c7ab.json": "3ed044592794f58c-29888499b43a.json",
+    "8b0e6f16a03ed340-a22ce43a85ac.json": "50ce54c9e486ce8f-0fb6374e203a.json",
+}
 
 
 def sha256(path: Path) -> str:
@@ -45,7 +51,7 @@ def git(*args: str) -> str:
     return subprocess.check_output(["git", *args], cwd=ROOT, text=True, encoding="utf-8").strip()
 
 
-def model_card(revision: str, core_hash: str, atlas_hash: str, horizon_hash: str, contrast_hash: str, odyssey_hash: str) -> str:
+def model_card(revision: str, core_hash: str, atlas_hash: str, horizon_hash: str, contrast_hash: str, odyssey_hash: str, version: str) -> str:
     return f"""---
 language:
 - en
@@ -72,16 +78,18 @@ tags:
 - synthetic-simulation
 ---
 
-# Supermix Poseidon v0.5.0: Odyssey Spatial Cognitive Mapping
+# Supermix Poseidon v{version}: Trajectory Evidence Audit
 
 A CPU-local experimental system with a trained synthetic scene/control core,
 a separate pretrained conversation model, and an inspectable topological cognitive
-mapping & navigational memory system (**Odyssey Atlas v0.5**). This release bundles
-matching runtime source and model artifacts. It is a custom PyTorch application, not
+mapping & navigational memory system (**Odyssey Atlas**). The v0.5.1 patch fixes
+episode scarcity resets, reconstructs recorded cognitive maps, and records real
+16-step branch returns with independent replay. This release bundles matching
+runtime source, unchanged model artifacts and corrected evidence. It is a custom PyTorch application, not
 a Transformers model at the repository root.
 
 [Source commit](https://github.com/kai9987kai/Supermix-Poseidon/tree/{revision}) ·
-[Odyssey design](docs/ODYSSEY_DESIGN.md) · [Odyssey results](docs/ODYSSEY_RESULTS.md) · [Horizon design](docs/HORIZON_DESIGN.md) · [Release guide](docs/HUGGINGFACE_RELEASE.md)
+[Trajectory audit and results](docs/TRAJECTORY_AUDIT.md) · [Odyssey design](docs/ODYSSEY_DESIGN.md) · [Historical Odyssey results](docs/ODYSSEY_RESULTS.md) · [Release guide](docs/HUGGINGFACE_RELEASE.md)
 
 ## Components and activation
 
@@ -109,7 +117,7 @@ connectome, consciousness or general autonomous-learning capability is claimed.
 
 ```bash
 python -m pip install huggingface-hub
-hf download {REPO_ID} --revision v0.5.0 --local-dir Poseidon-release
+hf download {REPO_ID} --revision v{version} --local-dir Poseidon-release
 cd Poseidon-release
 python -m pip install -e .
 python tools/verify_huggingface_release.py . --smoke
@@ -151,18 +159,32 @@ leakage. It tracks environmental replenishment dynamics
 ($\\lambda_{{food}} = 0.007 / scarcity, \\lambda_{{water}} = 0.014 / scarcity$), plans
 multi-hop navigational routes via breadth-first search with physical travel cost
 penalties, enforces pre-transit rest guards when stamina < 0.20, and prioritizes
-shelters during impending storms. Under high environmental scarcity (4.0),
-`odyssey_ungated` delivered a +0.04042 mean reward advantage over the policy baseline
-across 40 audited episodes (2,521 transitions, 15,126 counterfactual branches),
-with single-seed gains reaching up to +0.1127. The calibrated gate backs off to
-the incumbent policy when advantage margins do not clear the empirical error radius
-($\\varepsilon = 0.1502$). See docs/ODYSSEY_RESULTS.md.
+shelters during impending storms. The map's scarcity now matches the selected
+world settings. The v0.5.0 scarcity-4 suite used the default map setting of 2.5
+in 12 episodes; its preserved measurements have that limitation.
+
+Two fresh four-seed, ten-arm, 64-step suites used scarcity 2.5 and 4.0 with no
+tuning between them. Calibrated Odyssey matched policy with zero overrides.
+Ungated Odyssey's mean episode reward differences were +0.002331 and +0.041827,
+but the stress result was dominated by one seed. The separate H=16 auditor
+replayed 91 anchors, 546 actual multi-step branches and 8,712 branch transitions.
+Six of 11 ungated overrides had negative H-step return advantages. These small
+synthetic development suites do not establish superiority or a safety guarantee.
+The candidate remains opt-in and the core policy remains the default.
+
+The historical experiment audit forked six one-step reserve-utility branches;
+it did not validate multi-step reward margins. The new audit records every
+continuation action and replays returns without neural weights. It verifies
+execution and arithmetic, not neural authorship. Its strict parent checks also
+reconstruct maps, validate fitting partitions, paired cardinality, forecasts
+and terminal states. See docs/TRAJECTORY_AUDIT.md and docs/trajectory-evaluation.json.
 
 Horizon Atlas v0.4 indexes multi-horizon returns over H=16 lookahead steps across
 12 training episodes (1,728 transitions), evaluates physical depletion guards, and
 calibrates empirical advantage error radii across 8 disjoint calibration episodes
-(1,152 transitions). Under severe environmental scarcity (4.0), lookahead advantage
-guidance achieved a +0.01140 mean reward delta over the policy baseline. See docs/HORIZON_RESULTS.md.
+(1,152 transitions). Returns use undiscounted rewards. Empirical radii describe
+the sampled fitting data and are not calibrated failure probabilities. Historical
+episode measurements and their one-step audit limits are in docs/HORIZON_RESULTS.md.
 
 The candidate LoRA ran 256 steps, saw 512 examples and 42,104 tokens, and changed
 development loss from 0.960879 to 0.958487. That does not establish better conversation
@@ -213,7 +235,7 @@ to avoid relicensing upstream artifacts as MIT.
 def package(output: Path, repo_id: str = REPO_ID) -> dict:
     sys.path.insert(0, str(ROOT))
     from poseidon import __version__
-    if __version__ not in ("0.2.0", "0.4.0", "0.5.0"):
+    if __version__ != "0.5.1":
         raise ValueError(f"unsupported version {__version__}")
     if repo_id != REPO_ID:
         raise ValueError("this release card is bound to Kai9987kai/Supermix-Poseidon")
@@ -234,8 +256,7 @@ def package(output: Path, repo_id: str = REPO_ID) -> dict:
     from poseidon.odyssey import OdysseyAtlas
     from poseidon.core import CoreRuntime, active_core_path
     from poseidon.experiments import load_and_verify
-    from poseidon.horizon_experiments import load_and_verify as load_and_verify_horizon
-    from poseidon.odyssey_experiments import load_and_verify as load_and_verify_odyssey
+    from poseidon.trajectory_audit import load_artifacts, load_json, verify_parent, verify_audit
     torch.set_num_threads(2)
     core_path = active_core_path(ROOT)
     core_hash = sha256(core_path)
@@ -253,8 +274,15 @@ def package(output: Path, repo_id: str = REPO_ID) -> dict:
     odyssey_hash = odyssey.artifact["sha256"]
 
     experiment_verification = {name: load_and_verify(ROOT / "outputs/experiments" / name) for name in EXPERIMENTS}
-    horizon_experiment_verification = {name: load_and_verify_horizon(ROOT / "outputs/horizon_experiments" / name) for name in HORIZON_EXPERIMENTS}
-    odyssey_experiment_verification = {name: load_and_verify_odyssey(ROOT / "outputs/odyssey_experiments" / name) for name in ODYSSEY_EXPERIMENTS}
+    evidence_artifacts = load_artifacts(ROOT)
+    horizon_experiment_verification = {name: verify_parent(load_json(ROOT / "outputs/horizon_experiments" / name), evidence_artifacts) for name in HORIZON_EXPERIMENTS}
+    odyssey_experiment_verification = {name: verify_parent(load_json(ROOT / "outputs/odyssey_experiments" / name), evidence_artifacts) for name in ODYSSEY_EXPERIMENTS}
+    trajectory_audit_verification = {
+        name: {"parent_path": "outputs/odyssey_experiments/" + parent,
+               **verify_audit(load_json(ROOT / "outputs/trajectory_audits" / name),
+                              load_json(ROOT / "outputs/odyssey_experiments" / parent), evidence_artifacts)}
+        for name, parent in TRAJECTORY_AUDITS.items()
+    }
 
     upstream = json.loads((ROOT / "models/language/manifest.json").read_text(encoding="utf-8"))
     if upstream["revision"] != LANGUAGE_REVISION:
@@ -269,6 +297,8 @@ def package(output: Path, repo_id: str = REPO_ID) -> dict:
     if sha256(ROOT / "runs/beyond_adapted/ensemble_adapted.pt") != legacy_ensemble_hash:
         raise ValueError("historical ensemble bytes changed")
 
+    copied_sources = {}
+
     def copy(relative: str, target: str | None = None) -> None:
         requested = ROOT / relative
         source = requested.resolve()
@@ -276,7 +306,13 @@ def package(output: Path, repo_id: str = REPO_ID) -> dict:
             raise ValueError(f"invalid source artifact: {relative}")
         destination = output / (target or relative)
         destination.parent.mkdir(parents=True, exist_ok=True)
+        expected = sha256(source)
+        if relative in copied_sources and copied_sources[relative] != expected:
+            raise ValueError(f"source artifact changed while packaging: {relative}")
         shutil.copyfile(source, destination)
+        if sha256(destination) != expected or sha256(source) != expected:
+            raise ValueError(f"source artifact changed while copying: {relative}")
+        copied_sources[relative] = expected
 
     output.mkdir(parents=True)
     source_files = git("ls-files", "-z").split("\0")
@@ -302,6 +338,7 @@ def package(output: Path, repo_id: str = REPO_ID) -> dict:
     artifacts += [f"outputs/experiments/{name}" for name in EXPERIMENTS]
     artifacts += [f"outputs/horizon_experiments/{name}" for name in HORIZON_EXPERIMENTS]
     artifacts += [f"outputs/odyssey_experiments/{name}" for name in ODYSSEY_EXPERIMENTS]
+    artifacts += [f"outputs/trajectory_audits/{name}" for name in TRAJECTORY_AUDITS]
     for relative in artifacts:
         copy(relative)
     copy("docs/history/HF_MODEL_CARD_v0.1.md", "legacy/model-card-before-v0.2.md")
@@ -350,13 +387,16 @@ See runs/language/report.json, data/language/SOURCE_CARD.md and the root model c
         copy("runs/language/adapter/adapter_model.safetensors", directory + "/adapter_model.safetensors")
         write_json(output / directory / "adapter_config.json", adapter_config)
         (output / directory / "README.md").write_text(adapter_card, encoding="utf-8")
-    (output / "README.md").write_text(model_card(revision, core_hash, atlas_hash, horizon_hash, contrast_hash, odyssey_hash), encoding="utf-8")
+    (output / "README.md").write_text(model_card(revision, core_hash, atlas_hash, horizon_hash, contrast_hash, odyssey_hash, __version__), encoding="utf-8")
 
     if git("status", "--porcelain") or git("rev-parse", "HEAD") != revision:
         raise ValueError("source checkout changed while packaging")
     for name, expected in source_hashes.items():
         if sha256(ROOT / name) != expected:
             raise ValueError(f"source changed while packaging: {name}")
+    for name, expected in copied_sources.items():
+        if sha256(ROOT / name) != expected:
+            raise ValueError(f"source artifact changed while packaging: {name}")
     if (sha256(core_path) != core_hash or
             sha256(ROOT / "outputs/atlas/atlas.json") != sha256(output / "outputs/atlas/atlas.json") or
             sha256(ROOT / "outputs/odyssey/atlas.json") != sha256(output / "outputs/odyssey/atlas.json")):
@@ -382,6 +422,7 @@ See runs/language/report.json, data/language/SOURCE_CARD.md and the root model c
         "experiment_verification": experiment_verification,
         "horizon_experiment_verification": horizon_experiment_verification,
         "odyssey_experiment_verification": odyssey_experiment_verification,
+        "trajectory_audit_verification": trajectory_audit_verification,
         "build_environment": {name: importlib.metadata.version(name) for name in
                               ("torch", "transformers", "peft", "safetensors", "numpy", "huggingface-hub")},
         "activation": {"core": "existing-dagger-selection", "language": "unchanged-upstream-base",

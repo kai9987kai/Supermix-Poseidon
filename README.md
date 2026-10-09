@@ -9,6 +9,29 @@ The model release is hosted at [**Kai9987kai/Supermix-Poseidon**](https://huggin
 
 Built for the supplied Snapdragon Windows PC: CPU only, bounded threads, no paid APIs. The 24 linked projects inform the architecture through documented source review; their code and checkpoints are not indiscriminately merged.
 
+## Trajectory evidence audit — v0.5.1
+
+The new audit reconstructs Odyssey's cognitive map from recorded observations and
+actions, checks every controller's fitting partitions, rejects duplicate paired
+episodes, and recomputes forecast errors and terminal states. It also branches
+selected states into six real **16-step reward trajectories**, recording every
+continuation action so their returns can replay without loading model weights.
+Regular anchors and every Horizon/Odyssey override are included within a bounded
+budget. This separates one-step reserve utility from multi-step episode reward.
+
+```powershell
+python -m poseidon verify-evidence outputs/odyssey_experiments/RECEIPT.json
+python -m poseidon audit-trajectory outputs/odyssey_experiments/RECEIPT.json --horizon 16 --stride 32
+python -m poseidon verify-trajectory outputs/trajectory_audits/AUDIT.json --parent outputs/odyssey_experiments/RECEIPT.json
+```
+
+Odyssey now preserves explicitly selected scarcity when it resets at an episode
+boundary. The v0.5.0 high-scarcity receipt used a map replenishment setting of 2.5
+inside scarcity-4 worlds; that historical limitation is retained and disclosed.
+The v0.5.1 release profile includes both corrected suites and their multi-step
+receipts alongside the historical evidence. See
+[audit design, limits and validation](docs/TRAJECTORY_AUDIT.md).
+
 ## Odyssey Atlas — v0.5 release
 
 The new opt-in **Odyssey Atlas** equips Poseidon with an episodic topological cognitive map and navigational memory constructed strictly from 16-d observation streams without simulator cheats or global coordinate leaks.
@@ -27,13 +50,13 @@ python -m poseidon world --planner odyssey --seed 42 --scarcity 4.0 --max-steps 
 python -m poseidon verify-odyssey outputs/odyssey_experiments/RECEIPT.json
 ```
 
-On a 40-episode benchmark suite at high environmental scarcity ($4.0$), `odyssey_ungated` delivered a **+0.04042 mean reward advantage over the policy baseline** (with single-seed reward gains reaching up to +0.1127), discovering 12.25–13.0 patches per episode. The calibrated margin gate defers safely to the incumbent policy when advantage margins do not clear the empirical error radius ($\varepsilon = 0.1502$). See [design](docs/ODYSSEY_DESIGN.md) and [measured results](docs/ODYSSEY_RESULTS.md).
+On the historical v0.5.0 high-scarcity suite, `odyssey_ungated` delivered a **+0.04042 mean reward difference against policy** across four seeds, discovering 12.25–13.0 patches per episode. These observations do not establish superiority or safety. The map-setting limitation above applies to those measurements. See [design](docs/ODYSSEY_DESIGN.md) and [historical results](docs/ODYSSEY_RESULTS.md).
 
 ## Horizon Atlas — v0.4 release
 
-The new opt-in **Horizon Atlas** models multi-step trajectory advantages ($H=16$, $\gamma=0.96$) to improve episode reward over the frozen policy baseline under environmental scarcity, while protecting the agent against physical resource depletion traps.
+The opt-in **Horizon Atlas** estimates multi-step trajectory advantages over 16 steps using undiscounted rewards, with observable resource-depletion guards.
 
-Offline fitting indexes multi-horizon discounted returns across 12 training episodes (1,728 transitions) and calibrates empirical advantage error radii across 8 disjoint calibration episodes (1,152 transitions). At runtime, an associative $k$-NN memory retrieves candidate returns and advantages, physical vitality filters prevent foraging or drinking in exhausted patches, and an empirical error gate compares advantages against calibrated bounds.
+Offline fitting indexes multi-horizon undiscounted returns across 12 training episodes (1,728 transitions) and calibrates empirical advantage error radii across 8 disjoint calibration episodes (1,152 transitions). At runtime, an associative $k$-NN memory retrieves candidate returns and advantages, local resource filters reject depleted harvest actions, and an empirical error gate compares advantages against descriptive radii.
 
 ```powershell
 python -m poseidon horizon-fit

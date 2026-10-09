@@ -1,16 +1,23 @@
-# Poseidon v0.5.0 model release
+# Poseidon v0.5.1 model release
+
+The v0.5.1 profile bundles the scarcity-reset correction, strict parent evidence
+checks, two corrected evaluation suites and their real 16-step trajectory audits.
+It retains historical receipts and discloses their one-step audit and map-setting
+limits. Historical Horizon/Odyssey evidence is checked with `verify-evidence`
+and matching sidecar artifacts; the older native verifier requires frozen source.
 
 The release target is [Kai9987kai/Supermix-Poseidon](https://huggingface.co/Kai9987kai/Supermix-Poseidon).
 Its `manifest.json` binds a clean Git source commit to every packaged file's size
 and SHA-256. `SHA256SUMS.txt` provides an additional file integrity inventory.
-Publishing these artifacts introduces the opt-in Odyssey Atlas v0.5 candidate without altering the default DAgger policy core.
+Publishing these artifacts improves the experimental instrument without changing
+the selected core, language weights or default DAgger policy. Odyssey remains opt-in.
 
 ## Download and run
 
 ```powershell
 # Install the Hub CLI in a Python environment with compatible CPU PyTorch.
 python -m pip install huggingface-hub
-hf download Kai9987kai/Supermix-Poseidon --revision v0.5.0 --local-dir Poseidon-release
+hf download Kai9987kai/Supermix-Poseidon --revision v0.5.1 --local-dir Poseidon-release
 cd Poseidon-release
 python -m pip install -e .
 python tools/verify_huggingface_release.py . --smoke
@@ -18,7 +25,7 @@ python -m poseidon serve --port 8787
 ```
 
 Open http://127.0.0.1:8787. For a reproducible download, add `--revision` with the
-release's Hub commit SHA or `v0.5.0` tag. Python 3.10+ and PyTorch 2.6+ are required;
+release's Hub commit SHA or `v0.5.1` tag. Python 3.10+ and PyTorch 2.6+ are required;
 the native custom core is loaded with `torch.load(..., weights_only=True)`.
 Transformers remote code is disabled. This is a custom PyTorch application, so
 `AutoModel.from_pretrained` on the Hub repository root is not supported.
@@ -52,9 +59,9 @@ a complete resumable language-training package is made.
 
 ```powershell
 # Commit all intended source changes first; packaging rejects a dirty checkout.
-python tools/package_huggingface.py --output outputs/releases/poseidon-v0.5.0
-python tools/verify_huggingface_release.py outputs/releases/poseidon-v0.5.0 --smoke
-hf upload Kai9987kai/Supermix-Poseidon outputs/releases/poseidon-v0.5.0 . --commit-message "Release Poseidon v0.5.0 Odyssey Spatial Cognitive Mapping"
+python tools/package_huggingface.py --output outputs/releases/poseidon-v0.5.1
+python tools/verify_huggingface_release.py outputs/releases/poseidon-v0.5.1 --smoke
+hf upload Kai9987kai/Supermix-Poseidon outputs/releases/poseidon-v0.5.1 . --commit-message "Release Poseidon v0.5.1 trajectory evidence audit"
 ```
 
 Packaging checks upstream language hashes, the actual active core hash, Atlas
@@ -62,7 +69,9 @@ checkpoint binding and experiment receipts. It refuses an occupied output
 directory and retrieves two historical assets from the explicitly pinned previous
 Hub revision. Verification checks file bytes and then, with `--smoke`, runs the
 bundled code in a separate process for core, Atlas, language, candidate LoRA and
-exact maths. Hub publication is complete only after remote revision, file inventory,
+exact maths. It also reconstructs packaged maps and replays the new H-step
+branches, checking their verifier results against the manifest. Hub publication
+is complete only after remote revision, file inventory,
 model card and uploaded hashes are independently checked.
 Known local download/install metadata (`.cache/huggingface`, `__pycache__`, root
 `*.egg-info` and `.pytest_cache`) is ignored; unexpected source/model files and
@@ -81,6 +90,12 @@ worsened and its conservative gate accepted no action overrides on 16 fresh
 evaluation seeds. Survival matched the incumbent. See [measured results](ATLAS_RESULTS.md).
 The 61,440-parameter LoRA candidate's small development-loss change is not evidence
 of improved conversation or reasoning.
+
+The two corrected four-seed suites each compare ten controllers for up to 64
+steps. Calibrated Odyssey matched the core policy with zero overrides. The
+separate audit replayed 546 real 16-step branches; six of 11 ungated overrides
+had negative return advantages. No planner promotion or general superiority is
+claimed. See [trajectory evidence and limits](TRAJECTORY_AUDIT.md).
 
 The pre-v0.2 Hub card and invalid Beyond promotion receipt are preserved under
 `legacy/` with explicit supersession notes. The old Hub `ensemble_adapted.pt` is
