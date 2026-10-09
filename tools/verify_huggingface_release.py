@@ -273,7 +273,11 @@ def verify_package(package_dir: str | Path, *, smoke: bool = False, timeout: int
     if smoke:
         root = Path(package_dir).resolve()
         environment = os.environ.copy()
-        environment.update({"PYTHONPATH": str(root), "PYTHONNOUSERSITE": "1", "PYTHONDONTWRITEBYTECODE": "1",
+        # Preserve legitimate user-site dependencies. Poseidon itself must still
+        # import from the package (asserted in the child), with only the package
+        # on PYTHONPATH and its directory as cwd.
+        environment.pop("PYTHONNOUSERSITE", None)
+        environment.update({"PYTHONPATH": str(root), "PYTHONDONTWRITEBYTECODE": "1",
                             "HF_HUB_OFFLINE": "1", "TRANSFORMERS_OFFLINE": "1", "HF_HUB_DISABLE_TELEMETRY": "1"})
         result = subprocess.run([sys.executable, "-B", "-c", SMOKE_SCRIPT], cwd=root, env=environment,
                                 capture_output=True, text=True, timeout=timeout, check=False)
