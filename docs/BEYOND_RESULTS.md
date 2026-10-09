@@ -1,5 +1,17 @@
 # Supermix Beyond — Empirical Benchmark Results
 
+> Historical report, superseded as capability evidence by the v0.2 audit on
+> 9 October 2026. The original benchmark checked a Boolean `death` field against
+> string causes, so its catastrophic-death counts were invalid. Its symmetric
+> intervals were normal approximations, including zero width at 100% survival.
+> Default ensemble heads were partially warm-started random priors, without
+> demonstrated independent training or probability calibration. The recall assay
+> tested explicit cue storage and used unequal control action sets; it did not
+> evaluate learned recurrent memory. The graph called "authentic" below was a
+> synthetic modular graph, not an imported fly connectome. Treat the original
+> interpretations below as an archived account, not validated current findings.
+> See [Atlas results](ATLAS_RESULTS.md) for fresh source-bound paired evidence.
+
 **Evaluation Date**: 8 October 2026  
 **Hardware Target**: Local CPU runtime (Windows x64 / Snapdragon architecture)  
 **Verification**: Deterministic paired-seed suites, zero regressions (78/78 passing tests)

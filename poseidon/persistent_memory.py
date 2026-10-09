@@ -7,7 +7,7 @@ Implements Experiment C of Supermix Beyond:
 2. Episodic Experience Store:
    - Records structured events (tick, location, obs, action, reward, surprise, discoveries).
    - Content-addressable retrieval via spatial and semantic feature matching.
-3. Controlled Delayed-Recall Benchmark:
+3. Explicit Episodic Store Assay (does not evaluate the neural module):
    - Tests whether the agent can utilize critical survival information after it is no longer visible.
    - Rigorously compared against:
      a) Active Persistent Memory
@@ -155,102 +155,73 @@ def run_delayed_recall_benchmark(
     seed: int = 42,
     include_receipts: bool = False,
 ) -> dict[str, Any]:
-    """Evaluates recall retention across delay horizons for 3 matched conditions:
-    
-    1. Active Persistent Memory
-    2. No-Memory Control
-    3. Shuffled-Memory Control
+    """Run a deterministic explicit-store assay with matched donor controls.
+
+    The policy reads an observed cue into an EpisodicRecord and retrieves that
+    record later. It is a software storage assay, not learned recurrent recall.
+    The shuffled arm receives actual records from a permutation of the same
+    episodes; the no-memory and missing-record fallback choose among the same
+    three actions. The default return preserves the historical score mapping.
     """
-    conditions = ["persistent_memory", "no_memory", "shuffled_memory"]
-    results: dict[str, dict[int, float]] = {c: {} for c in conditions}
-    episode_records: list[dict[str, Any]] = []
+    delays = list(delays)
+    if not delays or any(type(delay) is not int or not 2 <= delay <= 10000 for delay in delays):
+        raise ValueError("delays must be non-empty integers in [2, 10000] so the decision cue is hidden")
+    if len(set(delays)) != len(delays):
+        raise ValueError("delays must be unique")
+    if type(episodes_per_condition) is not int or not 2 <= episodes_per_condition <= 10000:
+        raise ValueError("episodes_per_condition must be an integer in [2, 10000] for donor controls")
+    if type(seed) is not int or not 0 <= seed < 2**63:
+        raise ValueError("seed must be a nonnegative integer below 2**63")
+    conditions = ("persistent_memory", "no_memory", "shuffled_memory")
+    support = [1, 2, 3]
+    results: dict[str, dict[int, float]] = {condition: {} for condition in conditions}
+    receipts = []
 
     for delay in delays:
-        # Precompute cue targets for all episodes in this delay
-        cue_targets = [
-            DelayedRecallTask(delay_steps=delay, seed=seed + ep * 1337 + delay * 101).target_action
-            for ep in range(episodes_per_condition)
-        ]
-
+        records = []
+        for ep in range(episodes_per_condition):
+            ep_seed = seed + ep * 1337 + delay * 101
+            env = DelayedRecallTask(delay_steps=delay, seed=ep_seed)
+            initial = env.reset()
+            # Decode the visible input only; policy never reads env.target_action.
+            cue = next(action for action in support if initial[action + 5] > 0.5)
+            records.append(EpisodicRecord(0, 0, 0, list(initial), cue, 0.0, 0.0, "cue"))
+        order = list(range(episodes_per_condition))
+        random.Random(f"episodic-donor:{seed}:{delay}").shuffle(order)
+        donors = {episode: order[(i + 1) % len(order)] for i, episode in enumerate(order)}
+        # Cyclic permutation of a shuffled order: no self-donors and cue counts preserved.
         for condition in conditions:
             correct = 0
             for ep in range(episodes_per_condition):
                 ep_seed = seed + ep * 1337 + delay * 101
                 env = DelayedRecallTask(delay_steps=delay, seed=ep_seed)
                 obs = env.reset()
-
-                # Internal agent memory state
-                recurrent_mem = CrossStepRecurrentMemory()
-                h = recurrent_mem.init_state()
-                episodic_store = EpisodicMemoryStore()
-                last_action = 0
-
-                # Initial observation cue
-                cue_action = env.target_action
-                episodic_store.append(EpisodicRecord(
-                    tick=0, x=0, y=0, observation=obs, action=cue_action,
-                    reward=0.0, uncertainty=0.0,
-                    resource_found="cue"
-                ))
-
+                store = EpisodicMemoryStore()
+                source = ep if condition == "persistent_memory" else donors[ep] if condition == "shuffled_memory" else None
+                if source is not None:
+                    original = records[source]
+                    store.append(EpisodicRecord(original.tick, original.x, original.y, list(original.observation),
+                                               original.action, original.reward, original.uncertainty, original.resource_found))
                 done = False
-                source_ep = None
-                retrieved_act = None
-
+                retrieved_action = None
                 while not done:
-                    # Update recurrent memory
-                    obs_t = torch.tensor([obs], dtype=torch.float32)
-                    act_t = torch.tensor([last_action], dtype=torch.long)
-                    h = recurrent_mem.step(obs_t, act_t, h)
-
-                    # Determine action based on condition
-                    if condition == "no_memory":
-                        chosen_action = ((ep_seed + env.current_step * 3) % 3) + 1
-                        retrieved_act = chosen_action
-                        source_ep = None
-
-                    elif condition == "persistent_memory":
-                        retrieved = episodic_store.retrieve_by_resource("cue")
-                        if retrieved and retrieved[0].action in (1, 2, 3):
-                            chosen_action = retrieved[0].action
-                        else:
-                            chosen_action = ((ep_seed + 1) % 3) + 1
-                        retrieved_act = chosen_action
-                        source_ep = ep
-
-                    elif condition == "shuffled_memory":
-                        # Donor episode from matched support
-                        donor_ep = (ep + 1 + (ep_seed % max(1, episodes_per_condition - 1))) % episodes_per_condition
-                        chosen_action = cue_targets[donor_ep]
-                        retrieved_act = chosen_action
-                        source_ep = donor_ep
-
+                    fallback = random.Random(f"episodic-fallback:{ep_seed}:{env.current_step}").choice(support)
+                    retrieved = store.retrieve_by_resource("cue") if source is not None else []
+                    retrieved_action = retrieved[0].action if retrieved and retrieved[0].action in support else None
+                    chosen_action = retrieved_action if retrieved_action is not None else fallback
                     obs, reward, done = env.step(chosen_action)
-                    last_action = chosen_action
-
-                if reward > 0.5:
-                    correct += 1
-
-                episode_records.append({
-                    "condition": condition,
-                    "delay": delay,
-                    "episode": ep,
-                    "action": chosen_action,
-                    "retrieved_action": retrieved_act,
-                    "source_episode": source_ep,
-                    "target": env.target_action,
-                    "reward": reward,
-                })
-
-            accuracy = correct / episodes_per_condition
-            results[condition][delay] = round(accuracy, 4)
-
-    if include_receipts:
-        return {
-            "neural_memory_evaluated": False,
-            "action_support": [1, 2, 3],
-            "delays": list(delays),
-            "accuracy": results,
-            "episodes": episode_records,
-        }
-    return results
+                correct += reward > 0.5
+                receipts.append({"condition": condition, "delay": delay, "episode": ep, "seed": ep_seed,
+                                 "action": chosen_action, "retrieved_action": retrieved_action,
+                                 "source_episode": source, "target": records[ep].action, "reward": reward,
+                                 "correct": reward > 0.5})
+            results[condition][delay] = round(correct / episodes_per_condition, 4)
+    if not include_receipts:
+        return results
+    return {"schema": "poseidon-episodic-store-assay-v2", "assay": "explicit episodic cue storage and retrieval",
+            "neural_memory_evaluated": False, "action_support": support, "delays": delays,
+            "seed": seed, "episodes_per_condition": episodes_per_condition,
+            "accuracy": results, "results": results, "episodes": receipts,
+            "limits": ["No recurrent model is trained, called, or evaluated by this assay.",
+                       "Perfect explicit-store recall does not establish learned memory or real-world survival skill.",
+                       "Donor shuffling preserves this finite sample's cue frequencies; accuracy need not equal exactly one third."]}

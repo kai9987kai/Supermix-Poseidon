@@ -1,4 +1,14 @@
 # Supermix Beyond — Adaptive Cognitive World Model
+
+> Scope correction, 9 October 2026: this document is a research agenda. The default
+> ensemble contains partially warm-started priors and its hand-written failure
+> score is not calibrated. "Authentic" graph labels refer to synthetic modular
+> topology, without imported biological connectivity. The episodic recall assay
+> checks explicit record storage/retrieval; learned recurrence is not evaluated.
+> The v0.2 auditor now measures actual semantic scenes and matched incumbent
+> dynamics/survival, reports eligibility, and never activates a candidate.
+> [Counterfactual Atlas](ATLAS_DESIGN.md) provides the implemented extension and
+> source-bound execution evidence.
 ## Architectural Specification and Research Agenda
 
 **Status**: Active Research Implementation  

@@ -3,5 +3,7 @@
   "parent_validation": 0.7291666666666666,
   "reason": "DAgger candidate beat parent on validation seeds",
   "selected_validation": 0.9930555555555555,
-  "sha256": "7175a06f495895de7e5f3708362df33476f0d2ff5a0f337886fab18889dad6df"
+  "sha256": "a053104ae63dc7f86baa15b4b34e46730e1ccb92117f221801fb21f90d2d6c27",
+  "previous_pointer_sha256": "7175a06f495895de7e5f3708362df33476f0d2ff5a0f337886fab18889dad6df",
+  "hash_correction_note": "v0.2 release metadata correction to current file bytes; checkpoint and selected policy unchanged."
 }

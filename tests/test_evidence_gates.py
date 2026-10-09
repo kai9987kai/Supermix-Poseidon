@@ -1,6 +1,4 @@
 """Behavioral checks for incomplete audit evidence and controlled episodic recall."""
-from types import SimpleNamespace
-
 import pytest
 import torch
 
@@ -150,6 +148,65 @@ def test_nonfinite_predictions_and_wrong_scene_split_are_rejected(audit_setup):
         complete_audit(audit_setup, scene_examples=generate_scene_examples(1, split="train"))
     with pytest.raises(ValueError, match="non-empty"):
         complete_audit(audit_setup, scene_examples=[])
+
+
+def test_better_incumbent_dynamics_prevents_candidate_eligibility(audit_setup):
+    class BetterEnsemble(AuditEnsemble):
+        def forward(self, latent, observation, action):
+            output = super().forward(latent, observation, action)
+            output["mean_delta"] = torch.full_like(observation, 0.1)
+            return output
+
+    report = complete_audit(audit_setup, incumbent_ensemble=BetterEnsemble())
+    assert report["metrics"]["incumbent_dynamics_mse"] < report["metrics"]["mean_dynamics_mse"]
+    assert report["criteria_passed"]["incumbent_dynamics"] is False
+    assert report["eligible"] is False
+
+
+def test_scene_audit_uses_real_prompt_features_and_checks_missing_heads(audit_setup, monkeypatch):
+    _, core, _, _ = audit_setup
+    forward = core.forward
+
+    def check_features(features, observations=None):
+        if observations is None:
+            assert bool(features.abs().sum() > 0), "scene audit discarded the actual prompt"
+        return forward(features, observations)
+
+    monkeypatch.setattr(core, "forward", check_features)
+    assert complete_audit(audit_setup)["metrics"]["scene_exact_accuracy"] == 1
+
+    def missing_head(features, observations=None):
+        result = forward(features, observations)
+        if observations is None:
+            del result["scene"]["shape"]
+        return result
+
+    monkeypatch.setattr(core, "forward", missing_head)
+    with pytest.raises(ValueError, match="missing"):
+        complete_audit(audit_setup)
+
+
+def test_adaptation_receipt_records_unchanged_core_and_disjoint_seed_sets(tmp_path):
+    from poseidon.core import TidalCore, save_checkpoint
+    from poseidon.train_adaptation import run_adaptation_cycle
+
+    checkpoint = tmp_path / "core.pt"
+    save_checkpoint(checkpoint, TidalCore(CoreConfig(hash_buckets=32, hidden_size=16)), receipt={})
+    old_threads = torch.get_num_threads()
+    torch.set_num_threads(2)
+    try:
+        receipt = run_adaptation_cycle(str(checkpoint), str(tmp_path / "candidate"), collect_episodes=1,
+                                       adaptation_steps=2, batch_size=4, base_seed=8001)
+    finally:
+        torch.set_num_threads(old_threads)
+    assert receipt["status"] == "complete"
+    assert receipt["parameters"]["core_changed"] is False
+    assert receipt["parameters"]["ensemble_changed"] is True
+    assert set(receipt["protocol"]["collection_seeds"]).isdisjoint(receipt["protocol"]["audit_seeds"])
+    assert receipt["audit"]["promoted"] is False
+    assert receipt["activated"] is False
+    assert receipt["audit"]["metrics"]["scene_examples"] > 0
+    assert receipt["audit"]["metrics"]["incumbent_dynamics_mse"] is not None
 
 
 def test_episodic_assay_uses_retrieval_not_unused_neural_state(monkeypatch):

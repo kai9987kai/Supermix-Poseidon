@@ -38,6 +38,22 @@ class BenchmarkSummary:
     catastrophic_deaths: int
     catastrophic_rate: float
     mean_latency_ms: float
+    survival_interval_95: tuple[float, float]
+
+
+def wilson_interval(successes: int, count: int) -> tuple[float, float]:
+    if type(successes) is not int or type(count) is not int or count < 1 or not 0 <= successes <= count:
+        raise ValueError("Wilson interval requires valid event counts")
+    z = 1.959963984540054
+    p = successes / count
+    denominator = 1 + z*z/count
+    center = (p + z*z/(2*count)) / denominator
+    radius = z * math.sqrt(p*(1-p)/count + z*z/(4*count*count)) / denominator
+    return max(0., center-radius), min(1., center+radius)
+
+
+def catastrophic_death(info: dict) -> bool:
+    return bool(info.get("death") and set((info.get("death_reason") or "").split("+")) & {"starvation", "dehydration", "hazard"})
 
 
 def run_paired_benchmark(
@@ -48,6 +64,8 @@ def run_paired_benchmark(
     max_steps: int = 256,
 ) -> dict[str, BenchmarkSummary]:
     """Runs matched, seed-paired evaluation across the three planning paradigms."""
+    if type(n_episodes) is not int or not 1 <= n_episodes <= 1000:
+        raise ValueError("n_episodes must be 1–1000")
     runtime = CoreRuntime(core_path)
     single_mpc = ModelPredictivePlanner(runtime, PlanningConfig(horizon=2))
     
@@ -97,15 +115,16 @@ def run_paired_benchmark(
                 survived += 1
             else:
                 # Death analysis: check if death was sudden/unmitigated
-                if info.get("death") in ("starvation", "dehydration", "hazard"):
+                if catastrophic_death(info):
                     catastrophic_deaths += 1
 
             total_steps += ep_steps
             total_reward += ep_reward
 
         surv_rate = survived / n_episodes
-        # Wilson / Normal approx 95% confidence interval
-        ci_95 = 1.96 * math.sqrt(max(0.0, surv_rate * (1.0 - surv_rate) / n_episodes))
+        interval = wilson_interval(survived, n_episodes)
+        # Legacy scalar retained as interval half-width; use the bounds directly.
+        ci_95 = (interval[1] - interval[0]) / 2
         mean_steps = total_steps / n_episodes
         mean_rew = total_reward / n_episodes
         cat_rate = catastrophic_deaths / n_episodes
@@ -122,6 +141,7 @@ def run_paired_benchmark(
             catastrophic_deaths=catastrophic_deaths,
             catastrophic_rate=round(cat_rate, 4),
             mean_latency_ms=round(mean_lat, 3),
+            survival_interval_95=interval,
         )
         results[name] = summary
 

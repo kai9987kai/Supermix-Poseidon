@@ -1,7 +1,7 @@
 """Biological Neural Circuitry and Connectome Recurrent Modules.
 
 Implements Experiment B of Supermix Beyond:
-1. Authentic connectome-inspired graph generator (256 nodes):
+1. Synthetic modular graph generator (256 nodes; legacy "authentic" label):
    - Small-world modular clustering, log-normal in/out degree distribution,
      and rich-club hub recurrent connectivity characteristic of invertebrate neuropils.
 2. Degree-preserving shuffled control graph:
@@ -12,8 +12,8 @@ Implements Experiment B of Supermix Beyond:
 4. ConnectomeRecurrentCell:
    - Recurrent neural update constrained by sparse synaptic adjacency masks:
        h_{t+1} = (1 - alpha) * h_t + alpha * tanh(W_in * x_t + (W_rec * M) * h_t + b)
-5. Matched benchmark testing whether authentic biological wiring demonstrates any
-   empirical advantage over degree-preserving shuffled wiring on temporal tasks.
+5. Untrained state-statistics comparison of generated graph topologies. No
+   biological connectome is imported and no task-performance advantage is tested.
 """
 from __future__ import annotations
 
@@ -38,7 +38,7 @@ class CircuitConfig:
 
 
 def generate_authentic_connectome_topology(n_nodes: int = 256, density: float = 0.08, seed: int = 42) -> torch.Tensor:
-    """Generates an authentic biologically structured directed adjacency matrix.
+    """Generate a synthetic modular directed graph, without biological data.
     
     Features:
     - 4 distinct functional neuropil modules (sensory, integrative, central complex, motor hubs)

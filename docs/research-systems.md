@@ -8,7 +8,7 @@ Reviewed 2026-10-08. These are source-level observations, not reproduced upstrea
 |---|---|---|---|
 | [NexusFlow](https://github.com/kai9987kai/nexusflow) | `3fb4be7e7f9a523bcd817bd2bd94a2d7855229ec` | MIT, Kai Piper | README, LICENSE, `nexusflow/cli.py`, first 190 lines of `NEXUSFLOW_LANGUAGE.md` |
 | [universal-modder](https://github.com/rehan-remade/universal-modder) | `8370faa8e114baf33acdb23079aff552a7728c4b` | MIT, Rehan and contributors | LICENSE, first 190 lines of README, repository tree |
-| [REA](https://github.com/morluto/rea) | `4fc6565b0ffb36d7105b3524e08d0c5d603ae07d` | MIT | LICENSE, first 120 lines of ADR-0001, first 190 lines of ADR-0002, repository tree |
+| [REA](https://github.com/morluto/rea) | `84a17d55199b1b46493aea6bf4e41029a3b200fc` (refreshed) | MIT | ADR-0001, ADR-0002 removal notice; earlier LICENSE and repository-tree review at `4fc6565b0ffb36d7105b3524e08d0c5d603ae07d` |
 | [Odysseus](https://github.com/odysseus-dev/odysseus) | `a8c147b238db01dbd00b57774ed8b453f1e43971` (`dev`) | AGPL-3.0 | LICENSE header, `docs/AGENT_TURN_CONTRACT.md`, `core/atomic_io.py`, repository tree |
 | [Periodic NTAG emulator](https://github.com/djpiper28/Flipper-Zero-Periodic-NTAG-Emulator) | `98fd7478253f9041195adc8eedfa95eabe084aff` | No license file found; API license field empty | Full repository tree, `application.fam`, first 150 lines of `ntag213_rotator.c` |
 | [quibble-builds](https://github.com/7coil/quibble-builds) | `f89481a1a3b81abfcbc1d43a2d539204101201aa` | LGPL-3.0 | LICENCE header, first 120 lines of README, `.github/workflows/build-amd64.yml` |
@@ -30,7 +30,7 @@ Poseidon lesson: export real files, open or decode them, and record compatible f
 
 ### REA: producer identity and reproducible evidence
 
-[ADR-0001](https://github.com/morluto/rea/blob/4fc6565b0ffb36d7105b3524e08d0c5d603ae07d/docs/adr/0001-provider-selection-and-analysis-profiles.md) explains deterministic provider selection, analysis-profile commitments and distinctions between availability and target support. It rejects treating a composite provider identity as evidence that several engines jointly produced a result. [ADR-0002](https://github.com/morluto/rea/blob/4fc6565b0ffb36d7105b3524e08d0c5d603ae07d/docs/adr/0002-controlled-replay-authority-and-sandbox.md) describes bounded, content-addressed replay with explicit provenance.
+[ADR-0001](https://github.com/morluto/rea/blob/84a17d55199b1b46493aea6bf4e41029a3b200fc/docs/adr/0001-provider-selection-and-analysis-profiles.md) explains deterministic provider selection, analysis-profile commitments and distinctions between availability and target support. It rejects treating a composite provider identity as evidence that several engines jointly produced a result. Its cache contract includes the producer version, normalized settings and target identity. The refreshed [ADR-0002](https://github.com/morluto/rea/blob/84a17d55199b1b46493aea6bf4e41029a3b200fc/docs/adr/0002-controlled-replay-authority-and-sandbox.md) explicitly states that the controlled JavaScript replay implementation was removed. Its bounded, content-addressed replay design remains historical context, not a supported current REA capability.
 
 Poseidon lesson: attach checkpoint, configuration and output identity to an experiment; distinguish learned policy, language inference, solver and renderer. Reverse engineering functionality itself is not part of the model architecture, and this review did not independently verify REA's implementation status.
 

@@ -123,3 +123,74 @@ def test_plan_does_not_read_simulator_or_mutate_artifact(core, monkeypatch):
     monkeypatch.setattr(TidePool, "step", forbidden)
     atlas.plan(obs)
     assert atlas.artifact == before
+
+
+def test_policy_override_requires_nonoverlapping_empirical_value_margins(core):
+    atlas, _ = fit_small(core)
+    for record in atlas.artifact["records"][::6]:
+        decision = atlas.plan(record["observation"])
+        if decision["override_accepted"]:
+            challenger = decision["candidates"][decision["action"]]
+            incumbent = decision["candidates"][decision["policy_action"]]
+            assert challenger["trusted"] and incumbent["trusted"]
+            assert challenger["value"] > incumbent["upper_value"] + atlas.config.override_margin
+        else:
+            assert decision["action"] == decision["policy_action"]
+
+
+def test_core_infinite_delta_is_rejected_before_clipping(core, monkeypatch):
+    atlas, _ = fit_small(core)
+    original = core.model.forward
+    def corrupt(*args, **kwargs):
+        result = original(*args, **kwargs)
+        result["delta"] = torch.full_like(result["delta"], float("inf"))
+        return result
+    monkeypatch.setattr(core.model, "forward", corrupt)
+    with pytest.raises(ValueError, match="non-finite"):
+        atlas.plan([0.5] * 16)
+
+
+def test_core_inplace_weight_change_invalidates_live_atlas(core):
+    atlas, _ = fit_small(core)
+    with torch.no_grad():
+        next(core.model.parameters()).add_(0.1)
+    with pytest.raises(ValueError, match="changed"):
+        atlas.plan([0.5] * 16)
+
+
+def test_rehashed_malformed_record_and_missing_branch_are_rejected(core):
+    from poseidon.atlas import CounterfactualAtlas
+    atlas, _ = fit_small(core)
+    for field, invalid in (("observation", [float("nan")] * 16), ("action", True)):
+        damaged = atlas.artifact
+        damaged["records"][0][field] = invalid
+        if field == "action":
+            damaged.pop("sha256")
+            damaged["sha256"] = hashlib.sha256(json.dumps(damaged, sort_keys=True, separators=(",", ":"), allow_nan=False).encode()).hexdigest()
+        with pytest.raises(ValueError):
+            CounterfactualAtlas(core, damaged)
+    damaged = atlas.artifact
+    damaged["records"].pop()
+    damaged.pop("sha256")
+    damaged["sha256"] = hashlib.sha256(json.dumps(damaged, sort_keys=True, separators=(",", ":"), allow_nan=False).encode()).hexdigest()
+    with pytest.raises(ValueError, match="six matched"):
+        CounterfactualAtlas(core, damaged)
+
+
+def test_supported_but_large_prediction_error_falls_back(core):
+    from poseidon.atlas import CounterfactualAtlas
+    atlas, _ = fit_small(core)
+    payload = atlas.artifact
+    for mode in ("memory", "base"):
+        for row in payload["calibration"][mode]:
+            row["error_radius"] = 1.0
+            row["supported_count"] = row["count"]
+    payload.pop("sha256")
+    payload["sha256"] = hashlib.sha256(json.dumps(payload, sort_keys=True, separators=(",", ":"), allow_nan=False).encode()).hexdigest()
+    conservative = CounterfactualAtlas(core, payload)
+    obs = payload["records"][0]["observation"]
+    decision = conservative.plan(obs)
+    assert all(row["supported"] for row in decision["candidates"])
+    assert not any(row["trusted"] for row in decision["candidates"])
+    assert decision["fallback_reason"] == "prediction_error_exceeds_budget"
+    assert decision["action"] == core.act(obs)

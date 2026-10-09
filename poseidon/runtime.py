@@ -13,7 +13,48 @@ class Poseidon:
         self.language = LanguageRuntime(self.root/"models/language", adapter=adapter)
         self._core = None
         self._core_stamp = None
+        self._atlas = None
+        self._atlas_stamp = None
         self.memory_path = self.root/"outputs/memory.json"
+
+    def atlas(self):
+        from .atlas import CounterfactualAtlas
+        path = self.root / "outputs/atlas/atlas.json"
+        if not path.is_file():
+            raise RuntimeError("Counterfactual Atlas is not fitted. Run python -m poseidon atlas-fit first.")
+        core = self.core()
+        stamp = (self._core_stamp, path.stat().st_mtime_ns, path.stat().st_size)
+        if self._atlas is None or self._atlas_stamp != stamp:
+            self._atlas = CounterfactualAtlas.load(core, path)
+            self._atlas_stamp = stamp
+        return self._atlas
+
+    def atlas_status(self):
+        path = self.root / "outputs/atlas/atlas.json"
+        if not path.exists():
+            return {"ready": False, "path": "outputs/atlas/atlas.json"}
+        try:
+            with self.lock:
+                atlas = self.atlas()
+                payload = atlas.artifact
+                return {"ready": True, "path": "outputs/atlas/atlas.json",
+                        "artifact_sha256": payload["sha256"],
+                        "fit_receipt": {"training_samples": len(payload["records"]),
+                                        "partition": payload["partition"], "calibration": payload["calibration"]}}
+        except (ValueError, OSError, RuntimeError) as error:
+            return {"ready": False, "path": "outputs/atlas/atlas.json", "error": str(error)}
+
+    def experiment(self, seed=93000001, episodes=4, max_steps=64, scarcity=2.5):
+        from .experiments import ExperimentSpec, run_experiment, verify_receipt, write_receipt
+        spec = ExperimentSpec(seed=seed, episodes=episodes, max_steps=max_steps, scarcity=scarcity)
+        with self.lock:
+            result = run_experiment(self.core(), self.atlas(), spec)
+            verification = verify_receipt(result)
+            path = write_receipt(result, self.root / "outputs/experiments")
+            replay = next(episode for episode in result["episodes"] if episode["controller"] == "atlas")
+            return {key: result[key] for key in ("schema", "experiment_id", "summary", "paired", "rows", "atlas", "limits")} | {
+                "artifact_url": "/artifacts/" + path.relative_to(self.root / "outputs").as_posix(),
+                "receipt_sha256": result["receipt_sha256"], "verification": verification, "replay": replay}
 
     def core(self):
         from .core import active_core_path
@@ -46,7 +87,8 @@ class Poseidon:
                     reports[name+"_recent"] = [json.loads(line) for line in lines[-12:]]
                 except (ValueError, OSError):
                     pass
-        return {"version": "0.1.0", "name": "Supermix Poseidon", "language_ready": (self.root/"models/language/model.safetensors").exists(), "core_ready": (self.root/"runs/tidal/core.pt").exists(), "reports": reports, "limits": "Experimental composite system. Controlled geometric media. Tool-assisted maths. Synthetic survival."}
+        from .core import active_core_path
+        return {"version": "0.2.0", "name": "Supermix Poseidon", "language_ready": (self.root/"models/language/model.safetensors").exists(), "core_ready": active_core_path(self.root).is_file(), "atlas": self.atlas_status(), "reports": reports, "limits": "Experimental composite system. Controlled geometric media. Tool-assisted maths. Synthetic survival."}
 
     def _memory(self):
         from .memory import MemoryBank
@@ -79,8 +121,13 @@ class Poseidon:
                 return result
             if mode == "world":
                 from .world import rollout
+                if planner not in ("policy", "mpc", "hybrid", "risk_aware", "uncertainty", "atlas"):
+                    raise ValueError("Unknown survival planner.")
                 core = self.core()
-                if planner == "mpc":
+                if planner == "atlas":
+                    controller = self.atlas()
+                    backend_desc = "Counterfactual Atlas residual memory + measured-error gate in TidePool"
+                elif planner == "mpc":
                     from .planning import ModelPredictivePlanner, PlanningConfig
                     controller = ModelPredictivePlanner(core, PlanningConfig(policy_weight=0.0, mpc_weight=1.0))
                     backend_desc = "Tidal dynamics head pure MPC planner in TidePool"
@@ -96,6 +143,8 @@ class Poseidon:
                     controller = core
                     backend_desc = "learned Tidal policy in TidePool"
                 episode = rollout(controller, seed=seed, max_steps=256)
+                episode["controller"] = planner
+                episode["backend"] = backend_desc
                 return {"text": f"Episode ended after {episode['steps']} steps. " + ("The agent reached the 256-step horizon alive." if episode["survived"] else f"The agent died: {episode['death_reason']}."), "backend": backend_desc, "episode": episode, "verified": True}
             if mode == "memory":
                 retrieved = self._memory().retrieve(prompt, disabled_carriers=disabled_carriers or [])

@@ -30,7 +30,15 @@ class PlanningConfig:
     gamma: float = 0.90
     policy_weight: float = 0.60
     mpc_weight: float = 0.40
-    hazard_veto_threshold: float = 0.70
+    def __post_init__(self):
+        if type(self.horizon) is not int or self.horizon not in (1, 2):
+            raise ValueError("The neural MPC supports horizons 1 and 2 only")
+        for name in ("gamma", "policy_weight", "mpc_weight"):
+            value = getattr(self, name)
+            if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) or not 0 <= value <= 1:
+                raise ValueError(f"{name} must be finite and in [0,1]")
+        if self.policy_weight + self.mpc_weight <= 0:
+            raise ValueError("At least one planner weight must be positive")
 
 
 def evaluate_predicted_observation(obs: Sequence[float], action: int) -> float:

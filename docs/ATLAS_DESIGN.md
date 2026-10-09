@@ -17,7 +17,10 @@ weights or asserting global novelty.
    disjoint episode seeds, separately for corrected and memory-erased predictions.
 3. Plan from observations alone. Use support distance and measured error to decide
    whether to trust a prediction; fall back to the incumbent policy when support
-   is inadequate. The online controller cannot inspect simulator snapshots.
+   is inadequate. An override must exceed the incumbent action's optimistic value
+   using the challenger's pessimistic value plus a configured margin. Ambiguous
+   counterfactual advantages retain the incumbent. The online controller cannot
+   inspect simulator snapshots.
 4. Compare incumbent policy, neural MPC, atlas, memory-erased atlas and scripted
    heuristic on exactly paired seeds. Preserve actions, terminal states, prediction
    errors and decision evidence; identify source, configuration, checkpoint and

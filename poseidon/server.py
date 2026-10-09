@@ -62,12 +62,19 @@ def make_handler(runtime, port):
                     raise ValueError("Expected a JSON object.")
             except (ValueError, UnicodeDecodeError) as error:
                 self.send_json(400, {"error": str(error)}); return
-            if self.path not in ("/api/respond", "/api/remember"):
+            if self.path not in ("/api/respond", "/api/remember", "/api/experiment"):
                 self.send_json(404, {"error": "Not found"}); return
             if not busy.acquire(blocking=False):
                 self.send_json(409, {"error": "Poseidon is processing another request. Try again shortly."}); return
             try:
-                if self.path == "/api/remember":
+                if self.path == "/api/experiment":
+                    if set(payload) - {"seed", "episodes", "max_steps", "scarcity"}:
+                        raise ValueError("Unknown experiment setting.")
+                    episodes, max_steps = payload.get("episodes", 4), payload.get("max_steps", 64)
+                    if type(episodes) is not int or not 1 <= episodes <= 8 or type(max_steps) is not int or not 32 <= max_steps <= 256:
+                        raise ValueError("Workbench experiments require 1–8 paired episodes and 32–256 steps.")
+                    result = runtime.experiment(payload.get("seed", 93000001), episodes, max_steps, payload.get("scarcity", 2.5))
+                elif self.path == "/api/remember":
                     result = runtime.remember(payload.get("text"), payload.get("carrier", "episodic"))
                 else:
                     result = runtime.respond(payload.get("prompt"), payload.get("mode", "chat"), payload.get("history"), payload.get("seed", 42), payload.get("disabled_carriers"), planner=payload.get("planner", "policy"))

@@ -5,9 +5,60 @@
 
 A local experimental model system that combines a newly trained **Tidal core**, a compact pretrained language model, explicit carrier memory, exact maths tools, and a deterministic survival environment. It produces basic PNG images, short animations, and OBJ/glTF models from a shared learned scene representation.
 
-The complete trained model suite, promoted DAgger checkpoint, configuration, evaluation receipts, and LoRA adapters are published on Hugging Face: [**Kai9987kai/Supermix-Poseidon**](https://huggingface.co/Kai9987kai/Supermix-Poseidon).
+The model release is hosted at [**Kai9987kai/Supermix-Poseidon**](https://huggingface.co/Kai9987kai/Supermix-Poseidon). It contains the trained Tidal checkpoints, separate pretrained language component, inactive candidate LoRA, experimental Atlas, runtime source and evaluation receipts. See [release instructions and boundaries](docs/HUGGINGFACE_RELEASE.md); the Hub manifest identifies the exact published source revision.
 
 Built for the supplied Snapdragon Windows PC: CPU only, bounded threads, no paid APIs. The 24 linked projects inform the architecture through documented source review; their code and checkpoints are not indiscriminately merged.
+
+## Counterfactual Atlas — v0.2
+
+Poseidon now learns an inspectable residual memory around its neural world model.
+Offline, it forks each frozen simulator state into all six actions. At inference,
+nearby action-conditioned experiences correct the neural prediction, and a gate
+checks fitted support and held-out vital-state error before using it. Unsupported
+or inaccurate predictions fall back to the existing learned policy.
+
+Each decision exposes all six candidate futures, retrieved record identities,
+distances, error radii, policy preference and the selected action. The controller
+receives only the 16 observations; simulator snapshots are confined to fitting
+and evaluation. This is an experimental synthesis of the portfolio's retrieval,
+memory intervention and causal comparison ideas, with established methods beneath
+it. See [design](docs/ATLAS_DESIGN.md) and [measured results](docs/ATLAS_RESULTS.md).
+
+```powershell
+# Fit a bounded sidecar; does not modify core weights or activate a candidate.
+python -m poseidon atlas-fit
+
+# Six controllers, eight paired seeds, complete execution receipts.
+python -m poseidon experiment --seed 93000001 --episodes 8 --max-steps 128 --scarcity 2.5
+
+# Explicitly select the atlas for a survival episode.
+python -m poseidon world --planner atlas --seed 42
+
+# Independently replay the receipt, without loading any model weights.
+python -m poseidon verify-experiment outputs/experiments/RECEIPT.json
+```
+
+The workbench has a Counterfactual Atlas panel with bounded paired experiments,
+controller comparisons, memory-erased controls, replay and JSON downloads. It
+compares the learned policy, neural MPC, Atlas, memory-erased Atlas, scripted
+heuristic and deterministic random controller. Different controllers use different
+compute budgets; timings are reported rather than treated as a matched budget.
+
+The default fit uses 12 training episodes and six separate calibration episodes,
+with 24 anchors per episode and six branches per anchor: 1,728 training and 864
+calibration transitions. Branches within an episode are correlated. The fit spans
+scarcity levels 1, 2 and 3. Error radii are descriptive held-out quantiles, without
+future coverage or calibrated failure-probability guarantees. Experiments reject
+seeds used in fitting or calibration. Repeated inspection makes a suite development
+evidence. Outcomes cannot promote the candidate automatically.
+
+Artifacts reside in `outputs/atlas/` and `outputs/experiments/`. Atlas loading checks
+its checksum, checkpoint identity, model weights, normalized observations and
+bounded schema. Receipts commit the exact source files and configuration, preserve
+all actions and terminal states, and validate episode outcomes by simulator replay.
+Checksums provide integrity diagnostics, not cryptographic authorship. A source-only
+checkout needs a fit after preparing the core checkpoint; the Hugging Face snapshot
+includes the fitted sidecar bound to its packaged checkpoint.
 
 ## Start
 
@@ -40,7 +91,7 @@ Supported scene vocabulary: cube/sphere/pyramid/cylinder; red/blue/green/yellow/
 
 ## What is learned
 
-The Tidal core shares a hashed word/bigram encoder, observation projection, four gated experts and two within-decision recurrent updates. It learns five scene attributes, a six-action survival policy, and action-conditioned observation deltas. The dynamics head is an auxiliary supervised experiment; it is not used for model-based planning in v0.1. Persistent carrier memory is an external retrieval store, not recurrent neural state.
+The Tidal core shares a hashed word/bigram encoder, observation projection, four gated experts and two within-decision recurrent updates. It learns five scene attributes, a six-action survival policy, and action-conditioned observation deltas. The dynamics head supports optional neural MPC and Counterfactual Atlas planning. Persistent carrier memory is an external retrieval store, not recurrent neural state.
 
 Conversation comes from **HuggingFaceTB/SmolLM2-135M-Instruct**, pinned at `12fd25f77366fa6b3b4b768ec3050bf629380bac`. The upstream model card reports pretraining on two trillion tokens; those tokens were not trained here. Poseidon also includes a local LoRA training experiment on the last four attention layers. Its candidate stays inactive by default until stronger capability evaluation justifies activation. You can explicitly test it with `--adapter runs/language/adapter`. The base model was already fine-tuned on smol-smoltalk upstream: the local language dev split measures adaptation behavior on that distribution, not previously unseen knowledge or independent generalization.
 

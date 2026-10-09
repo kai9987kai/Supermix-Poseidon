@@ -20,7 +20,7 @@ import torch
 
 from .world import ACTIONS, N_ACTIONS, OBS_SIZE, TidePool, WORLD_VERSION, teacher_action
 
-ATLAS_SCHEMA = "poseidon-counterfactual-atlas-v1"
+ATLAS_SCHEMA = "poseidon-counterfactual-atlas-v2"
 MAX_ARTIFACT_BYTES = 48 * 1024 * 1024
 _LIMITS = [
     "One-step residual retrieval in the synthetic TidePool environment.",
@@ -74,6 +74,12 @@ def _model_digest(core):
     return digest.hexdigest()
 
 
+def _parameter_stamp(core):
+    """Cheap serving-time guard against ordinary in-place updates/replacement."""
+    return tuple((name, id(tensor), tensor._version)
+                 for name, tensor in list(core.model.named_parameters()) + list(core.model.named_buffers()))
+
+
 @dataclass(frozen=True)
 class AtlasConfig:
     k_neighbors: int = 5
@@ -81,6 +87,8 @@ class AtlasConfig:
     quantile: float = 0.90
     policy_weight: float = 0.15
     margin_penalty: float = 2.0
+    max_vital_error: float = 0.20
+    override_margin: float = 0.02
     max_samples: int = 12000
     scarcity_levels: tuple[float, ...] = (1.0, 2.0, 3.0)
 
@@ -91,6 +99,8 @@ class AtlasConfig:
         _number(self.quantile, "quantile", 0.5, 1)
         _number(self.policy_weight, "policy_weight", 0, 2)
         _number(self.margin_penalty, "margin_penalty", 0, 20)
+        _number(self.max_vital_error, "max_vital_error", 0, 1)
+        _number(self.override_margin, "override_margin", 0, 5)
         if not isinstance(self.scarcity_levels, (list, tuple)) or not 1 <= len(self.scarcity_levels) <= 8:
             raise ValueError("scarcity_levels requires 1 to 8 levels")
         levels = tuple(_number(x, "scarcity", 0.5, 4) for x in self.scarcity_levels)
@@ -125,6 +135,8 @@ def _base(core, observations, actions):
     for start in range(0, len(obs), 256):
         batch = obs[start:start + 256]
         result = core.model([""] * len(batch), batch, ids[start:start + 256])
+        if not torch.isfinite(result["delta"]).all() or not torch.isfinite(result["action"]).all():
+            raise ValueError("Core returned non-finite predictions")
         predictions.append((batch + result["delta"]).clamp(0, 1))
         logits.append(result["action"])
     predicted, policy = torch.cat(predictions), torch.cat(logits)
@@ -231,6 +243,7 @@ class CounterfactualAtlas:
                 _number(item["mean_error"], "mean_error", 0, 1)
         data["sha256"] = expected
         self.core = core
+        self._parameter_stamp = _parameter_stamp(core)
         self._payload = data
         self._records = [[r for r in records if r["action"] == action] for action in range(N_ACTIONS)]
         self._observations = [torch.tensor([r["observation"] for r in group], dtype=torch.float32) for group in self._records]
@@ -320,6 +333,8 @@ class CounterfactualAtlas:
             raise ValueError("use_memory must be boolean")
         if self.core.model.training:
             raise ValueError("Atlas requires the core in evaluation mode")
+        if self._parameter_stamp != _parameter_stamp(self.core):
+            raise ValueError("Core weights changed after atlas binding")
         bases, policy_logits = _base(self.core, [obs] * N_ACTIONS, list(range(N_ACTIONS)))
         probabilities = policy_logits[0].softmax(-1).tolist()
         policy_action = int(policy_logits[0].argmax())
@@ -336,19 +351,45 @@ class CounterfactualAtlas:
             vitality = 2.0 * health + 1.6 * energy + 1.9 * hydration + 0.8 * stamina - 1.2 * upper_exposure
             reserve_shortfall = max(0, 0.12 - energy) + 1.2 * max(0, 0.12 - hydration) + max(0, 0.08 - stamina) + max(0, upper_exposure - 0.8)
             value = vitality - self.config.margin_penalty * reserve_shortfall + self.config.policy_weight * probabilities[action]
+            # An override must beat the incumbent's optimistic value using the
+            # challenger pessimistic value. Radii are empirical, not guarantees.
+            high_health, high_energy, high_hydration, high_stamina = [min(1.0, predicted[i] + radius) for i in range(4)]
+            low_exposure = max(0.0, predicted[4] - radius)
+            upper_shortfall = max(0, 0.12 - high_energy) + 1.2 * max(0, 0.12 - high_hydration) + max(0, 0.08 - high_stamina) + max(0, low_exposure - 0.8)
+            upper_value = (2.0 * high_health + 1.6 * high_energy + 1.9 * high_hydration + 0.8 * high_stamina
+                           - 1.2 * low_exposure - self.config.margin_penalty * upper_shortfall
+                           + self.config.policy_weight * probabilities[action])
             candidates.append({"action": action, "action_name": ACTIONS[action],
                                "predicted_observation": predicted, "base_observation": base,
                                "support_distance": distance, "error_radius": radius,
                                "supported": distance <= self.config.support_radius,
+                               "trusted": distance <= self.config.support_radius and calibration["supported_count"] > 0 and radius <= self.config.max_vital_error,
                                "calibration_count": calibration["count"],
                                "supported_calibration_count": calibration["supported_count"],
-                               "value": value, "source_ids": sources if use_memory else []})
-        valid = [row for row in candidates if row["supported"] and row["supported_calibration_count"] > 0]
+                               "value": value, "upper_value": upper_value, "source_ids": sources if use_memory else []})
+        valid = [row for row in candidates if row["trusted"]]
         chosen = max(valid, key=lambda row: (row["value"], -row["action"]))["action"] if valid else policy_action
-        reason = None if valid else "outside_fitted_support" if not any(row["supported"] for row in candidates) else "no_supported_calibration"
+        proposal = chosen
+        reason = None
+        if not valid:
+            if not any(row["supported"] for row in candidates):
+                reason = "outside_fitted_support"
+            elif not any(row["supported"] and row["supported_calibration_count"] > 0 for row in candidates):
+                reason = "no_supported_calibration"
+            else:
+                reason = "prediction_error_exceeds_budget"
+        elif chosen != policy_action:
+            if not candidates[policy_action]["trusted"]:
+                reason = "incumbent_prediction_not_supported"
+                chosen = policy_action
+            elif candidates[chosen]["value"] <= candidates[policy_action]["upper_value"] + self.config.override_margin:
+                reason = "counterfactual_advantage_unresolved"
+                chosen = policy_action
         return {"action": chosen, "action_name": ACTIONS[chosen], "policy_action": policy_action,
-                "trusted": bool(valid), "fallback_reason": reason, "use_memory": use_memory,
-                "backend": "counterfactual-atlas-v1", "horizon": 1,
+                "proposed_action": proposal, "override_accepted": chosen != policy_action,
+                "empirical_advantage_margin": candidates[proposal]["value"] - candidates[policy_action]["upper_value"],
+                "trusted": bool(valid) and reason is None, "fallback_reason": reason, "use_memory": use_memory,
+                "backend": "counterfactual-atlas-v2", "horizon": 1,
                 "candidates": candidates, "artifact_sha256": self._payload["sha256"],
                 "error_note": "Held-out vital prediction-error quantile; not a failure probability or safety guarantee."}
 

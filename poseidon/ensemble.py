@@ -1,11 +1,11 @@
 """Uncertainty-Aware Dynamics Ensemble and Risk-Sensitive World Modeling.
 
 Implements Experiment A of Supermix Beyond:
-1. Ensemble of K independently trained dynamics heads:
+1. Ensemble of K separately parameterized dynamics heads:
        \\hat{s}_{t+1}^{(k)} = s_t + \\Delta_{\\theta_k}(s_t, a_t)  for k in {1, ..., K}
 2. Epistemic uncertainty estimation via predictive disagreement:
        U(s_t, a_t) = (1 / K) * sum_{k=1}^K || \\hat{s}_{t+1}^{(k)} - \\bar{s}_{t+1} ||^2
-3. Calibrated failure probability estimation P(failure | s_t, a_t):
+3. Heuristic vulnerability score (not a calibrated probability):
        Detects predicted starvation, dehydration, exhaustion, exposure, and predator attacks
        across the imagined ensemble paths.
 4. Risk-sensitive Model Predictive Control (MPC):
@@ -62,8 +62,9 @@ class DynamicsHead(nn.Module):
 class WorldModelEnsemble(nn.Module):
     """Ensemble of K independently parameterized dynamics predictors.
     
-    Trained on different bootstrap/noise views to capture epistemic uncertainty
-    in regions of the state-action space where experience is sparse or volatile.
+    Construction initializes random predictors. Training and held-out calibration
+    must be demonstrated separately; disagreement alone does not establish
+    epistemic uncertainty. The default planner uses partially warm-started priors.
     """
 
     def __init__(self, hidden_size: int = 128, k: int = 3, base_seed: int = 100):
@@ -104,16 +105,16 @@ class WorldModelEnsemble(nn.Module):
 
 
 def evaluate_survival_state(obs: Sequence[float], action: int) -> tuple[float, float]:
-    """Evaluates expected survival value and estimated failure probability.
+    """Evaluates reserve value and a hand-written vulnerability score.
     
     Returns:
-        (vitality_score, failure_probability)
+        (vitality_score, vulnerability_score), with no probability calibration.
     """
     if len(obs) != OBS_SIZE:
         raise ValueError(f"Observation must have {OBS_SIZE} elements")
     health, energy, hydration, stamina, exposure, threat, food, water, shelter, severity, temp, daylight, terrain, scent, last_action, progress = obs
 
-    # Calibrated lethal vulnerability indicators
+    # Hand-written lethal vulnerability indicators
     failure_risk = 0.0
     if health < 0.20:
         failure_risk += 0.8 * (0.20 - health) / 0.20
@@ -164,7 +165,7 @@ class UncertaintyAwarePlanner:
         if ensemble is not None:
             self.ensemble = ensemble
         else:
-            # Initialize ensemble and calibrate with the trained core's dynamics head
+            # Partial warm start; later randomly initialized layers are untrained.
             self.ensemble = WorldModelEnsemble(hidden_size=h, k=self.config.ensemble_size)
             self._warm_start_ensemble()
 
@@ -302,6 +303,8 @@ class UncertaintyAwarePlanner:
             "epistemic_uncertainty": float(total_uncertainty[chosen_action]),
             "failure_probability": float(total_failure_risk[chosen_action]),
             "is_high_surprise": bool(total_uncertainty[chosen_action] > self.config.disagreement_threshold),
+            "uncertainty_note": "Ensemble disagreement; default heads are partially warm-started untrained priors.",
+            "risk_note": "failure_probability is a legacy field name for a heuristic vulnerability score.",
             "policy_probs": [round(float(p), 4) for p in policy_probs.tolist()],
             "combined_scores": [round(float(s), 4) for s in combined.tolist()],
             "predicted_futures": predicted_futures,
