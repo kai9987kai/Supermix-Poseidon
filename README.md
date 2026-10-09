@@ -9,6 +9,64 @@ The model release is hosted at [**Kai9987kai/Supermix-Poseidon**](https://huggin
 
 Built for the supplied Snapdragon Windows PC: CPU only, bounded threads, no paid APIs. The 24 linked projects inform the architecture through documented source review; their code and checkpoints are not indiscriminately merged.
 
+## Horizon Atlas — v0.4 release
+
+The new opt-in **Horizon Atlas** models multi-step trajectory advantages ($H=16$, $\gamma=0.96$) to improve episode reward over the frozen policy baseline under environmental scarcity, while protecting the agent against physical resource depletion traps.
+
+Offline fitting indexes multi-horizon discounted returns across 12 training episodes (1,728 transitions) and calibrates empirical advantage error radii across 8 disjoint calibration episodes (1,152 transitions). At runtime, an associative $k$-NN memory retrieves candidate returns and advantages, physical vitality filters prevent foraging or drinking in exhausted patches, and an empirical error gate compares advantages against calibrated bounds.
+
+```powershell
+python -m poseidon horizon-fit
+python -m poseidon horizon-experiment --seed 110000001 --episodes 8 --max-steps 128 --scarcity 4.0
+python -m poseidon world --planner horizon --seed 42 --scarcity 4.0 --max-steps 128
+python -m poseidon verify-horizon outputs/horizon_experiments/RECEIPT.json
+```
+
+On an official 8-seed audit suite at severe scarcity (4.0), lookahead advantage guidance achieved a **+0.01140 mean reward delta over the policy baseline** (with 4 wins, 1 tie, 3 losses, and single-seed gains reaching up to +0.0523). In moderate conditions where policy is near saturation, the calibrated margin gate defers gracefully with zero overrides and 100% survival. See [design](docs/HORIZON_DESIGN.md) and [measured results](docs/HORIZON_RESULTS.md).
+
+## Contrast Atlas — v0.3 development
+
+The new opt-in planner learns which observation channels benefit from residual
+memory, then measures prediction errors in **action advantages** against the
+incumbent. Four separate episode partitions cover memory fitting, feature
+selection, error calibration and evaluation. Each feature selects a shrinkage
+weight from 0, 0.25, 0.5, 0.75 and 1 using episode-balanced prediction error;
+the base prediction wins ties or improvements below 2%.
+
+After freezing those weights, the paired gate subtracts an empirical error radius
+from a proposed action's predicted one-step utility advantage. Calibration uses
+the maximum over all challengers and anchors within each episode, followed by a
+descriptive 90th percentile across calibration episodes. This is a diagnostic
+margin, without a safety or future-coverage guarantee. Support and vital-error
+checks still apply. The default planner and selected core weights are unchanged.
+
+```powershell
+python -m poseidon contrast-fit
+python -m poseidon contrast-experiment --seed 105000001 --episodes 8 --max-steps 128 --scarcity 2.5
+python -m poseidon world --planner contrast --seed 42 --scarcity 2.5 --max-steps 128
+python -m poseidon verify-contrast outputs/contrast_experiments/RECEIPT.json
+```
+
+The nine-controller comparison includes policy, neural MPC, v0.2 Atlas, Contrast,
+an absolute-bound gate, memory-erased and unfiltered controls, a heuristic and
+deterministic random control. Every visited state has all six actual one-step
+branches audited. A separate probe compares base, unfiltered and selected forecasts
+at identical policy-arm anchors. Utility gains, forecast errors, episode reward
+and survival are reported separately, alongside unequal controller compute costs.
+See [design and limits](docs/CONTRAST_DESIGN.md) and
+[measured results](docs/CONTRAST_RESULTS.md): selected forecasts improved by
+1.93% and 2.50% on two fresh suites, while slightly lower episode reward and
+unchanged survival keep Contrast experimental.
+
+Artifacts go to `outputs/contrast/` and `outputs/contrast_experiments/`. The
+workbench exposes paired margins, selected feature weights, action audits and
+replayable raw receipts. World requests honor scarcity and horizon controls and
+retain planner decisions. A source-change guard rejects experiments from a
+process that imported older Python files; restart the server after editing code.
+The simulator remains byte-identical to v0.2 so its existing receipts can replay.
+The published Hugging Face `v0.2.0` snapshot remains available independently of
+this local development version.
+
 ## Counterfactual Atlas — v0.2
 
 Poseidon now learns an inspectable residual memory around its neural world model.

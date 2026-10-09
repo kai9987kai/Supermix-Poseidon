@@ -7,33 +7,72 @@ def main():
     p.add_argument("command", choices=[
         "serve", "chat", "math", "image", "video", "mesh", "world", "status",
         "beyond-benchmark", "beyond-circuits", "beyond-memory", "beyond-moe", "beyond-scene",
-        "atlas-fit", "experiment", "verify-experiment"
+        "atlas-fit", "experiment", "verify-experiment", "contrast-fit", "contrast-experiment", "verify-contrast",
+        "horizon-fit", "horizon-experiment", "verify-horizon"
     ])
     p.add_argument("prompt", nargs="?", default="")
     p.add_argument("--root", default=".")
     p.add_argument("--port", type=int, default=8787)
     p.add_argument("--seed", type=int, default=None)
     p.add_argument("--episodes", type=int, default=None)
-    p.add_argument("--scarcity", type=float, default=2.5)
+    p.add_argument("--scarcity", type=float, default=None)
     p.add_argument("--adapter")
-    p.add_argument("--planner", choices=["policy", "mpc", "hybrid", "risk_aware", "uncertainty", "atlas"], default="policy", help="world simulation planner")
+    p.add_argument("--planner", choices=["policy", "mpc", "hybrid", "risk_aware", "uncertainty", "atlas", "contrast", "horizon"], default="policy", help="world simulation planner")
     p.add_argument("--max-steps", type=int, default=None)
     p.add_argument("--anchors", type=int, default=24)
     p.add_argument("--train-episodes", type=int, default=12)
-    p.add_argument("--calibration-episodes", type=int, default=6)
+    p.add_argument("--selection-episodes", type=int, default=8)
+    p.add_argument("--calibration-episodes", type=int, default=None)
     args = p.parse_args()
-    args.seed = args.seed if args.seed is not None else (81000001 if args.command == "atlas-fit" else 93000001 if args.command == "experiment" else 42)
-    args.episodes = args.episodes if args.episodes is not None else (4 if args.command == "experiment" else 100)
+    default_seeds = {"atlas-fit": 81000001, "experiment": 93000001,
+                     "contrast-fit": 101000001, "contrast-experiment": 104000001,
+                     "horizon-fit": 107000001, "horizon-experiment": 108000001}
+    args.seed = args.seed if args.seed is not None else default_seeds.get(args.command, 42)
+    args.episodes = args.episodes if args.episodes is not None else (4 if args.command in ("experiment", "contrast-experiment", "horizon-experiment") else 100)
+    args.scarcity = args.scarcity if args.scarcity is not None else (1.0 if args.command == "world" else 2.5)
+    args.calibration_episodes = args.calibration_episodes if args.calibration_episodes is not None else (8 if args.command in ("contrast-fit", "horizon-fit") else 6)
 
-    if args.command == "verify-experiment":
+    if args.command in ("verify-experiment", "verify-contrast", "verify-horizon"):
         from pathlib import Path
-        from .experiments import load_and_verify
+        if args.command == "verify-horizon":
+            from .horizon_experiments import load_and_verify
+        elif args.command == "verify-contrast":
+            from .contrast_experiments import load_and_verify
+        else:
+            from .experiments import load_and_verify
         if not args.prompt:
-            p.error("verify-experiment requires a receipt path")
+            p.error(f"{args.command} requires a receipt path")
         path = Path(args.prompt)
         if not path.is_absolute():
             path = Path(args.root) / path
         print(json.dumps(load_and_verify(path), indent=2))
+        return
+
+    if args.command == "contrast-fit":
+        from .contrast import ContrastAtlas
+        from pathlib import Path
+        import os
+        import tempfile
+        if any(not 1 <= value <= 64 for value in (args.train_episodes, args.selection_episodes, args.calibration_episodes)) or not 0 <= args.seed <= 2**63 - 2000100:
+            p.error("contrast-fit needs 1–64 episodes per partition and room for disjoint selection/calibration seeds")
+        runtime = Poseidon(args.root)
+        atlas, receipt = ContrastAtlas.fit(runtime.core(),
+            train_seeds=list(range(args.seed, args.seed + args.train_episodes)),
+            selection_seeds=list(range(args.seed + 1000000, args.seed + 1000000 + args.selection_episodes)),
+            calibration_seeds=list(range(args.seed + 2000000, args.seed + 2000000 + args.calibration_episodes)),
+            anchors_per_episode=args.anchors, max_steps=args.max_steps if args.max_steps is not None else 128)
+        directory = Path(args.root) / "outputs/contrast"
+        directory.mkdir(parents=True, exist_ok=True)
+        atlas.save(directory / "atlas.json")
+        descriptor, temporary = tempfile.mkstemp(prefix="fit-", suffix=".tmp", dir=directory)
+        try:
+            with os.fdopen(descriptor, "w", encoding="utf-8") as stream:
+                json.dump(receipt, stream, indent=2, allow_nan=False)
+            os.replace(temporary, directory / "fit_receipt.json")
+        finally:
+            if os.path.exists(temporary):
+                os.unlink(temporary)
+        print(json.dumps({key: value for key, value in receipt.items() if key != "rows" and not key.endswith("_rows")}, indent=2))
         return
 
     if args.command == "atlas-fit":
@@ -56,8 +95,41 @@ def main():
         print(json.dumps({key: value for key, value in receipt.items() if key != "calibration_rows"}, indent=2))
         return
 
-    if args.command == "experiment":
-        result = Poseidon(args.root).experiment(args.seed, args.episodes, args.max_steps if args.max_steps is not None else 64, args.scarcity)
+    if args.command == "horizon-fit":
+        from .horizon import HorizonAtlas
+        from pathlib import Path
+        import os
+        import tempfile
+        if any(not 1 <= value <= 64 for value in (args.train_episodes, args.calibration_episodes)) or not 0 <= args.seed <= 2**63 - 2000100:
+            p.error("horizon-fit needs 1–64 episodes per partition and room for disjoint calibration seeds")
+        runtime = Poseidon(args.root)
+        atlas, receipt = HorizonAtlas.fit(runtime.core(),
+            train_seeds=list(range(args.seed, args.seed + args.train_episodes)),
+            calibration_seeds=list(range(args.seed + 1000000, args.seed + 1000000 + args.calibration_episodes)),
+            anchors_per_episode=args.anchors, max_steps=args.max_steps if args.max_steps is not None else 128)
+        directory = Path(args.root) / "outputs/horizon"
+        directory.mkdir(parents=True, exist_ok=True)
+        atlas.save(directory / "atlas.json")
+        descriptor, temporary = tempfile.mkstemp(prefix="fit-", suffix=".tmp", dir=directory)
+        try:
+            with os.fdopen(descriptor, "w", encoding="utf-8") as stream:
+                json.dump(receipt, stream, indent=2, allow_nan=False)
+            os.replace(temporary, directory / "fit_receipt.json")
+        finally:
+            if os.path.exists(temporary):
+                os.unlink(temporary)
+        print(json.dumps({key: value for key, value in receipt.items() if key != "calibration_anchor_rows"}, indent=2))
+        return
+
+    if args.command in ("experiment", "contrast-experiment", "horizon-experiment"):
+        runtime = Poseidon(args.root)
+        if args.command == "horizon-experiment":
+            experiment = runtime.horizon_experiment
+        elif args.command == "contrast-experiment":
+            experiment = runtime.contrast_experiment
+        else:
+            experiment = runtime.experiment
+        result = experiment(args.seed, args.episodes, args.max_steps if args.max_steps is not None else 64, args.scarcity)
         print(json.dumps({key: value for key, value in result.items() if key != "replay"}, indent=2))
         return
 
@@ -113,7 +185,8 @@ def main():
     if args.command == "status":
         result = runtime.status()
     else:
-        result = runtime.respond(args.prompt or "Survive", args.command, seed=args.seed, planner=args.planner)
+        result = runtime.respond(args.prompt or "Survive", args.command, seed=args.seed, planner=args.planner,
+                                 scarcity=args.scarcity, max_steps=args.max_steps if args.max_steps is not None else 256)
     print(json.dumps(result, indent=2, ensure_ascii=False))
 
 if __name__ == "__main__":

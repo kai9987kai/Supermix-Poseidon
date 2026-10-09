@@ -35,9 +35,8 @@ def digest(value) -> str:
 
 
 def source_identity() -> dict:
-    root = Path(__file__).parent
-    return {path.name: hashlib.sha256(path.read_bytes()).hexdigest()
-            for path in sorted(root.glob("*.py"))}
+    from .provenance import assert_source_current
+    return assert_source_current()
 
 
 @dataclass(frozen=True)
@@ -174,7 +173,7 @@ def run_experiment(core, atlas, spec: ExperimentSpec | None = None) -> dict:
             row, episode = _episode(core, atlas, mpc, arm, seed, spec)
             rows.append(row)
             episodes.append(episode)
-    if source_identity() != sources or hashlib.sha256(core.path.read_bytes()).hexdigest() != checkpoint_sha or digest(atlas.artifact) != protocol["atlas_sha256"]:
+    if source_identity() != sources or hashlib.sha256(core.path.read_bytes()).hexdigest() != checkpoint_sha or digest(atlas.artifact) != protocol["atlas_sha256"] or _model_digest(core) != artifact["model_sha256"]:
         raise RuntimeError("Source, checkpoint or atlas changed during the experiment; no receipt published")
     summary, paired = paired_summary(rows)
     result = {"schema": SCHEMA, "experiment_id": identifier, "protocol": protocol,

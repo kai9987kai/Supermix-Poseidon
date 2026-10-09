@@ -7,6 +7,7 @@ import json
 import mimetypes
 import threading
 from .runtime import Poseidon
+from .provenance import StaleSourceError, assert_source_current, source_status
 
 WEB = Path(__file__).parent/"web"
 
@@ -25,7 +26,12 @@ def make_handler(runtime, port):
         def do_GET(self):
             path = unquote(urlsplit(self.path).path)
             if path == "/api/status":
-                self.send_json(200, runtime.status())
+                try:
+                    self.send_json(200, runtime.status())
+                except (ValueError, TypeError) as error:
+                    self.send_json(400, {"error": str(error), "type": type(error).__name__})
+                except Exception as error:
+                    self.send_json(500, {"error": str(error), "type": type(error).__name__})
                 return
             if path in ("/", "/index.html", "/style.css", "/app.js"):
                 file = WEB/("index.html" if path in ("/", "/index.html") else path[1:])
@@ -62,25 +68,36 @@ def make_handler(runtime, port):
                     raise ValueError("Expected a JSON object.")
             except (ValueError, UnicodeDecodeError) as error:
                 self.send_json(400, {"error": str(error)}); return
-            if self.path not in ("/api/respond", "/api/remember", "/api/experiment"):
+            if self.path not in ("/api/respond", "/api/remember", "/api/experiment", "/api/contrast-experiment", "/api/horizon-experiment"):
                 self.send_json(404, {"error": "Not found"}); return
             if not busy.acquire(blocking=False):
                 self.send_json(409, {"error": "Poseidon is processing another request. Try again shortly."}); return
             try:
-                if self.path == "/api/experiment":
+                if self.path in ("/api/experiment", "/api/contrast-experiment", "/api/horizon-experiment"):
                     if set(payload) - {"seed", "episodes", "max_steps", "scarcity"}:
                         raise ValueError("Unknown experiment setting.")
                     episodes, max_steps = payload.get("episodes", 4), payload.get("max_steps", 64)
                     if type(episodes) is not int or not 1 <= episodes <= 8 or type(max_steps) is not int or not 32 <= max_steps <= 256:
                         raise ValueError("Workbench experiments require 1–8 paired episodes and 32–256 steps.")
-                    result = runtime.experiment(payload.get("seed", 93000001), episodes, max_steps, payload.get("scarcity", 2.5))
+                    assert_source_current()
+                    if self.path == "/api/horizon-experiment":
+                        result = runtime.horizon_experiment(payload.get("seed", 108000001), episodes, max_steps, payload.get("scarcity", 2.5))
+                    elif self.path == "/api/contrast-experiment":
+                        result = runtime.contrast_experiment(payload.get("seed", 104000001), episodes, max_steps, payload.get("scarcity", 2.5))
+                    else:
+                        result = runtime.experiment(payload.get("seed", 93000001), episodes, max_steps, payload.get("scarcity", 2.5))
                 elif self.path == "/api/remember":
                     result = runtime.remember(payload.get("text"), payload.get("carrier", "episodic"))
                 else:
-                    result = runtime.respond(payload.get("prompt"), payload.get("mode", "chat"), payload.get("history"), payload.get("seed", 42), payload.get("disabled_carriers"), planner=payload.get("planner", "policy"))
+                    max_steps = payload.get("max_steps", 256)
+                    if payload.get("mode", "chat") == "world" and (type(max_steps) is not int or not 1 <= max_steps <= 512):
+                        raise ValueError("Workbench worlds require a 1–512 step horizon.")
+                    result = runtime.respond(payload.get("prompt"), payload.get("mode", "chat"), payload.get("history"), payload.get("seed", 42), payload.get("disabled_carriers"), planner=payload.get("planner", "policy"), scarcity=payload.get("scarcity", 1.0), max_steps=max_steps)
                     if "paths" in result:
                         result["links"] = {key: "/artifacts/"+Path(value).resolve().relative_to(runtime.root/"outputs").as_posix() for key,value in result["paths"].items()}
                 self.send_json(200, result)
+            except StaleSourceError as error:
+                self.send_json(409, {"error": str(error)} | source_status())
             except (ValueError, TypeError) as error:
                 self.send_json(400, {"error": str(error)})
             except Exception as error:
