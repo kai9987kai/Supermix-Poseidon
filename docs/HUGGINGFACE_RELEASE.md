@@ -28,6 +28,8 @@ layout and bundles the matching source. No training or additional model download
 is needed for the default workbench. `SOURCE_README.md` is the project README;
 the root README is the Hub model card. Legacy root `core.pt`, `core_base.pt` and
 `adapter/` paths are retained as compatibility copies.
+The Hub `.gitignore` permits the packaged weights; original Git source exclusions
+are preserved in `SOURCE_GITIGNORE`.
 
 ```powershell
 python -m poseidon chat "Explain why seasons change."

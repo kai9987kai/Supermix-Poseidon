@@ -233,8 +233,12 @@ def package(output: Path, repo_id: str = REPO_ID) -> dict:
     source_files = git("ls-files", "-z").split("\0")
     for name in source_files:
         if name:
-            copy(name, "SOURCE_README.md" if name == "README.md" else None)
+            target = {"README.md": "SOURCE_README.md", ".gitignore": "SOURCE_GITIGNORE"}.get(name)
+            copy(name, target)
     source_hashes = {name: sha256(ROOT / name) for name in source_files if name}
+    # The Hub's preupload API applies incoming .gitignore to weight additions.
+    # Source ignores training artifacts; a model release must include them.
+    (output / ".gitignore").write_text("__pycache__/\n.pytest_cache/\n.cache/huggingface/\n*.egg-info/\n", encoding="utf-8")
 
     artifacts = [
         "runs/tidal_dagger/core.pt", "runs/tidal/core.pt",
@@ -313,6 +317,7 @@ See runs/language/report.json, data/language/SOURCE_CARD.md and the root model c
         "core_sha256": core_hash, "atlas_artifact_sha256": atlas_hash,
         "upstream_language": upstream, "source_file_sha256": source_hashes,
         "release_transforms": {"README.md": "Hub model card; original becomes SOURCE_README.md",
+                               ".gitignore": "Hub upload rules; original becomes SOURCE_GITIGNORE",
                                "runs/language/adapter/README.md": "authored inactive candidate card",
                                "runs/language/adapter/adapter_config.json": "portable upstream id and pinned revision"},
         "experiment_verification": experiment_verification,
