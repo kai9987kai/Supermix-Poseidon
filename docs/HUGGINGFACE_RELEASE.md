@@ -63,9 +63,9 @@ a complete resumable language-training package is made.
 
 ```powershell
 # Commit all intended source changes first; packaging rejects a dirty checkout.
-python tools/package_huggingface.py --output outputs/releases/poseidon-v0.7.0
-python tools/verify_huggingface_release.py outputs/releases/poseidon-v0.7.0 --smoke
-hf upload Kai9987kai/Supermix-Poseidon outputs/releases/poseidon-v0.7.0 . --commit-message "Release Poseidon v0.7.0 Odysseus Empirical Navigator & Memory Carrier Observatory (MCO)"
+python tools/package_huggingface.py --output outputs/releases/poseidon-v0.8.0
+python tools/verify_huggingface_release.py outputs/releases/poseidon-v0.8.0 --smoke
+hf upload Kai9987kai/Supermix-Poseidon outputs/releases/poseidon-v0.8.0 . --commit-message "Release Poseidon v0.8.0 AURA Central Complex, Tessera Macro Commons & Mnemorph Archaeology"
 ```
 
 Packaging checks upstream language hashes, the actual active core hash, Atlas/Odyssey/Helm/Odysseus
