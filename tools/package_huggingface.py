@@ -344,6 +344,18 @@ def package(output: Path, repo_id: str = REPO_ID) -> dict:
     copy("docs/history/HF_MODEL_CARD_v0.1.md", "legacy/model-card-before-v0.2.md")
     copy("runs/beyond_adapted/ensemble_adapted.pt", "legacy/ensemble_adapted.pt")
     shutil.copyfile(historical_assets[".gitattributes"], output / ".gitattributes")
+    # The Hub adds exact LFS rules for newly uploaded large JSON receipts. Stage
+    # them before hashing so the remote commit cannot silently change this file.
+    attributes_path = output / ".gitattributes"
+    attributes = attributes_path.read_text(encoding="utf-8").rstrip("\n")
+    rules = set(attributes.splitlines())
+    for path in sorted(output.rglob("*.json")):
+        if path.stat().st_size >= 10 * 1024 * 1024:
+            rule = path.relative_to(output).as_posix() + " filter=lfs diff=lfs merge=lfs -text"
+            if rule not in rules:
+                attributes += "\n" + rule
+                rules.add(rule)
+    attributes_path.write_text(attributes + "\n", encoding="utf-8")
     shutil.copyfile(historical_assets["replay.mp4"], output / "legacy/replay-before-v0.2.mp4")
 
     # Original bytes remain available; a current envelope retracts the old promotion.
@@ -417,6 +429,7 @@ See runs/language/report.json, data/language/SOURCE_CARD.md and the root model c
         "upstream_language": upstream, "source_file_sha256": source_hashes,
         "release_transforms": {"README.md": "Hub model card; original becomes SOURCE_README.md",
                                ".gitignore": "Hub upload rules; original becomes SOURCE_GITIGNORE",
+                               ".gitattributes": "historical LFS rules plus explicit large JSON receipt paths",
                                "runs/language/adapter/README.md": "authored inactive candidate card",
                                "runs/language/adapter/adapter_config.json": "portable upstream id and pinned revision"},
         "experiment_verification": experiment_verification,
