@@ -1,19 +1,19 @@
-# Poseidon v0.7.0 model release
+# Poseidon v0.8.0 model release
 
-The v0.7.0 release bundles the **Odysseus** empirical cognitive navigator (Bayesian replenishment estimation, empirical macro-action transition matrices, and physiological stamina rest gating), the **Memory Carrier Observatory (MCO)** causal factorial evaluation suite (16 memory carrier subsets, 4 falsifiable negative controls, and query-invariant LOTO sensitivity across 1,024 independent trials), the independently fitted **Helm** history-conditioned return critic, durable cooperative workbench job manager, and complete evaluation receipts with weightless replay verification. It retains all historical receipts and discloses evidence limits.
+The v0.8.0 release bundles the **AURA** biomimetic Central Complex controller (16-wedge recurrent neural ring attractor compass, PVA heading and bump coherence tracking, optomotor stabilization reflex, and 128-Kenyon cell sparse Mushroom Body neuropil with $k=8$ APL winner-take-all inhibitory gain control arbitrating metabolic, fatigue, and threat drives), the **Tessera** lineage-ratified macro-action commons (dual-lineage reinforcement ratification, finite-domain safety assertions, and epoch-based expiration), the **Mnemorph** archaeological memory assay suite (associative concept graphs, typed structural lesions, Hub Vulnerability Ratio, and associative regrowth recovery), the **Odysseus** empirical cognitive navigator, the **Memory Carrier Observatory (MCO)** causal factorial evaluation suite, the independently fitted **Helm** history-conditioned return critic, durable cooperative workbench job manager, and complete evaluation receipts with weightless replay verification. It retains all historical receipts and discloses evidence limits.
 
 The release target is [Kai9987kai/Supermix-Poseidon](https://huggingface.co/Kai9987kai/Supermix-Poseidon).
 Its `manifest.json` binds a clean Git source commit to every packaged file's size
 and SHA-256. `SHA256SUMS.txt` provides an additional file integrity inventory.
 Publishing these artifacts improves the experimental instrument without changing
-the selected core, language weights or default DAgger policy. Odysseus and Helm remain opt-in.
+the selected core, language weights or default DAgger policy. AURA, Tessera, Mnemorph, Odysseus and Helm remain opt-in.
 
 ## Download and run
 
 ```powershell
 # Install the Hub CLI in a Python environment with compatible CPU PyTorch.
 python -m pip install huggingface-hub
-hf download Kai9987kai/Supermix-Poseidon --revision v0.7.0 --local-dir Poseidon-release
+hf download Kai9987kai/Supermix-Poseidon --revision v0.8.0 --local-dir Poseidon-release
 cd Poseidon-release
 python -m pip install -e .
 python tools/verify_huggingface_release.py . --smoke
@@ -21,7 +21,7 @@ python -m poseidon serve --port 8787
 ```
 
 Open http://127.0.0.1:8787. For a reproducible download, add `--revision` with the
-release's Hub commit SHA or `v0.7.0` tag. Python 3.10+ and PyTorch 2.6+ are required;
+release's Hub commit SHA or `v0.8.0` tag. Python 3.10+ and PyTorch 2.6+ are required;
 the native custom core is loaded with `torch.load(..., weights_only=True)`.
 Transformers remote code is disabled. This is a custom PyTorch application, so
 `AutoModel.from_pretrained` on the Hub repository root is not supported.
@@ -37,12 +37,16 @@ are preserved in `SOURCE_GITIGNORE`.
 ```powershell
 python -m poseidon chat "Explain why seasons change."
 python -m poseidon world --planner policy --seed 42
+python -m poseidon world --planner aura --seed 42
 python -m poseidon world --planner odysseus --seed 42
 python -m poseidon world --planner helm --seed 42
 python -m poseidon world --planner odyssey --seed 42
 python -m poseidon world --planner horizon --seed 42
 python -m poseidon world --planner contrast --seed 42
 python -m poseidon world --planner atlas --seed 42
+python -m poseidon aura-experiment
+python -m poseidon tessera-experiment
+python -m poseidon mnemorph-experiment
 python -m poseidon odysseus-experiment
 python -m poseidon mco-experiment
 python -m poseidon chat "Explain why seasons change." --adapter runs/language/adapter

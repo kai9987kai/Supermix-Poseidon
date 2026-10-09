@@ -29,6 +29,7 @@ class Poseidon:
         self._odysseus_stamp = None
         self._jobs = None
         self._jobs_lock = threading.Lock()
+        self._tessera = None
         self._candidate_status_snapshots = {}
         self.memory_path = self.root/"outputs/memory.json"
 
@@ -121,6 +122,49 @@ class Poseidon:
 
     def odysseus_status(self):
         return self._candidate_status("odysseus")
+
+    def tessera(self):
+        if self._tessera is None:
+            from .tessera import TesseraMacroCommons
+            path = self.root / "outputs/tessera/commons.json"
+            if path.is_file():
+                self._tessera = TesseraMacroCommons.load(path)
+            else:
+                self._tessera = TesseraMacroCommons()
+        return self._tessera
+
+    def tessera_status(self):
+        tess = self.tessera()
+        return {
+            "ready": True,
+            "ratified_count": len(tess.ratified),
+            "quarantine_count": len(tess.quarantine),
+            "current_epoch": tess.current_epoch,
+        }
+
+    def aura(self):
+        from .aura import AuraController
+        return AuraController(core=self.core(), tessera=self.tessera())
+
+    def aura_status(self):
+        return {"ready": True, "type": "biomimetic_central_complex_and_neuropil"}
+
+    def mnemorph_status(self):
+        relative = "outputs/mnemorph/RECEIPT.json"
+        path = self.root / relative
+        if not path.is_file():
+            return {"ready": False, "path": relative}
+        try:
+            receipt = json.loads(path.read_text(encoding="utf-8"))
+            return {
+                "ready": True,
+                "path": relative,
+                "receipt_sha256": receipt.get("receipt_sha256"),
+                "intact_mean": receipt.get("intact_mean_retrieval"),
+                "hub_vulnerability": receipt.get("hub_vulnerability_ratio"),
+            }
+        except Exception as error:
+            return {"ready": False, "path": relative, "error": str(error)}
 
     def jobs(self):
         with self._jobs_lock:
@@ -288,6 +332,130 @@ class Poseidon:
         finally:
             self.lock.release()
 
+    def submit_aura_experiment(self, settings):
+        from .provenance import assert_source_current
+        from .world import _integer, _number
+        if not isinstance(settings, dict) or set(settings) - {"kind", "seed", "episodes", "max_steps", "scarcity"}:
+            raise ValueError("Unknown job setting.")
+        if settings.get("kind") != "aura-experiment":
+            raise ValueError("Unknown experiment job kind.")
+        seed = _integer(settings.get("seed", 144000001), "seed", 0, 2**63 - 9)
+        episodes = _integer(settings.get("episodes", 4), "episodes", 1, 8)
+        max_steps = _integer(settings.get("max_steps", 64), "max_steps", 16, 256)
+        scarcity = _number(settings.get("scarcity", 2.5), "scarcity", .5, 4)
+        assert_source_current()
+        if not self.lock.acquire(blocking=False):
+            raise RuntimeError("Poseidon is processing another model operation. Try again shortly.")
+        try:
+            self.core()
+        finally:
+            self.lock.release()
+        normalized = {"seed": seed, "episodes": episodes, "max_steps": max_steps, "scarcity": scarcity}
+        return self.jobs().submit("aura-experiment", normalized,
+            lambda progress: self.aura_experiment(**normalized, progress=progress), timeout_seconds=1800)
+
+    def aura_experiment(self, seed=144000001, episodes=4, max_steps=64, scarcity=2.5, progress=None):
+        from .aura_experiment import run_aura_experiment, verify_aura_receipt
+        from .experiments import write_receipt
+        from .provenance import assert_source_current
+        from .world import _integer, _number
+        seed = _integer(seed, "seed", 0, 2**63 - 65)
+        episodes = _integer(episodes, "episodes", 1, 64)
+        max_steps = _integer(max_steps, "max_steps", 16, 512)
+        scarcity = _number(scarcity, "scarcity", .5, 4)
+        def check(event):
+            assert_source_current()
+            if progress:
+                progress(event)
+        while not self.lock.acquire(timeout=.2):
+            check({"phase": "waiting-for-model"})
+        try:
+            check({"phase": "starting"})
+            seeds = list(range(seed, seed + episodes))
+            result = run_aura_experiment(self.core(), seeds=seeds, max_steps=max_steps, scarcity=scarcity, progress=check)
+            check({"phase": "verifying"})
+            verification = verify_aura_receipt(result)
+            check({"phase": "publishing"})
+            path = write_receipt(result, self.root / "outputs/aura_experiments")
+            replay = next(episode for episode in result["episodes"] if episode["controller"] == "aura")
+            return {key: result[key] for key in ("schema", "experiment_id", "summary") if key in result} | {
+                "artifact_url": "/artifacts/" + path.relative_to(self.root / "outputs").as_posix(),
+                "receipt_sha256": result["receipt_sha256"], "verification": verification, "replay": replay}
+        finally:
+            self.lock.release()
+
+    def submit_tessera_experiment(self, settings=None):
+        from .provenance import assert_source_current
+        assert_source_current()
+        settings = settings or {}
+        if not isinstance(settings, dict) or set(settings) - {"kind", "seed"}:
+            raise ValueError("Unknown job setting.")
+        if settings.get("kind") != "tessera-experiment":
+            raise ValueError("Unknown experiment job kind.")
+        return self.jobs().submit("tessera-experiment", settings,
+            lambda progress: self.tessera_experiment(progress=progress), timeout_seconds=1800)
+
+    def tessera_experiment(self, seeds=None, progress=None):
+        import json
+        from .tessera_experiment import run_tessera_experiment, verify_tessera_receipt
+        from .provenance import assert_source_current
+        def check(event):
+            assert_source_current()
+            if progress:
+                progress(event)
+        seeds = seeds or [155000001, 155000002, 155000003, 155000004]
+        receipt = run_tessera_experiment(seeds=seeds, progress=check)
+        verification = verify_tessera_receipt(receipt)
+        receipt_dir = self.root / "outputs/tessera_experiments"
+        receipt_dir.mkdir(parents=True, exist_ok=True)
+        path = receipt_dir / "RECEIPT.json"
+        path.write_text(json.dumps(receipt, indent=2, sort_keys=True), encoding="utf-8")
+        return {
+            "schema": receipt["schema"],
+            "experiment_id": receipt["experiment_id"],
+            "ratified_opcodes_count": receipt["ratified_opcodes_count"],
+            "quarantined_candidates_count": receipt["quarantined_candidates_count"],
+            "artifact_url": "/artifacts/" + path.relative_to(self.root / "outputs").as_posix(),
+            "receipt_sha256": receipt["receipt_sha256"],
+            "verification": verification,
+        }
+
+    def submit_mnemorph_experiment(self, settings=None):
+        from .provenance import assert_source_current
+        assert_source_current()
+        settings = settings or {}
+        if not isinstance(settings, dict) or set(settings) - {"kind"}:
+            raise ValueError("Unknown job setting.")
+        if settings.get("kind") != "mnemorph-experiment":
+            raise ValueError("Unknown experiment job kind.")
+        return self.jobs().submit("mnemorph-experiment", settings,
+            lambda progress: self.mnemorph_experiment(progress=progress), timeout_seconds=1800)
+
+    def mnemorph_experiment(self, progress=None):
+        import json
+        from .mnemorph import MnemorphArchaeology, verify_mnemorph_receipt
+        from .provenance import assert_source_current
+        assert_source_current()
+        arch = MnemorphArchaeology()
+        receipt = arch.run_archaeological_study()
+        verification = verify_mnemorph_receipt(receipt)
+        receipt_dir = self.root / "outputs/mnemorph"
+        receipt_dir.mkdir(parents=True, exist_ok=True)
+        path = receipt_dir / "RECEIPT.json"
+        path.write_text(json.dumps(receipt, indent=2, sort_keys=True), encoding="utf-8")
+        return {
+            "schema": receipt["schema"],
+            "intact_mean_retrieval": receipt["intact_mean_retrieval"],
+            "hub_lesion_mean_retrieval": receipt["hub_lesion_mean_retrieval"],
+            "periphery_lesion_mean_retrieval": receipt["periphery_lesion_mean_retrieval"],
+            "regrowth_mean_retrieval": receipt["regrowth_mean_retrieval"],
+            "associative_regrowth_recovery_rate": receipt["associative_regrowth_recovery_rate"],
+            "hub_vulnerability_ratio": receipt["hub_vulnerability_ratio"],
+            "artifact_url": "/artifacts/" + path.relative_to(self.root / "outputs").as_posix(),
+            "receipt_sha256": receipt["receipt_sha256"],
+            "verification": verification,
+        }
+
     def _candidate_status(self, name):
         """Readiness may be cached while a world or experiment owns the model."""
         relative = f"outputs/{name}/atlas.json"
@@ -421,7 +589,7 @@ class Poseidon:
             core_ready = active_core_path(self.root).is_file()
         except (ValueError, TypeError, OSError) as error:
             core_ready, core_error = False, str(error)
-        result = {"version": __version__, "name": "Supermix Poseidon", "language_ready": (self.root/"models/language/model.safetensors").exists(), "core_ready": core_ready, "atlas": self.atlas_status(), "contrast": self.contrast_status(), "horizon": self.horizon_status(), "odyssey": self.odyssey_status(), "helm": self.helm_status(), "odysseus": self.odysseus_status(), "mco": self.mco_status(), "reports": reports, "limits": "Experimental composite system. Controlled geometric media. Tool-assisted maths. Synthetic survival."} | source_status()
+        result = {"version": __version__, "name": "Supermix Poseidon", "language_ready": (self.root/"models/language/model.safetensors").exists(), "core_ready": core_ready, "atlas": self.atlas_status(), "contrast": self.contrast_status(), "horizon": self.horizon_status(), "odyssey": self.odyssey_status(), "helm": self.helm_status(), "odysseus": self.odysseus_status(), "mco": self.mco_status(), "aura": self.aura_status(), "tessera": self.tessera_status(), "mnemorph": self.mnemorph_status(), "reports": reports, "limits": "Experimental composite system. Controlled geometric media. Tool-assisted maths. Synthetic survival."} | source_status()
         if core_error:
             result["core_error"] = core_error
         return result
@@ -460,10 +628,14 @@ class Poseidon:
                 from .world_controls import rollout_with_decisions
                 _integer(max_steps, "max_steps", 1, 10000)
                 scarcity = _number(scarcity, "scarcity", .5, 4)
-                if planner not in ("policy", "mpc", "hybrid", "risk_aware", "uncertainty", "atlas", "contrast", "horizon", "odyssey", "helm", "odysseus"):
+                if planner not in ("policy", "mpc", "hybrid", "risk_aware", "uncertainty", "atlas", "contrast", "horizon", "odyssey", "helm", "odysseus", "aura"):
                     raise ValueError("Unknown survival planner.")
                 core = self.core()
-                if planner == "odysseus":
+                if planner == "aura":
+                    controller = self.aura()
+                    controller.reset(scarcity)
+                    backend_desc = "AURA biomimetic Central Complex ring attractor + sparse neuropil arbiter in TidePool"
+                elif planner == "odysseus":
                     controller = self.odysseus()
                     controller.reset(scarcity)
                     backend_desc = "Odysseus empirical cognitive map + Bayesian replenishment in TidePool"

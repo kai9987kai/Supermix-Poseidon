@@ -1,9 +1,9 @@
 const $=s=>document.querySelector(s);
 let mode='chat',history=[],episode=null,frame=0,playing=false,first=true;
-let animationHandle=null,atlasReady=false,contrastReady=false,horizonReady=false,odysseyReady=false,helmReady=false,odysseusReady=false,mcoReady=false,experimentBusy=false,requestBusy=false,serverBusy=false,restartRequired=false,statusInFlight=false,currentExperiment=null,experimentOutcome='idle',protocolChosen=false,activeJobId=null,jobPollHandle=null;
-const candidateStatus={atlas:null,contrast:null,horizon:null,odyssey:null,helm:null,odysseus:null};
-const plannerNotes={policy:'Direct actions from the trained policy. No teacher fallback.',mpc:'Plans actions using the learned dynamics head. Predicted outcomes can be inaccurate.',hybrid:'Combines the learned policy with dynamics-based planning.',atlas:'Experimental Atlas v2 with retrieved residuals and absolute error bounds. Availability is not evidence of superiority.',contrast:'Experimental Contrast Atlas with selected channel corrections and calibrated paired action margins. Inspect its decisions in the replay; calibration does not guarantee safety.',horizon:'Experimental Horizon Atlas v4 with multi-horizon return advantage, depletion-trap guards and held-out calibration margins.',odyssey:'Experimental Odyssey Atlas v5 with episodic topological cognitive mapping, replenishment decay tracking and goal-oriented waypoint navigation.',helm:'Experimental Helm Critic v0.6 with history-conditioned return critique, reservoir memory and calibrated advantage gating.',odysseus:'Experimental Odysseus Navigator with empirical macro-action transition matrices, Bayesian replenishment LCB estimation and stamina rest guards.',risk_aware:'Experimental uncertainty-aware ensemble controller.'};
-const controllerNames={policy:'Learned policy',mpc:'Dynamics MPC',neural_mpc:'Neural MPC',hybrid:'Policy + dynamics',atlas:'Counterfactual Atlas v2',atlas_v2:'Counterfactual Atlas v2',atlas_no_memory:'Atlas v2 without memory',contrast:'Contrast Atlas',contrast_absolute:'Contrast · absolute bounds',contrast_no_memory:'Contrast · no memory',contrast_unfiltered:'Contrast · unfiltered',horizon:'Horizon Atlas v4',horizon_no_memory:'Horizon · no memory',horizon_ungated:'Horizon · ungated',odyssey:'Odyssey Atlas v5',odyssey_no_memory:'Odyssey · no memory',odyssey_ungated:'Odyssey · ungated',helm:'Helm Critic v0.6',selected:'Helm · selected',observation:'Helm · observation',no_innovation:'Helm · no innovation',yoked:'Helm · yoked',ungated:'Helm · ungated',odysseus:'Odysseus Navigator',odysseus_calibrated:'Odysseus · calibrated',odysseus_ungated:'Odysseus · ungated',odysseus_no_memory:'Odysseus · no memory',heuristic:'Heuristic control',random:'Random control',risk_aware:'Uncertainty ensemble'};
+let animationHandle=null,atlasReady=false,contrastReady=false,horizonReady=false,odysseyReady=false,helmReady=false,odysseusReady=false,mcoReady=false,auraReady=true,tesseraReady=true,mnemorphReady=true,experimentBusy=false,requestBusy=false,serverBusy=false,restartRequired=false,statusInFlight=false,currentExperiment=null,experimentOutcome='idle',protocolChosen=false,activeJobId=null,jobPollHandle=null;
+const candidateStatus={atlas:null,contrast:null,horizon:null,odyssey:null,helm:null,odysseus:null,aura:null,tessera:null,mnemorph:null};
+const plannerNotes={policy:'Direct actions from the trained policy. No teacher fallback.',mpc:'Plans actions using the learned dynamics head. Predicted outcomes can be inaccurate.',hybrid:'Combines the learned policy with dynamics-based planning.',atlas:'Experimental Atlas v2 with retrieved residuals and absolute error bounds. Availability is not evidence of superiority.',contrast:'Experimental Contrast Atlas with selected channel corrections and calibrated paired action margins. Inspect its decisions in the replay; calibration does not guarantee safety.',horizon:'Experimental Horizon Atlas v4 with multi-horizon return advantage, depletion-trap guards and held-out calibration margins.',odyssey:'Experimental Odyssey Atlas v5 with episodic topological cognitive mapping, replenishment decay tracking and goal-oriented waypoint navigation.',helm:'Experimental Helm Critic v0.6 with history-conditioned return critique, reservoir memory and calibrated advantage gating.',odysseus:'Experimental Odysseus Navigator with empirical macro-action transition matrices, Bayesian replenishment LCB estimation and stamina rest guards.',aura:'Experimental AURA biomimetic controller with Central Complex 16-wedge ring attractor compass, sparse Kenyon cell neuropil arbiter, and ratified Tessera macro-actions.',risk_aware:'Experimental uncertainty-aware ensemble controller.'};
+const controllerNames={policy:'Learned policy',mpc:'Dynamics MPC',neural_mpc:'Neural MPC',hybrid:'Policy + dynamics',atlas:'Counterfactual Atlas v2',atlas_v2:'Counterfactual Atlas v2',atlas_no_memory:'Atlas v2 without memory',contrast:'Contrast Atlas',contrast_absolute:'Contrast · absolute bounds',contrast_no_memory:'Contrast · no memory',contrast_unfiltered:'Contrast · unfiltered',horizon:'Horizon Atlas v4',horizon_no_memory:'Horizon · no memory',horizon_ungated:'Horizon · ungated',odyssey:'Odyssey Atlas v5',odyssey_no_memory:'Odyssey · no memory',odyssey_ungated:'Odyssey · ungated',helm:'Helm Critic v0.6',selected:'Helm · selected',observation:'Helm · observation',no_innovation:'Helm · no innovation',yoked:'Helm · yoked',ungated:'Helm · ungated',odysseus:'Odysseus Navigator',odysseus_calibrated:'Odysseus · calibrated',odysseus_ungated:'Odysseus · ungated',odysseus_no_memory:'Odysseus · no memory',aura:'AURA Biomimetic Central Complex',aura_no_ring:'AURA · no ring compass',aura_no_neuropil:'AURA · no neuropil arbiter',tessera:'Tessera Macro Commons',mnemorph:'Mnemorph Archaeological Memory',heuristic:'Heuristic control',random:'Random control',risk_aware:'Uncertainty ensemble'};
 const controllerName=value=>controllerNames[value]||String(value||'Unspecified controller');
 const notes={chat:'Local pretrained language model. Answers can be wrong; arithmetic is checked by a separate exact solver.',math:'Exact rational arithmetic and linear equations. Use explicit multiplication: 3*x + 7 = 22. This result comes from a tool, not unaided neural reasoning.',image:'Learned scene attributes → software renderer. Describe cube, sphere, pyramid or cylinder; color; one to three objects; and small, medium or large.',video:'A learned scene becomes a 2.4-second animation. Motions: still, orbit, bounce, spin. Geometric animation, not photorealistic video.',mesh:'Create basic OBJ + MTL and glTF assets from the same learned scene representation. Up to three geometric objects.',world:'The trained policy chooses six actions in a deterministic synthetic world. Reaches the 256-step horizon or dies. No teacher fallback.'};
 const examples={chat:'Ask Poseidon something…',math:'(17 + 5) * 3, or 3*x + 7 = 22',image:'Create two small cyan spheres with orbit motion.',video:'Make three medium purple cubes with bounce motion.',mesh:'Build one large yellow pyramid with still motion.',world:'Run the learned agent in TidePool'};
@@ -79,8 +79,8 @@ let lastFrame=0;function animateWorld(time=0){animationHandle=null;if(!playing||
 $('#scrub').oninput=()=>{stopWorld();frame=Number($('#scrub').value);drawWorld();};$('#replay').onclick=()=>{if(!episode?.trajectory?.length)return;stopWorld();frame=0;lastFrame=0;playing=true;animateWorld();};
 $('#remember').onclick=async()=>{if($('#remember').disabled)return;requestBusy=true;syncControls();try{const r=await request('/api/remember',{text:$('#memoryText').value,carrier:$('#carrier').value});$('#memoryStatus').textContent=r.saved?'Fact saved locally.':'Not saved';$('#memoryText').value='';}catch(e){$('#memoryStatus').textContent=e.message;}finally{requestBusy=false;serverBusy=false;syncControls();refreshStatus();}};
 $('#recall').onclick=async()=>{if($('#recall').disabled)return;requestBusy=true;syncControls();try{const r=await request('/api/respond',{prompt:$('#prompt').value||'memory',mode:'memory',disabled_carriers:excluded()});$('#memoryStatus').textContent=r.text;}catch(e){$('#memoryStatus').textContent=e.message;}finally{requestBusy=false;serverBusy=false;syncControls();refreshStatus();}};
-function selectedProtocol(){return $('#experimentType').value||'odysseus';}
-function protocolReady(){const p=selectedProtocol();return p==='mco'?true:p==='odysseus'?odysseusReady:p==='helm'?helmReady:p==='odyssey'?odysseyReady&&horizonReady&&contrastReady&&atlasReady:p==='horizon'?horizonReady&&contrastReady&&atlasReady:p==='contrast'?contrastReady&&atlasReady:atlasReady;}
+function selectedProtocol(){return $('#experimentType').value||'aura';}
+function protocolReady(){const p=selectedProtocol();return (p==='aura'||p==='tessera'||p==='mnemorph'||p==='mco')?true:p==='odysseus'?odysseusReady:p==='helm'?helmReady:p==='odyssey'?odysseyReady&&horizonReady&&contrastReady&&atlasReady:p==='horizon'?horizonReady&&contrastReady&&atlasReady:p==='contrast'?contrastReady&&atlasReady:atlasReady;}
 let seedChosen=false;
 $('#experimentSeed').addEventListener('input',()=>seedChosen=true);
 $('#experimentType').onchange=()=>{protocolChosen=true;experimentOutcome='idle';updateProtocol();};
@@ -98,8 +98,11 @@ function syncControls(){
 }
 function updateProtocol(){
   const protocol=selectedProtocol();
-  if(!seedChosen)$('#experimentSeed').value=protocol==='odysseus'?'133000001':protocol==='mco'?'140000001':protocol==='helm'?'123000001':protocol==='odyssey'?'110000001':protocol==='horizon'?'109000001':protocol==='contrast'?'104000001':'93000001';
-  $('#protocolNote').textContent=protocol==='odysseus'?'Six paired arms evaluate Odysseus calibrated routing, ungated, no-memory, Odyssey, random against the frozen policy baseline.':protocol==='mco'?'Full causal factorial evaluation across 16 carrier combinations and 3 falsifiable negative controls on standard knowledge benchmarks.':protocol==='helm'?'Six paired arms compare Helm selected, observation-only, no-innovation, yoked and ungated critics against the frozen policy baseline.':protocol==='odyssey'?'Ten paired controllers compare Odyssey cognitive mapping against Horizon Atlas, Contrast Atlas, Atlas v2, Neural MPC and policy.':protocol==='horizon'?'Nine paired controllers separate multi-horizon return advantages, depletion-trap guards, memory removal and uncalibrated interventions on identical worlds.':protocol==='contrast'?'Nine paired controllers separate action advantage, absolute bounds, memory removal and unfiltered corrections. Atlas v2 is retained as a baseline.':'Six paired controllers compare the original Atlas v2 with memory removed, neural MPC, policy, heuristic and random controls.';
+  if(!seedChosen)$('#experimentSeed').value=protocol==='aura'?'150000001':protocol==='tessera'?'160000001':protocol==='mnemorph'?'170000001':protocol==='odysseus'?'133000001':protocol==='mco'?'140000001':protocol==='helm'?'123000001':protocol==='odyssey'?'110000001':protocol==='horizon'?'109000001':protocol==='contrast'?'104000001':'93000001';
+  $('#protocolNote').textContent=protocol==='aura'?'Biomimetic ring attractor heading tracking and sparse Kenyon cell neuropil arbitration on identical worlds.':protocol==='tessera'?'Independent-lineage verified macro-action commons and finite-domain semantic safety pre-checks on identical seeds.':protocol==='mnemorph'?'Mnemorph archaeological memory assays: hub vs periphery structural lesions, context shift, and associative regrowth.':protocol==='odysseus'?'Six paired arms evaluate Odysseus calibrated routing, ungated, no-memory, Odyssey, random against the frozen policy baseline.':protocol==='mco'?'Full causal factorial evaluation across 16 carrier combinations and 3 falsifiable negative controls on standard knowledge benchmarks.':protocol==='helm'?'Six paired arms compare Helm selected, observation-only, no-innovation, yoked and ungated critics against the frozen policy baseline.':protocol==='odyssey'?'Ten paired controllers compare Odyssey cognitive mapping against Horizon Atlas, Contrast Atlas, Atlas v2, Neural MPC and policy.':protocol==='horizon'?'Nine paired controllers separate multi-horizon return advantages, depletion-trap guards, memory removal and uncalibrated interventions on identical worlds.':protocol==='contrast'?'Nine paired controllers separate action advantage, absolute bounds, memory removal and unfiltered corrections. Atlas v2 is retained as a baseline.':'Six paired controllers compare the original Atlas v2 with memory removed, neural MPC, policy, heuristic and random controls.';
+  $('#auraSetup').hidden=(protocol!=='aura');
+  $('#tesseraSetup').hidden=(protocol!=='tessera');
+  $('#mnemorphSetup').hidden=(protocol!=='mnemorph');
   $('#odysseusSetup').hidden=!(protocol==='odysseus'&&!odysseusReady);
   $('#mcoSetup').hidden=!(protocol==='mco'&&!mcoReady);
   $('#helmSetup').hidden=!(protocol==='helm'&&!helmReady);
@@ -107,18 +110,21 @@ function updateProtocol(){
   $('#horizonSetup').hidden=!(protocol==='horizon'&&!horizonReady);
   $('#contrastSetup').hidden=!(protocol==='contrast'&&!contrastReady);
   $('#atlasSetup').hidden=atlasReady;
-  $('#jobPanel').hidden=(protocol!=='helm'&&protocol!=='odysseus'&&protocol!=='mco');
+  $('#jobPanel').hidden=false;
   if(!experimentBusy&&experimentOutcome==='idle')$('#experimentStatus').textContent=restartRequired?'Restart the local server to use the current source before recording an experiment.':serverBusy?'The server is handling another request. Latest availability comes from its cached status.':protocolReady()?'Ready. Compare controllers or benchmark factorial subsets on identical seeds.':'Prepare candidate dependencies before running this comparison.';
   syncControls();
 }
 function setCandidateStatus(kind,status){
   candidateStatus[kind]=status;
-  const ready=status?.ready===true,label=kind==='odysseus'?'Odysseus Navigator':kind==='helm'?'Helm Critic v0.6':kind==='odyssey'?'Odyssey Atlas v5':kind==='horizon'?'Horizon Atlas v4':kind==='contrast'?'Contrast Atlas':'Atlas v2';
-  if(kind==='odysseus')odysseusReady=ready;else if(kind==='helm')helmReady=ready;else if(kind==='odyssey')odysseyReady=ready;else if(kind==='horizon')horizonReady=ready;else if(kind==='contrast')contrastReady=ready;else atlasReady=ready;
+  const ready=status?.ready===true,label=kind==='aura'?'AURA Biomimetic Central Complex':kind==='tessera'?'Tessera Macro-Commons':kind==='mnemorph'?'Mnemorph Archaeological Memory':kind==='odysseus'?'Odysseus Navigator':kind==='helm'?'Helm Critic v0.6':kind==='odyssey'?'Odyssey Atlas v5':kind==='horizon'?'Horizon Atlas v4':kind==='contrast'?'Contrast Atlas':'Atlas v2';
+  if(kind==='aura')auraReady=ready;else if(kind==='tessera')tesseraReady=ready;else if(kind==='mnemorph')mnemorphReady=ready;else if(kind==='odysseus')odysseusReady=ready;else if(kind==='helm')helmReady=ready;else if(kind==='odyssey')odysseyReady=ready;else if(kind==='horizon')horizonReady=ready;else if(kind==='contrast')contrastReady=ready;else atlasReady=ready;
   if($('#'+kind+'State')){$('#'+kind+'State').textContent=ready?'OPT-IN CANDIDATE':'FIT NOT READY';$('#'+kind+'State').classList.toggle('available',ready);}
   const receipt=status?.fit_receipt,selection=receipt?.selection,calibration=receipt?.calibration;
   const sampleCount=receipt?.training_samples;
   let detail=ready?'A fitted candidate is available. ':label+' is unavailable. '+(status?.error||'Fit it with the local command below.')+' ';
+  if(ready&&kind==='aura')detail='16-wedge ring attractor compass (PVA coherence) & 128 Kenyon cell sparse neuropil arbiter (k=8 WTA). ';
+  if(ready&&kind==='tessera')detail='Independent dual-lineage ratified macro-actions with finite-domain safety assertions. ';
+  if(ready&&kind==='mnemorph')detail='Archaeological memory assays: token hub/periphery lesions and associative regrowth. ';
   if(ready&&kind==='odysseus'&&numeric(status?.fit_receipt?.error_radius))detail+='Error radius: '+decimal(status.fit_receipt.error_radius,3)+'. ';
   if(ready&&numeric(sampleCount))detail+=sampleCount.toLocaleString()+' fitted '+(kind==='horizon'||kind==='helm'?'anchor states':'branch transitions')+'. ';
   if(ready&&kind==='helm'){
@@ -256,17 +262,17 @@ $('#experimentForm').onsubmit=async event=>{
   event.preventDefault();if(experimentBusy||requestBusy||serverBusy||restartRequired||!protocolReady())return;
   if(!$('#experimentForm').checkValidity()){$('#experimentForm').reportValidity();return;}
   const protocol=selectedProtocol();
-  const payload={kind:protocol==='helm'?'helm-experiment':protocol,seed:Number($('#experimentSeed').value),scarcity:Number($('#scarcity').value),episodes:Number($('#episodes').value),max_steps:Number($('#maxSteps').value)};
+  const payload={kind:protocol==='aura'?'aura-experiment':protocol==='tessera'?'tessera-experiment':protocol==='mnemorph'?'mnemorph-experiment':protocol==='helm'?'helm-experiment':protocol,seed:Number($('#experimentSeed').value),scarcity:Number($('#scarcity').value),episodes:Number($('#episodes').value),max_steps:Number($('#maxSteps').value)};
   stopWorld();
   experimentBusy=true;currentExperiment=null;experimentOutcome='running';$('#experimentResults').hidden=true;
   $('#decisionPanel').hidden=true;
   $('#experimentPanel').setAttribute('aria-busy','true');
   $('#experimentStatus').classList.remove('error');
-  $('#experimentStatus').textContent='Running '+(protocol==='atlas'||protocol==='helm'?'six':protocol==='contrast'||protocol==='horizon'?'nine':'ten')+' controllers on '+payload.episodes+' paired episodes each, up to '+payload.max_steps+' steps. Local CPU work may take a while…';
+  $('#experimentStatus').textContent='Running '+(protocol==='aura'?'five':protocol==='atlas'||protocol==='helm'||protocol==='odysseus'?'six':protocol==='contrast'||protocol==='horizon'?'nine':'ten')+' controllers on '+payload.episodes+' paired episodes each, up to '+payload.max_steps+' steps. Local CPU work may take a while…';
   syncControls();
-  if(protocol==='helm'||protocol==='odysseus'||protocol==='mco'){
+  if(protocol==='aura'||protocol==='tessera'||protocol==='mnemorph'||protocol==='helm'||protocol==='odysseus'||protocol==='mco'){
     try{
-      const payload={kind:protocol==='mco'?'mco-experiment':protocol==='odysseus'?'odysseus-experiment':'helm-experiment',seed:Number($('#experimentSeed').value),scarcity:Number($('#scarcity').value),episodes:Number($('#episodes').value),max_steps:Number($('#maxSteps').value)};
+      const payload={kind:protocol==='aura'?'aura-experiment':protocol==='tessera'?'tessera-experiment':protocol==='mnemorph'?'mnemorph-experiment':protocol==='mco'?'mco-experiment':protocol==='odysseus'?'odysseus-experiment':'helm-experiment',seed:Number($('#experimentSeed').value),scarcity:Number($('#scarcity').value),episodes:Number($('#episodes').value),max_steps:Number($('#maxSteps').value)};
       const jobRes=await fetch('/api/jobs',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
       const jobData=await jobRes.json();
       if(!jobRes.ok)throw Error(jobData.error||jobRes.statusText);
@@ -303,10 +309,13 @@ $('#experimentForm').onsubmit=async event=>{
     }
   }
   try{
-    const url=protocol==='odysseus'?'/api/odysseus-experiment':protocol==='mco'?'/api/mco-experiment':protocol==='odyssey'?'/api/odyssey-experiment':protocol==='horizon'?'/api/horizon-experiment':protocol==='contrast'?'/api/contrast-experiment':'/api/experiment';
+    const url=protocol==='aura'?'/api/aura-experiment':protocol==='tessera'?'/api/tessera-experiment':protocol==='mnemorph'?'/api/mnemorph-experiment':protocol==='odysseus'?'/api/odysseus-experiment':protocol==='mco'?'/api/mco-experiment':protocol==='odyssey'?'/api/odyssey-experiment':protocol==='horizon'?'/api/horizon-experiment':protocol==='contrast'?'/api/contrast-experiment':'/api/experiment';
     const data=await request(url,payload);
     showExperiment(data);experimentOutcome='complete';
     $('#experimentStatus').textContent='Completed locally. Compare controllers or benchmark factorial subsets below.';
+    if(data.aura)setCandidateStatus('aura',data.aura);
+    if(data.tessera)setCandidateStatus('tessera',data.tessera);
+    if(data.mnemorph)setCandidateStatus('mnemorph',data.mnemorph);
     if(data.atlas)setCandidateStatus('atlas',data.atlas);
     if(data.contrast)setCandidateStatus('contrast',data.contrast);
     if(data.horizon)setCandidateStatus('horizon',data.horizon);
@@ -337,8 +346,9 @@ async function refreshStatus(){
     $('#corpus').textContent=counts?Object.values(counts).reduce((a,b)=>a+b,0).toLocaleString()+' rows':'Preparing';
     $('#evidence').textContent=JSON.stringify(r,null,2);
     setCandidateStatus('atlas',data.atlas);setCandidateStatus('contrast',data.contrast);setCandidateStatus('horizon',data.horizon);setCandidateStatus('odyssey',data.odyssey);setCandidateStatus('helm',data.helm);setCandidateStatus('odysseus',data.odysseus);
+    setCandidateStatus('aura',data.aura);setCandidateStatus('tessera',data.tessera);setCandidateStatus('mnemorph',data.mnemorph);
     if(data.mco?.ready)mcoReady=true;
-    if(!protocolChosen){$('#experimentType').value=odysseusReady?'odysseus':helmReady?'helm':odysseyReady?'odyssey':horizonReady?'horizon':contrastReady?'contrast':atlasReady?'atlas':'odysseus';protocolChosen=true;}
+    if(!protocolChosen){$('#experimentType').value='aura';protocolChosen=true;}
     updateProtocol();
   }catch{$('#connection').textContent='Offline · start the local server';}
   finally{statusInFlight=false;syncControls();}

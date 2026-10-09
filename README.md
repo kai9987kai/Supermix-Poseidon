@@ -9,6 +9,48 @@ The model release is hosted at [**Kai9987kai/Supermix-Poseidon**](https://huggin
 
 Built for the supplied Snapdragon Windows PC: CPU only, bounded threads, no paid APIs. The 24 linked projects inform the architecture through documented source review; their code and checkpoints are not indiscriminately merged.
 
+## AURA, Tessera & Mnemorph — v0.8 release
+
+The **v0.8 release** introduces three groundbreaking biologically and architecturally inspired innovations synthesizing cutting-edge principles across biomimetic insect navigation, lineage-ratified macro-actions, and topological memory archaeology without altering the frozen Tidal neural weights:
+
+1. **AURA Biomimetic Central Complex Controller**:
+   - **Central Complex Ring Attractor Compass**: 16-wedge recurrent neural network with local excitation, global inhibition ($W_{ij} = \cos(\theta_i - \theta_j)$), and angular velocity integration.
+   - **Bump Coherence & Involuntary Optomotor Reflex**: Continuously estimates population vector average (PVA) heading $\hat{\theta}$ and coherence $R \in [0, 1]$. When bump coherence drops below 0.35, reflexively triggers optomotor stabilization saccades to recover heading lock.
+   - **Sparse Kenyon Cell Mushroom Body Neuropil**: 128 virtual Kenyon cells with strict $k=8$ anterior paired lateral (APL) GABAergic inhibitory winner-take-all gain control (6.25% sparsity).
+   - **Tri-Drive Homeostatic Arbitration**: Computes continuous metabolic, fatigue, and threat drives to arbitrate descending motor channels (`harvester`, `sentinel`, `escaper`).
+
+2. **Tessera Lineage-Ratified Macro-Action Commons**:
+   - **Dual-Lineage Independent Ratification**: Quarantines single-lineage candidate action sequences, promoting them into globally executable `OP_*` opcodes only upon independent dual-lineage confirmation with $\Delta R > 0$.
+   - **Finite-Domain Semantic Safety Assertions**: Verifies action validity, sequence length ($2 \le L \le 6$), and stamina exhaustion limits before ratification.
+   - **Epoch Expiration**: Prunes stale opcodes lacking multi-epoch reinforcement.
+
+3. **Mnemorph Archaeological Memory & Lesion Assays**:
+   - **Associative Knowledge Graph**: Maps entity and fact co-occurrences with degree centrality metrics.
+   - **Typed Structural Lesion Assays**: Systematically evaluates catastrophic forgetting under `intact`, `hub_lesion` (top 10% degree hubs deleted), `periphery_lesion` (degree-1 nodes deleted), and `associative_regrowth` (Hebbian transitive recovery).
+   - **Hub Vulnerability Ratio (HVR)**: Formalizes topological vulnerability and associative self-repair.
+
+```powershell
+# Run the 5-arm paired AURA biomimetic evaluation benchmark
+python -m poseidon aura-experiment --seed 150000001 --episodes 4 --max-steps 64 --scarcity 2.5
+
+# Verify AURA experiment receipt offline
+python -m poseidon verify-aura outputs/aura_experiments/d9e0d76bd4812c03-b489e9702cff.json
+
+# Run Tessera macro-action ratification study
+python -m poseidon tessera-experiment
+
+# Verify Tessera receipt offline
+python -m poseidon verify-tessera outputs/tessera_experiments/RECEIPT.json
+
+# Run Mnemorph archaeological memory lesion assays
+python -m poseidon mnemorph-experiment
+
+# Verify Mnemorph receipt offline
+python -m poseidon verify-mnemorph outputs/mnemorph/RECEIPT.json
+```
+
+See [AURA design](docs/AURA_DESIGN.md), [AURA results](docs/AURA_RESULTS.md), [Tessera design](docs/TESSERA_DESIGN.md), [Tessera results](docs/TESSERA_RESULTS.md), and [Mnemorph design](docs/MNEMORPH_DESIGN.md).
+
 ## Odysseus & MCO — v0.7 release
 
 The **v0.7 release** introduces two foundational innovations advancing empirical cognition and causal memory verification without altering the frozen Tidal neural weights:

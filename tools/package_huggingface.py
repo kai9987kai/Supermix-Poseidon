@@ -31,6 +31,9 @@ ODYSSEY_EXPERIMENTS = (
 ODYSSEUS_EXPERIMENTS = (
     "1521d677b6f2f75b-c4035a1005d3.json",
 )
+AURA_EXPERIMENTS = (
+    "d9e0d76bd4812c03-b489e9702cff.json",
+)
 TRAJECTORY_AUDITS = {
     "8491880ca77a2dba-c7284642c7ab.json": "3ed044592794f58c-29888499b43a.json",
     "8b0e6f16a03ed340-a22ce43a85ac.json": "50ce54c9e486ce8f-0fb6374e203a.json",
@@ -84,14 +87,15 @@ tags:
 - synthetic-simulation
 ---
 
-# Supermix Poseidon v{version}: Odysseus & Memory Carrier Observatory (MCO)
+# Supermix Poseidon v{version}: AURA Central Complex, Tessera Macro-Commons & Mnemorph Archaeological Memory
 
-Version 0.7 introduces two foundational additions:
-1. **Odysseus Empirical Cognitive Navigator**: Online Bayesian replenishment estimation ($z=1.645$ LCB), empirical macro-action transition matrices $\\hat{{P}}(P_{{dest}} \\mid P_{{src}}, a)$, and physiological pre-transit stamina rest guards without altering the frozen Tidal core weights.
-2. **Memory Carrier Observatory (MCO)**: Full 16-subset causal factorial analysis across episodic, body, habitat, and social memory carriers paired with three falsifiable negative controls (`intact`, `shuffled`, `irrelevant`, `erased`) and query-invariant LOTO sensitivity across 1,024 independent trials.
+Version 0.8 introduces three biomimetic, macro-action, and memory archaeology additions:
+1. **AURA Biomimetic Central Complex Controller**: 16-wedge recurrent ring attractor compass with cosine kernel and continuous angular velocity integration, Population Vector Average (PVA) heading tracking and bump coherence $R$, optomotor stabilization reflex ($R < 0.35$), and 128 virtual Kenyon cell Mushroom Body neuropil with $k=8$ winner-take-all APL inhibitory gain control (6.25% sparsity) arbitrating metabolic, fatigue, and threat homeostatic drives into descending motor channels (`harvester`, `sentinel`, `escaper`).
+2. **Tessera Lineage-Ratified Macro-Action Commons**: Decentralized macro-action discovery where single-lineage candidate bursts are quarantined, and ratified into global `OP_*` opcodes only upon independent dual-lineage confirmation ($\Delta R > 0$) with finite-domain stamina and horizon safety assertions.
+3. **Mnemorph Archaeological Memory Assays**: Associative concept graph assays evaluating catastrophic forgetting and topological resilience across typed structural interventions (`intact`, `hub_lesion`, `periphery_lesion`, `associative_regrowth`), measuring Hub Vulnerability Ratio (HVR) and associative recovery.
 
 [Source commit](https://github.com/kai9987kai/Supermix-Poseidon/tree/{revision}) ·
-[Odysseus design](docs/ODYSSEUS_DESIGN.md) · [Odysseus results](docs/ODYSSEUS_RESULTS.md) · [MCO design](docs/MCO_DESIGN.md) · [MCO results](docs/MCO_RESULTS.md) · [Release guide](docs/HUGGINGFACE_RELEASE.md)
+[AURA design](docs/AURA_DESIGN.md) · [AURA results](docs/AURA_RESULTS.md) · [Tessera design](docs/TESSERA_DESIGN.md) · [Tessera results](docs/TESSERA_RESULTS.md) · [Mnemorph design](docs/MNEMORPH_DESIGN.md) · [Odysseus design](docs/ODYSSEUS_DESIGN.md) · [MCO design](docs/MCO_DESIGN.md) · [Release guide](docs/HUGGINGFACE_RELEASE.md)
 
 ## Components and activation
 
@@ -101,6 +105,9 @@ Version 0.7 introduces two foundational additions:
 | Supervised baseline | `runs/tidal/core.pt` | Comparison checkpoint, original embedded training state |
 | SmolLM2: 134,515,008 stored parameters | `models/language/model.safetensors` | Separate unchanged pretrained conversation backend |
 | LoRA: 61,440 parameters | `runs/language/adapter/` | Experimental candidate, inactive by default |
+| AURA Biomimetic Controller | `poseidon/aura.py` | 16-wedge CX-ring attractor & 128-KC sparse neuropil arbiter, opt-in controller |
+| Tessera Macro-Commons | `outputs/tessera_experiments/RECEIPT.json` | Independent dual-lineage ratified macro-actions, opt-in commons |
+| Mnemorph Memory Assays | `outputs/mnemorph/RECEIPT.json` | Typed structural lesion and associative regrowth receipts |
 | Odysseus Navigator | `outputs/odysseus/atlas.json` | Empirical macro-action transitions & Bayesian replenishment LCB, opt-in candidate |
 | Helm Critic v0.6 | `outputs/helm/atlas.json` | Fitted multi-horizon critic with observed history, opt-in candidate |
 | Odyssey Atlas v5 | `outputs/odyssey/atlas.json` | Spatial cognitive map and replenishment-decay waypoint planner, opt-in candidate |
@@ -240,7 +247,7 @@ to avoid relicensing upstream artifacts as MIT.
 def package(output: Path, repo_id: str = REPO_ID) -> dict:
     sys.path.insert(0, str(ROOT))
     from poseidon import __version__
-    if __version__ != "0.7.0":
+    if __version__ != "0.8.0":
         raise ValueError(f"unsupported version {__version__}")
     if repo_id != REPO_ID:
         raise ValueError("this release card is bound to Kai9987kai/Supermix-Poseidon")
@@ -305,6 +312,20 @@ def package(output: Path, repo_id: str = REPO_ID) -> dict:
         "RECEIPT.json": verify_mco_receipt(json.loads((ROOT / "outputs/mco_experiments/RECEIPT.json").read_text(encoding="utf-8")))
     }
 
+    from poseidon.aura_experiment import verify_aura_receipt
+    from poseidon.tessera_experiment import verify_tessera_receipt
+    from poseidon.mnemorph import verify_mnemorph_receipt
+    aura_experiment_verification = {
+        name: verify_aura_receipt(json.loads((ROOT / "outputs/aura_experiments" / name).read_text(encoding="utf-8")))
+        for name in AURA_EXPERIMENTS
+    }
+    tessera_experiment_verification = {
+        "RECEIPT.json": verify_tessera_receipt(json.loads((ROOT / "outputs/tessera_experiments/RECEIPT.json").read_text(encoding="utf-8")))
+    }
+    mnemorph_experiment_verification = {
+        "RECEIPT.json": verify_mnemorph_receipt(json.loads((ROOT / "outputs/mnemorph/RECEIPT.json").read_text(encoding="utf-8")))
+    }
+
     experiment_verification = {name: load_and_verify(ROOT / "outputs/experiments" / name) for name in EXPERIMENTS}
     evidence_artifacts = load_artifacts(ROOT)
     horizon_experiment_verification = {name: verify_parent(load_json(ROOT / "outputs/horizon_experiments" / name), evidence_artifacts) for name in HORIZON_EXPERIMENTS}
@@ -367,6 +388,8 @@ def package(output: Path, repo_id: str = REPO_ID) -> dict:
         "outputs/helm/atlas.json", "outputs/helm/fit_receipt.json",
         "outputs/odysseus/atlas.json", "outputs/odysseus/fit_receipt.json",
         "outputs/mco_experiments/RECEIPT.json",
+        "outputs/tessera_experiments/RECEIPT.json",
+        "outputs/mnemorph/RECEIPT.json",
         "models/language/manifest.json", "data/language/manifest.json",
         "data/language/SOURCE_CARD.md",
     ] + [f"models/language/{name}" for name in upstream["files"]]
@@ -376,6 +399,7 @@ def package(output: Path, repo_id: str = REPO_ID) -> dict:
     artifacts += [f"outputs/trajectory_audits/{name}" for name in TRAJECTORY_AUDITS]
     artifacts += [f"outputs/helm_experiments/{name}" for name in helm_names]
     artifacts += [f"outputs/odysseus_experiments/{name}" for name in ODYSSEUS_EXPERIMENTS]
+    artifacts += [f"outputs/aura_experiments/{name}" for name in AURA_EXPERIMENTS]
     for relative in artifacts:
         copy(relative)
     copy("docs/history/HF_MODEL_CARD_v0.1.md", "legacy/model-card-before-v0.2.md")
@@ -479,6 +503,9 @@ See runs/language/report.json, data/language/SOURCE_CARD.md and the root model c
         "helm_experiment_verification": helm_experiment_verification,
         "odysseus_experiment_verification": odysseus_experiment_verification,
         "mco_experiment_verification": mco_experiment_verification,
+        "aura_experiment_verification": aura_experiment_verification,
+        "tessera_experiment_verification": tessera_experiment_verification,
+        "mnemorph_experiment_verification": mnemorph_experiment_verification,
         "build_environment": {name: importlib.metadata.version(name) for name in
                               ("torch", "transformers", "peft", "safetensors", "numpy", "huggingface-hub")},
         "activation": {"core": "existing-dagger-selection", "language": "unchanged-upstream-base",
@@ -488,6 +515,9 @@ See runs/language/report.json, data/language/SOURCE_CARD.md and the root model c
                        "helm": "opt-in-experiment",
                        "odysseus": "opt-in-experiment",
                        "mco": "factual-observatory-benchmark",
+                       "aura": "opt-in-biomimetic-controller",
+                       "tessera": "ratified-macro-commons",
+                       "mnemorph": "archaeological-memory-assays",
                        "legacy_ensemble": "historical-unvalidated-not-loaded"},
     }
     write_json(output / "manifest.json", manifest)

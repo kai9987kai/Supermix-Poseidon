@@ -383,7 +383,7 @@ def validate_odysseus_artifact(artifact: dict, core: CoreRuntime | None = None) 
     unsigned = {k: v for k, v in artifact.items() if k != "sha256"}
     if _digest(unsigned) != artifact["sha256"]:
         raise ValueError("Artifact checksum mismatch")
-    if core is not None:
+    if core is not None and hasattr(core, "path"):
         core_checkpoint_hash = hashlib.sha256(Path(core.path).read_bytes()).hexdigest()
         if artifact.get("checkpoint_sha256") != core_checkpoint_hash:
             raise ValueError("Core checkpoint mismatch")
