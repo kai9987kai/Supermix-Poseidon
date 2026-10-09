@@ -302,7 +302,7 @@ if manifest["version"] in ("0.7.0", "0.8.0"):
     finite(odysseus_decision)
 if manifest["version"] == "0.8.0":
     aura_decision = aura.plan(observation)
-    assert len(aura_decision["candidates"]) == 6 and "coherence" in aura_decision
+    assert 0 <= aura_decision["action"] <= 5 and "pva_coherence" in aura_decision
     finite(aura_decision)
 worlds = {}
 controllers = [("policy", core), ("atlas", atlas)]
@@ -349,7 +349,7 @@ for path in sorted((root / "outputs/experiments").glob("*.json")):
     replays.append({"path":path.relative_to(root).as_posix(), **load_and_verify(path)})
 assert replays, "Packaged experiment receipts are missing"
 odyssey_replays, trajectory_replays = [], []
-if manifest["version"] in ("0.5.1", "0.6.0", "0.7.0"):
+if manifest["version"] in ("0.5.1", "0.6.0", "0.7.0", "0.8.0"):
     from poseidon.trajectory_audit import load_artifacts, load_json, verify_parent, verify_audit
     artifacts = load_artifacts(root)
     packaged_files = {row["path"] for row in manifest["files"]}
