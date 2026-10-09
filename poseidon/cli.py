@@ -10,7 +10,8 @@ def main():
         "atlas-fit", "experiment", "verify-experiment", "contrast-fit", "contrast-experiment", "verify-contrast",
         "horizon-fit", "horizon-experiment", "verify-horizon",
         "odyssey-fit", "odyssey-experiment", "verify-odyssey",
-        "verify-evidence", "audit-trajectory", "verify-trajectory"
+        "verify-evidence", "audit-trajectory", "verify-trajectory",
+        "fit-helm", "helm-experiment", "verify-helm"
     ])
     p.add_argument("prompt", nargs="?", default="")
     p.add_argument("--root", default=".")
@@ -19,7 +20,7 @@ def main():
     p.add_argument("--episodes", type=int, default=None)
     p.add_argument("--scarcity", type=float, default=None)
     p.add_argument("--adapter")
-    p.add_argument("--planner", choices=["policy", "mpc", "hybrid", "risk_aware", "uncertainty", "atlas", "contrast", "horizon", "odyssey"], default="policy", help="world simulation planner")
+    p.add_argument("--planner", choices=["policy", "mpc", "hybrid", "risk_aware", "uncertainty", "atlas", "contrast", "horizon", "odyssey", "helm"], default="policy", help="world simulation planner")
     p.add_argument("--max-steps", type=int, default=None)
     p.add_argument("--anchors", type=int, default=24)
     p.add_argument("--train-episodes", type=int, default=12)
@@ -33,11 +34,58 @@ def main():
     default_seeds = {"atlas-fit": 81000001, "experiment": 93000001,
                      "contrast-fit": 101000001, "contrast-experiment": 104000001,
                      "horizon-fit": 107000001, "horizon-experiment": 108000001,
-                     "odyssey-fit": 109000001, "odyssey-experiment": 110000001}
+                     "odyssey-fit": 109000001, "odyssey-experiment": 110000001,
+                     "fit-helm": 120000001, "helm-experiment": 123000001}
     args.seed = args.seed if args.seed is not None else default_seeds.get(args.command, 42)
-    args.episodes = args.episodes if args.episodes is not None else (4 if args.command in ("experiment", "contrast-experiment", "horizon-experiment", "odyssey-experiment") else 100)
+    args.episodes = args.episodes if args.episodes is not None else (4 if args.command in ("experiment", "contrast-experiment", "horizon-experiment", "odyssey-experiment", "helm-experiment") else 100)
     args.scarcity = args.scarcity if args.scarcity is not None else (1.0 if args.command == "world" else 2.5)
-    args.calibration_episodes = args.calibration_episodes if args.calibration_episodes is not None else (8 if args.command in ("contrast-fit", "horizon-fit", "odyssey-fit") else 6)
+    args.calibration_episodes = args.calibration_episodes if args.calibration_episodes is not None else (8 if args.command in ("contrast-fit", "horizon-fit", "odyssey-fit", "fit-helm") else 6)
+
+    if args.command == "verify-helm":
+        from pathlib import Path
+        from .helm import stable_json
+        from .helm_experiment import verify_helm_receipt
+        if not args.prompt:
+            p.error("verify-helm requires a receipt path")
+        path = Path(args.prompt)
+        if not path.is_absolute():
+            path = Path(args.root) / path
+        print(json.dumps(verify_helm_receipt(stable_json(path, max_bytes=128 * 1024 * 1024)), indent=2))
+        return
+
+    if args.command == "fit-helm":
+        from .helm import HelmCritic
+        from pathlib import Path
+        from .provenance import assert_source_current
+        import os
+        import tempfile
+        if any(not 2 <= value <= 64 for value in (args.train_episodes, args.selection_episodes, args.calibration_episodes)) or not 0 <= args.seed <= 2**63 - 2000100:
+            p.error("fit-helm requires 2–64 episodes per partition and disjoint seed namespaces")
+        runtime = Poseidon(args.root)
+        sources = assert_source_current()
+        def progress(event):
+            assert_source_current()
+            if event.get("phase") and event.get("episode") is not None:
+                import sys
+                print(json.dumps(event), file=sys.stderr, flush=True)
+        critic, receipt = HelmCritic.fit(runtime.core(),
+            train_seeds=list(range(args.seed, args.seed + args.train_episodes)),
+            selection_seeds=list(range(args.seed + 1000000, args.seed + 1000000 + args.selection_episodes)),
+            calibration_seeds=list(range(args.seed + 2000000, args.seed + 2000000 + args.calibration_episodes)),
+            anchors_per_episode=args.anchors, max_steps=args.max_steps if args.max_steps is not None else 96, progress=progress)
+        assert_source_current()
+        directory = runtime.root / "outputs/helm"
+        critic.save(directory / "atlas.json")
+        descriptor, temporary = tempfile.mkstemp(prefix="fit-", suffix=".tmp", dir=directory)
+        try:
+            with os.fdopen(descriptor, "w", encoding="utf-8") as stream:
+                json.dump(receipt, stream, indent=2, allow_nan=False)
+            os.replace(temporary, directory / "fit_receipt.json")
+        finally:
+            if os.path.exists(temporary):
+                os.unlink(temporary)
+        print(json.dumps(receipt, indent=2))
+        return
 
     if args.command in ("verify-evidence", "audit-trajectory", "verify-trajectory"):
         from pathlib import Path
@@ -186,9 +234,11 @@ def main():
         print(json.dumps({key: value for key, value in receipt.items() if key != "calibration_anchor_rows"}, indent=2))
         return
 
-    if args.command in ("experiment", "contrast-experiment", "horizon-experiment", "odyssey-experiment"):
+    if args.command in ("experiment", "contrast-experiment", "horizon-experiment", "odyssey-experiment", "helm-experiment"):
         runtime = Poseidon(args.root)
-        if args.command == "odyssey-experiment":
+        if args.command == "helm-experiment":
+            experiment = runtime.helm_experiment
+        elif args.command == "odyssey-experiment":
             experiment = runtime.odyssey_experiment
         elif args.command == "horizon-experiment":
             experiment = runtime.horizon_experiment

@@ -51,7 +51,7 @@ def git(*args: str) -> str:
     return subprocess.check_output(["git", *args], cwd=ROOT, text=True, encoding="utf-8").strip()
 
 
-def model_card(revision: str, core_hash: str, atlas_hash: str, horizon_hash: str, contrast_hash: str, odyssey_hash: str, version: str) -> str:
+def model_card(revision: str, core_hash: str, atlas_hash: str, horizon_hash: str, contrast_hash: str, odyssey_hash: str, version: str, helm_hash: str = "") -> str:
     return f"""---
 language:
 - en
@@ -78,7 +78,16 @@ tags:
 - synthetic-simulation
 ---
 
-# Supermix Poseidon v{version}: Trajectory Evidence Audit
+# Supermix Poseidon v{version}: Helm history-conditioned critic
+
+Version 0.6 adds a separately fitted CPU return critic with observed history,
+realized prediction-error feedback, observation-only/erased/yoked controls,
+disjoint selection and calibration, and actual 4/16-step branch receipts.
+Durable cancellable workbench jobs retain producer identity and deadlines.
+The core policy remains default; Helm is opt-in. See docs/HELM_DESIGN.md,
+docs/HELM_RESULTS.md and docs/research/README.md for measurements and the
+24-repository/current-research review. Small synthetic suites do not establish
+general capability, biological fidelity, safe improvement or future coverage.
 
 A CPU-local experimental system with a trained synthetic scene/control core,
 a separate pretrained conversation model, and an inspectable topological cognitive
@@ -199,6 +208,7 @@ Atlas canonical payload SHA-256: `{atlas_hash}`.
 Contrast canonical payload SHA-256: `{contrast_hash}`.
 Horizon canonical payload SHA-256: `{horizon_hash}`.
 Odyssey canonical payload SHA-256: `{odyssey_hash}`.
+Helm canonical payload SHA-256: `{helm_hash}`.
 `manifest.json` and `SHA256SUMS.txt` inventory the staged files. The manifest binds
 source, weights, upstream provenance and the exact experiment receipts.
 Checksums diagnose integrity; they do not prove scientific validity or authorship.
@@ -235,7 +245,7 @@ to avoid relicensing upstream artifacts as MIT.
 def package(output: Path, repo_id: str = REPO_ID) -> dict:
     sys.path.insert(0, str(ROOT))
     from poseidon import __version__
-    if __version__ != "0.5.1":
+    if __version__ != "0.6.0":
         raise ValueError(f"unsupported version {__version__}")
     if repo_id != REPO_ID:
         raise ValueError("this release card is bound to Kai9987kai/Supermix-Poseidon")
@@ -272,6 +282,20 @@ def package(output: Path, repo_id: str = REPO_ID) -> dict:
     horizon_hash = horizon.artifact["sha256"]
     odyssey = OdysseyAtlas.load(core, ROOT / "outputs/odyssey/atlas.json")
     odyssey_hash = odyssey.artifact["sha256"]
+    from poseidon.helm import HelmCritic, stable_json
+    from poseidon.helm_experiment import verify_helm_receipt
+    helm = HelmCritic.load(core, ROOT / "outputs/helm/atlas.json")
+    helm_hash = helm.artifact["sha256"]
+    evaluation = stable_json(ROOT / "docs/helm-evaluation.json")
+    helm_names = evaluation.get("receipts")
+    if (evaluation.get("status") != "completed-evaluation" or not isinstance(helm_names, list) or
+            not 2 <= len(helm_names) <= 8 or len(set(helm_names)) != len(helm_names) or
+            any(not isinstance(name, str) or Path(name).name != name or not name.endswith(".json") for name in helm_names)):
+        raise ValueError("Helm release requires a frozen complete evaluation profile")
+    helm_experiment_verification = {
+        name: verify_helm_receipt(stable_json(ROOT / "outputs/helm_experiments" / name)) for name in helm_names}
+    if any(stable_json(ROOT / "outputs/helm_experiments" / name)["helm"]["artifact_sha256"] != helm_hash for name in helm_names):
+        raise ValueError("Helm evaluation is bound to a different fitted critic")
 
     experiment_verification = {name: load_and_verify(ROOT / "outputs/experiments" / name) for name in EXPERIMENTS}
     evidence_artifacts = load_artifacts(ROOT)
@@ -332,6 +356,7 @@ def package(output: Path, repo_id: str = REPO_ID) -> dict:
         "outputs/contrast/atlas.json", "outputs/contrast/fit_receipt.json",
         "outputs/horizon/atlas.json", "outputs/horizon/fit_receipt.json",
         "outputs/odyssey/atlas.json", "outputs/odyssey/fit_receipt.json",
+        "outputs/helm/atlas.json", "outputs/helm/fit_receipt.json",
         "models/language/manifest.json", "data/language/manifest.json",
         "data/language/SOURCE_CARD.md",
     ] + [f"models/language/{name}" for name in upstream["files"]]
@@ -339,6 +364,7 @@ def package(output: Path, repo_id: str = REPO_ID) -> dict:
     artifacts += [f"outputs/horizon_experiments/{name}" for name in HORIZON_EXPERIMENTS]
     artifacts += [f"outputs/odyssey_experiments/{name}" for name in ODYSSEY_EXPERIMENTS]
     artifacts += [f"outputs/trajectory_audits/{name}" for name in TRAJECTORY_AUDITS]
+    artifacts += [f"outputs/helm_experiments/{name}" for name in helm_names]
     for relative in artifacts:
         copy(relative)
     copy("docs/history/HF_MODEL_CARD_v0.1.md", "legacy/model-card-before-v0.2.md")
@@ -399,7 +425,7 @@ See runs/language/report.json, data/language/SOURCE_CARD.md and the root model c
         copy("runs/language/adapter/adapter_model.safetensors", directory + "/adapter_model.safetensors")
         write_json(output / directory / "adapter_config.json", adapter_config)
         (output / directory / "README.md").write_text(adapter_card, encoding="utf-8")
-    (output / "README.md").write_text(model_card(revision, core_hash, atlas_hash, horizon_hash, contrast_hash, odyssey_hash, __version__), encoding="utf-8")
+    (output / "README.md").write_text(model_card(revision, core_hash, atlas_hash, horizon_hash, contrast_hash, odyssey_hash, __version__, helm_hash), encoding="utf-8")
 
     if git("status", "--porcelain") or git("rev-parse", "HEAD") != revision:
         raise ValueError("source checkout changed while packaging")
@@ -426,6 +452,7 @@ See runs/language/report.json, data/language/SOURCE_CARD.md and the root model c
         "contrast_artifact_sha256": contrast_hash,
         "horizon_artifact_sha256": horizon_hash,
         "odyssey_artifact_sha256": odyssey_hash,
+        "helm_artifact_sha256": helm_hash,
         "upstream_language": upstream, "source_file_sha256": source_hashes,
         "release_transforms": {"README.md": "Hub model card; original becomes SOURCE_README.md",
                                ".gitignore": "Hub upload rules; original becomes SOURCE_GITIGNORE",
@@ -436,12 +463,14 @@ See runs/language/report.json, data/language/SOURCE_CARD.md and the root model c
         "horizon_experiment_verification": horizon_experiment_verification,
         "odyssey_experiment_verification": odyssey_experiment_verification,
         "trajectory_audit_verification": trajectory_audit_verification,
+        "helm_experiment_verification": helm_experiment_verification,
         "build_environment": {name: importlib.metadata.version(name) for name in
                               ("torch", "transformers", "peft", "safetensors", "numpy", "huggingface-hub")},
         "activation": {"core": "existing-dagger-selection", "language": "unchanged-upstream-base",
                        "language_adapter": "inactive-candidate", "atlas": "opt-in-experiment",
                        "contrast": "opt-in-experiment", "horizon": "opt-in-experiment",
                        "odyssey": "opt-in-experiment",
+                       "helm": "opt-in-experiment",
                        "legacy_ensemble": "historical-unvalidated-not-loaded"},
     }
     write_json(output / "manifest.json", manifest)
@@ -451,7 +480,7 @@ See runs/language/report.json, data/language/SOURCE_CARD.md and the root model c
             "bytes": sum(row["size"] for row in files), "manifest_sha256": sha256(output / "manifest.json"),
             "core_sha256": core_hash, "atlas_artifact_sha256": atlas_hash,
             "contrast_artifact_sha256": contrast_hash, "horizon_artifact_sha256": horizon_hash,
-            "odyssey_artifact_sha256": odyssey_hash}
+            "odyssey_artifact_sha256": odyssey_hash, "helm_artifact_sha256": helm_hash}
 
 
 def main() -> None:

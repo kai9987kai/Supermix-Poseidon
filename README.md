@@ -9,6 +9,12 @@ The model release is hosted at [**Kai9987kai/Supermix-Poseidon**](https://huggin
 
 Built for the supplied Snapdragon Windows PC: CPU only, bounded threads, no paid APIs. The 24 linked projects inform the architecture through documented source review; their code and checkpoints are not indiscriminately merged.
 
+## Helm — v0.6 development
+
+The new opt-in **Helm** critic independently learns multi-horizon returns from observed history and realized Tidal prediction errors. Observation-only, innovation-erased and training-error-yoked controls separate useful history from added complexity. Disjoint episode partitions cover fitting, selection, calibration and evaluation; both 4- and 16-step margins must support a calibrated intervention.
+
+The workbench adds durable cancellable CPU experiments, full action/trajectory receipts and descriptive benefit/harm versus override coverage. The default core policy remains selected. See [design and commands](docs/HELM_DESIGN.md) and [the refreshed review of all 24 repositories and recent research](docs/research/README.md).
+
 ## Trajectory evidence audit — v0.5.1
 
 The new audit reconstructs Odyssey's cognitive map from recorded observations and
@@ -38,10 +44,10 @@ The new opt-in **Odyssey Atlas** equips Poseidon with an episodic topological co
 
 Key innovations:
 - **Zero-Coordinate Spatial Fingerprinting**: Observation-native static terrain and shelter values identify patches ($P_k$) without leaking global grid coordinates.
-- **Topological Discovery**: Transitions under action 4 (`explore`) and 5 (`flee`) establish graph edges, enabling breadth-first search (BFS) shortest-path waypoint planning.
+- **Topological Discovery**: Transitions under action 4 (`explore`) and 5 (`flee`) establish graph edges. Breadth-first distances help score known destinations; the action interface does not directly command a destination or guarantee following a shortest path.
 - **Replenishment Dynamics**: Models environmental replenishment ($\lambda_{\text{food}} = 0.007 / \text{scarcity}$, $\lambda_{\text{water}} = 0.014 / \text{scarcity}$) to revisit replenished resource patches once recovered.
 - **Physiological Travel Costs & Pre-Transit Rest**: Accounts for multi-hop travel costs ($d \times (0.038 \text{ energy} + 0.037 \text{ hyd} + 0.112 \text{ stam})$) and boosts resting (action 0) when stamina $< 0.20$ before embarking on long journeys.
-- **Impending Storm Evacuation**: Automatically routes to shelter when storm risk is high and shelter is low.
+- **Impending Storm Response**: Shelter scores bias action proposals when storm risk is high and shelter is low; movement remains governed by the simulator's action semantics.
 
 ```powershell
 python -m poseidon odyssey-fit

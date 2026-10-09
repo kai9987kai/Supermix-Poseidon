@@ -25,6 +25,22 @@ def make_handler(runtime, port):
 
         def do_GET(self):
             path = unquote(urlsplit(self.path).path)
+            if path == "/api/jobs" or path.startswith("/api/jobs/"):
+                try:
+                    if path == "/api/jobs":
+                        result = {"jobs": runtime.jobs().list()}
+                    elif path.count("/") == 3:
+                        result = runtime.jobs().get(path.rsplit("/", 1)[1])
+                    else:
+                        raise KeyError(path)
+                    self.send_json(200, result)
+                except KeyError:
+                    self.send_json(404, {"error": "Unknown experiment job."})
+                except StaleSourceError as error:
+                    self.send_json(409, {"error": str(error)} | source_status())
+                except (ValueError, TypeError) as error:
+                    self.send_json(400, {"error": str(error)})
+                return
             if path == "/api/status":
                 try:
                     self.send_json(200, runtime.status())
@@ -68,19 +84,40 @@ def make_handler(runtime, port):
                     raise ValueError("Expected a JSON object.")
             except (ValueError, UnicodeDecodeError) as error:
                 self.send_json(400, {"error": str(error)}); return
-            if self.path not in ("/api/respond", "/api/remember", "/api/experiment", "/api/contrast-experiment", "/api/horizon-experiment", "/api/odyssey-experiment"):
+            path = unquote(urlsplit(self.path).path)
+            if path == "/api/jobs" or (path.startswith("/api/jobs/") and path.endswith("/cancel") and path.count("/") == 4):
+                try:
+                    if path == "/api/jobs":
+                        assert_source_current()
+                        self.send_json(202, runtime.submit_helm_experiment(payload))
+                    else:
+                        if payload:
+                            raise ValueError("Cancellation requires an empty object.")
+                        self.send_json(200, runtime.jobs().cancel(path.split("/")[3]))
+                except KeyError:
+                    self.send_json(404, {"error": "Unknown experiment job."})
+                except StaleSourceError as error:
+                    self.send_json(409, {"error": str(error)} | source_status())
+                except (ValueError, TypeError) as error:
+                    self.send_json(400, {"error": str(error)})
+                except RuntimeError as error:
+                    self.send_json(409, {"error": str(error)})
+                return
+            if self.path not in ("/api/respond", "/api/remember", "/api/experiment", "/api/contrast-experiment", "/api/horizon-experiment", "/api/odyssey-experiment", "/api/helm-experiment"):
                 self.send_json(404, {"error": "Not found"}); return
             if not busy.acquire(blocking=False):
                 self.send_json(409, {"error": "Poseidon is processing another request. Try again shortly."}); return
             try:
-                if self.path in ("/api/experiment", "/api/contrast-experiment", "/api/horizon-experiment", "/api/odyssey-experiment"):
+                if self.path in ("/api/experiment", "/api/contrast-experiment", "/api/horizon-experiment", "/api/odyssey-experiment", "/api/helm-experiment"):
                     if set(payload) - {"seed", "episodes", "max_steps", "scarcity"}:
                         raise ValueError("Unknown experiment setting.")
                     episodes, max_steps = payload.get("episodes", 4), payload.get("max_steps", 64)
                     if type(episodes) is not int or not 1 <= episodes <= 8 or type(max_steps) is not int or not 32 <= max_steps <= 256:
                         raise ValueError("Workbench experiments require 1–8 paired episodes and 32–256 steps.")
                     assert_source_current()
-                    if self.path == "/api/odyssey-experiment":
+                    if self.path == "/api/helm-experiment":
+                        result = runtime.helm_experiment(payload.get("seed", 112000001), episodes, max_steps, payload.get("scarcity", 2.5))
+                    elif self.path == "/api/odyssey-experiment":
                         result = runtime.odyssey_experiment(payload.get("seed", 110000001), episodes, max_steps, payload.get("scarcity", 2.5))
                     elif self.path == "/api/horizon-experiment":
                         result = runtime.horizon_experiment(payload.get("seed", 108000001), episodes, max_steps, payload.get("scarcity", 2.5))
@@ -123,6 +160,7 @@ def serve(root=".", port=8787, adapter=None):
                 print(f"Server error recovered: {e}", flush=True)
     finally:
         server.server_close()
+        runtime.close()
 
 if __name__ == "__main__":
     p = argparse.ArgumentParser()

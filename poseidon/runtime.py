@@ -23,6 +23,10 @@ class Poseidon:
         self._horizon_stamp = None
         self._odyssey = None
         self._odyssey_stamp = None
+        self._helm = None
+        self._helm_stamp = None
+        self._jobs = None
+        self._jobs_lock = threading.Lock()
         self._candidate_status_snapshots = {}
         self.memory_path = self.root/"outputs/memory.json"
 
@@ -85,6 +89,90 @@ class Poseidon:
 
     def odyssey_status(self):
         return self._candidate_status("odyssey")
+
+    def helm(self):
+        from .helm import HelmCritic
+        path = self.root / "outputs/helm/atlas.json"
+        if not path.is_file():
+            raise RuntimeError("Helm is not fitted. Run python -m poseidon fit-helm first.")
+        core = self.core()
+        stamp = (self._core_stamp, path.stat().st_mtime_ns, path.stat().st_size)
+        if self._helm is None or self._helm_stamp != stamp:
+            self._helm = HelmCritic.load(core, path)
+            self._helm_stamp = stamp
+        return self._helm
+
+    def helm_status(self):
+        return self._candidate_status("helm")
+
+    def jobs(self):
+        with self._jobs_lock:
+            if self._jobs is None:
+                import hashlib
+                from .jobs import ExperimentJobs
+                from .provenance import assert_source_current
+                sources = assert_source_current()
+                producer = {"version": __version__, "source_sha256": hashlib.sha256(
+                    json.dumps(sources, sort_keys=True).encode()).hexdigest()}
+                self._jobs = ExperimentJobs(self.root / "outputs/jobs", producer=producer)
+            return self._jobs
+
+    def close(self):
+        if self._jobs is not None:
+            self._jobs.close()
+
+    def submit_helm_experiment(self, settings):
+        from .provenance import assert_source_current
+        from .world import _integer, _number
+        if not isinstance(settings, dict) or set(settings) - {"kind", "seed", "episodes", "max_steps", "scarcity"}:
+            raise ValueError("Unknown job setting.")
+        if settings.get("kind") != "helm-experiment":
+            raise ValueError("Unknown experiment job kind.")
+        seed = _integer(settings.get("seed", 112000001), "seed", 0, 2**63 - 9)
+        episodes = _integer(settings.get("episodes", 4), "episodes", 1, 8)
+        max_steps = _integer(settings.get("max_steps", 64), "max_steps", 32, 256)
+        scarcity = _number(settings.get("scarcity", 2.5), "scarcity", .5, 4)
+        assert_source_current()
+        # Fail missing/invalid producer readiness before accepting background work.
+        if not self.lock.acquire(blocking=False):
+            raise RuntimeError("Poseidon is processing another model operation. Try again shortly.")
+        try:
+            self.helm()
+        finally:
+            self.lock.release()
+        normalized = {"seed": seed, "episodes": episodes, "max_steps": max_steps, "scarcity": scarcity}
+        return self.jobs().submit("helm-experiment", normalized,
+            lambda progress: self.helm_experiment(**normalized, progress=progress), timeout_seconds=1800)
+
+    def helm_experiment(self, seed=112000001, episodes=4, max_steps=64, scarcity=2.5, progress=None):
+        from .helm_experiment import run_helm_experiment, verify_helm_receipt
+        from .experiments import write_receipt
+        from .provenance import assert_source_current
+        from .world import _integer, _number
+        seed = _integer(seed, "seed", 0, 2**63 - 65)
+        episodes = _integer(episodes, "episodes", 1, 64)
+        max_steps = _integer(max_steps, "max_steps", 16, 512)
+        scarcity = _number(scarcity, "scarcity", .5, 4)
+        def check(event):
+            assert_source_current()
+            if progress:
+                progress(event)
+        while not self.lock.acquire(timeout=.2):
+            check({"phase": "waiting-for-model"})
+        try:
+            check({"phase": "starting"})
+            result = run_helm_experiment(self.core(), self.helm(), seeds=list(range(seed, seed + episodes)),
+                max_steps=max_steps, scarcity=scarcity, progress=check)
+            check({"phase": "verifying"})
+            verification = verify_helm_receipt(result, progress=check)
+            check({"phase": "publishing"})
+            path = write_receipt(result, self.root / "outputs/helm_experiments")
+            replay = next(episode for episode in result["episodes"] if episode["controller"] == "selected")
+            return {key: result[key] for key in ("schema", "experiment_id", "summary", "paired", "rows", "risk_coverage", "limits") if key in result} | {
+                "artifact_url": "/artifacts/" + path.relative_to(self.root / "outputs").as_posix(),
+                "receipt_sha256": result["receipt_sha256"], "verification": verification, "replay": replay}
+        finally:
+            self.lock.release()
 
     def _candidate_status(self, name):
         """Readiness may be cached while a world or experiment owns the model."""
@@ -202,7 +290,7 @@ class Poseidon:
             core_ready = active_core_path(self.root).is_file()
         except (ValueError, TypeError, OSError) as error:
             core_ready, core_error = False, str(error)
-        result = {"version": __version__, "name": "Supermix Poseidon", "language_ready": (self.root/"models/language/model.safetensors").exists(), "core_ready": core_ready, "atlas": self.atlas_status(), "contrast": self.contrast_status(), "horizon": self.horizon_status(), "odyssey": self.odyssey_status(), "reports": reports, "limits": "Experimental composite system. Controlled geometric media. Tool-assisted maths. Synthetic survival."} | source_status()
+        result = {"version": __version__, "name": "Supermix Poseidon", "language_ready": (self.root/"models/language/model.safetensors").exists(), "core_ready": core_ready, "atlas": self.atlas_status(), "contrast": self.contrast_status(), "horizon": self.horizon_status(), "odyssey": self.odyssey_status(), "helm": self.helm_status(), "reports": reports, "limits": "Experimental composite system. Controlled geometric media. Tool-assisted maths. Synthetic survival."} | source_status()
         if core_error:
             result["core_error"] = core_error
         return result
@@ -241,10 +329,14 @@ class Poseidon:
                 from .world_controls import rollout_with_decisions
                 _integer(max_steps, "max_steps", 1, 10000)
                 scarcity = _number(scarcity, "scarcity", .5, 4)
-                if planner not in ("policy", "mpc", "hybrid", "risk_aware", "uncertainty", "atlas", "contrast", "horizon", "odyssey"):
+                if planner not in ("policy", "mpc", "hybrid", "risk_aware", "uncertainty", "atlas", "contrast", "horizon", "odyssey", "helm"):
                     raise ValueError("Unknown survival planner.")
                 core = self.core()
-                if planner == "odyssey":
+                if planner == "helm":
+                    controller = self.helm()
+                    controller.reset(scarcity=scarcity, max_steps=max_steps)
+                    backend_desc = "Helm independently fitted multi-horizon critic with observed history and empirical abstention in TidePool"
+                elif planner == "odyssey":
                     controller = self.odyssey()
                     controller.reset(scarcity)
                     backend_desc = "Odyssey cognitive topological mapping + navigational memory in TidePool"
