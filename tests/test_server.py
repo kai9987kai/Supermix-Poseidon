@@ -96,3 +96,16 @@ def test_odysseus_and_mco_experiment_request_validation(server):
     assert error.value.code == 500
     assert "checkpoint" in json.load(error.value)["error"].lower()
 
+
+def test_metamorph_experiment_request_validation(server):
+    url, _ = server
+    for settings in ({"episodes": 9}, {"max_steps": 1000}, {"episodes": True}, {"unknown": 1}):
+        with pytest.raises(HTTPError) as error:
+            post(url+"/api/metamorph-experiment", settings)
+        assert error.value.code == 400
+    with pytest.raises(HTTPError) as error:
+        post(url+"/api/metamorph-experiment", {"episodes": 1, "max_steps": 32})
+    assert error.value.code == 500
+    assert "checkpoint" in json.load(error.value)["error"].lower()
+
+

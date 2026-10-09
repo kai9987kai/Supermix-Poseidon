@@ -90,7 +90,9 @@ def make_handler(runtime, port):
                     if path == "/api/jobs":
                         assert_source_current()
                         kind = payload.get("kind")
-                        if kind == "aura-experiment":
+                        if kind == "metamorph-experiment":
+                            self.send_json(202, runtime.submit_metamorph_experiment(payload))
+                        elif kind == "aura-experiment":
                             self.send_json(202, runtime.submit_aura_experiment(payload))
                         elif kind == "tessera-experiment":
                             self.send_json(202, runtime.submit_tessera_experiment(payload))
@@ -117,7 +119,7 @@ def make_handler(runtime, port):
                 except RuntimeError as error:
                     self.send_json(409, {"error": str(error)})
                 return
-            if self.path not in ("/api/respond", "/api/remember", "/api/experiment", "/api/contrast-experiment", "/api/horizon-experiment", "/api/odyssey-experiment", "/api/helm-experiment", "/api/odysseus-experiment", "/api/mco-experiment", "/api/aura-experiment", "/api/tessera-experiment", "/api/mnemorph-experiment"):
+            if self.path not in ("/api/respond", "/api/remember", "/api/experiment", "/api/contrast-experiment", "/api/horizon-experiment", "/api/odyssey-experiment", "/api/helm-experiment", "/api/odysseus-experiment", "/api/mco-experiment", "/api/aura-experiment", "/api/tessera-experiment", "/api/mnemorph-experiment", "/api/metamorph-experiment"):
                 self.send_json(404, {"error": "Not found"}); return
             if not busy.acquire(blocking=False):
                 self.send_json(409, {"error": "Poseidon is processing another request. Try again shortly."}); return
@@ -131,14 +133,16 @@ def make_handler(runtime, port):
                 elif self.path == "/api/mnemorph-experiment":
                     assert_source_current()
                     result = runtime.mnemorph_experiment()
-                elif self.path in ("/api/experiment", "/api/contrast-experiment", "/api/horizon-experiment", "/api/odyssey-experiment", "/api/helm-experiment", "/api/odysseus-experiment", "/api/aura-experiment"):
+                elif self.path in ("/api/experiment", "/api/contrast-experiment", "/api/horizon-experiment", "/api/odyssey-experiment", "/api/helm-experiment", "/api/odysseus-experiment", "/api/aura-experiment", "/api/metamorph-experiment"):
                     if set(payload) - {"kind", "seed", "episodes", "max_steps", "scarcity"}:
                         raise ValueError("Unknown experiment setting.")
                     episodes, max_steps = payload.get("episodes", 4), payload.get("max_steps", 64)
                     if type(episodes) is not int or not 1 <= episodes <= 8 or type(max_steps) is not int or not 32 <= max_steps <= 256:
                         raise ValueError("Workbench experiments require 1–8 paired episodes and 32–256 steps.")
                     assert_source_current()
-                    if self.path == "/api/aura-experiment":
+                    if self.path == "/api/metamorph-experiment":
+                        result = runtime.metamorph_experiment(payload.get("seed", 199000001), episodes, max_steps, payload.get("scarcity", 2.5))
+                    elif self.path == "/api/aura-experiment":
                         result = runtime.aura_experiment(payload.get("seed", 144000001), episodes, max_steps, payload.get("scarcity", 2.5))
                     elif self.path == "/api/odysseus-experiment":
                         result = runtime.odysseus_experiment(payload.get("seed", 133000001), episodes, max_steps, payload.get("scarcity", 2.5))

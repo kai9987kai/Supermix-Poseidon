@@ -9,6 +9,30 @@ The model release is hosted at [**Kai9987kai/Supermix-Poseidon**](https://huggin
 
 Built for the supplied Snapdragon Windows PC: CPU only, bounded threads, no paid APIs. The 24 linked projects inform the architecture through documented source review; their code and checkpoints are not indiscriminately merged.
 
+## METAMORPH, MOLT, NexusFlow & Chronos — v0.9 release
+
+The **v0.9 release** advances the experimental architecture to a new frontier, synthesizing life-stage morphogenesis, directed causal potential flux, and periodic frame beaconing without altering frozen Tidal neural weights:
+
+1. **MOLT: Metamorphic Online Life-Stage Transmutation & Morphogenesis** ([`docs/MOLT_DESIGN.md`](docs/MOLT_DESIGN.md)):
+   - **Life-Stage Specialization**: Implements `larval` (acute local foraging, high sensory gain), `pupa` (quiescent diapause, chitinous exposure hardening, internal structural remodeling), and `imago` (expanded receptive horizon, high-speed dispersal travel).
+   - **Ecdysis & Cryptographic Exuviae**: Accumulates developmental biomass and triggers ecdysis, shedding tamper-proof SHA-256 exuvia artifacts.
+
+2. **NexusFlow: Directed Acyclic Causal Flux & Superposition Routing** ([`docs/NEXUSFLOW_DESIGN.md`](docs/NEXUSFLOW_DESIGN.md)):
+   - **Continuous Causal Flux**: Solves hydraulic potential gradients $\Phi_{ij} = \exp(-d_{ij}/\tau) \cdot \Delta P_{ij}$ over spatial replenishment corridors.
+   - **Coherent Superposition Interference**: Evaluates wave interference $I(a, b) = 2\sqrt{V_a V_b}\cos(\Delta\theta)$ between biomimetic compass headings and topological potential vectors, suppressing destructive bifurcations ($\cos\Delta\theta < -0.2$).
+
+3. **Chronos & Ghost: Periodic Frame Synchronization & Phantom Trace Introspection** ([`docs/CHRONOS_DESIGN.md`](docs/CHRONOS_DESIGN.md)):
+   - **Periodic Beacon Clock**: Emulates hardware-level cyclic carrier beacon pulses ($T_{\text{sync}} = 8$ ticks) synchronizing macro-action expiration and concept consolidation.
+   - **Ghost Trace Auditor**: Quantifies counterfactual ontological divergence via the Spectral Divergence Index (SDI).
+
+```powershell
+# Run the 3-arm paired METAMORPH evaluation benchmark
+python -m poseidon metamorph-experiment --episodes 4 --max-steps 48 --scarcity 2.5
+
+# Verify METAMORPH experiment receipt offline
+python -m poseidon verify-metamorph outputs/metamorph_experiments/RECEIPT.json
+```
+
 ## AURA, Tessera & Mnemorph — v0.8 release
 
 The **v0.8 release** introduces three groundbreaking biologically and architecturally inspired innovations synthesizing cutting-edge principles across biomimetic insect navigation, lineage-ratified macro-actions, and topological memory archaeology without altering the frozen Tidal neural weights:

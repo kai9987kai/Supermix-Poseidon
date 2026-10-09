@@ -95,6 +95,10 @@ class TesseraMacroCommons:
                 del self.ratified[opcode_id]
         return expired
 
+    def retire_expired(self) -> List[str]:
+        """Retire expired opcodes upon cyclic beacon phase advance."""
+        return self.advance_epoch()
+
     def validate_safety(self, actions: List[int], current_stamina: float, current_depth: float) -> bool:
         """Finite-domain semantic check: verify stamina budget across the sequence."""
         # Action stamina costs: 0 (rest) recovers +0.10, movements 1..4 cost 0.05, forage 5 costs 0.08

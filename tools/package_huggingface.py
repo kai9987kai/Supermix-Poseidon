@@ -58,7 +58,7 @@ def git(*args: str) -> str:
 
 
 def model_card(revision: str, core_hash: str, atlas_hash: str, horizon_hash: str, contrast_hash: str, odyssey_hash: str, version: str, helm_hash: str = "", odysseus_hash: str = "") -> str:
-    return f"""---
+    return fr"""---
 language:
 - en
 license: other
@@ -87,15 +87,16 @@ tags:
 - synthetic-simulation
 ---
 
-# Supermix Poseidon v{version}: AURA Central Complex, Tessera Macro-Commons & Mnemorph Archaeological Memory
+# Supermix Poseidon v{version}: METAMORPH Developmental Ecdysis, NexusFlow Causal Flux & Chronos Synchronization
 
-Version 0.8 introduces three biomimetic, macro-action, and memory archaeology additions:
-1. **AURA Biomimetic Central Complex Controller**: 16-wedge recurrent ring attractor compass with cosine kernel and continuous angular velocity integration, Population Vector Average (PVA) heading tracking and bump coherence $R$, optomotor stabilization reflex ($R < 0.35$), and 128 virtual Kenyon cell Mushroom Body neuropil with $k=8$ winner-take-all APL inhibitory gain control (6.25% sparsity) arbitrating metabolic, fatigue, and threat homeostatic drives into descending motor channels (`harvester`, `sentinel`, `escaper`).
-2. **Tessera Lineage-Ratified Macro-Action Commons**: Decentralized macro-action discovery where single-lineage candidate bursts are quarantined, and ratified into global `OP_*` opcodes only upon independent dual-lineage confirmation ($\Delta R > 0$) with finite-domain stamina and horizon safety assertions.
-3. **Mnemorph Archaeological Memory Assays**: Associative concept graph assays evaluating catastrophic forgetting and topological resilience across typed structural interventions (`intact`, `hub_lesion`, `periphery_lesion`, `associative_regrowth`), measuring Hub Vulnerability Ratio (HVR) and associative recovery.
+Version 0.9 introduces metamorphic developmental stages, hydraulic causal flux routing, and hardware-synchronized cyclic introspection:
+1. **MOLT Life-Stage Transmutation & Morphogenesis**: Three distinct developmental instars (`larval`, `pupa`, `imago`) governing dynamic sensory gains, chitinous diapause hardening, ecdysis biomass triggers, and cryptographic exuvia hashing.
+2. **NexusFlow Directed Causal Flux & Superposition Routing**: Topological potential flow gradients $\Phi_{{ij}} = \exp(-d_{{ij}}/\tau) \cdot \Delta P_{{ij}}$ across replenishment corridors, coupled with coherent superposition wave interference checking $I(a, b) = 2\sqrt{{V_a V_b}}\cos(\Delta\theta)$ mitigating destructive directional bifurcations.
+3. **Chronos Cyclic Beacon & Ghost Trace Auditor**: Hardware-clock cyclic beacon clock ($T_{{\text{{sync}}}} = 8$ ticks) phase-synchronizing module expiration and concept consolidation, with a Ghost Trace Auditor tracking the Spectral Divergence Index (SDI) against frozen core counterfactuals.
+4. **Unified METAMORPH Controller**: Integrated controller combining AURA biomimetic steering, MOLT life-stage adaptation, NexusFlow topological gradient flow, and Chronos synchronization.
 
 [Source commit](https://github.com/kai9987kai/Supermix-Poseidon/tree/{revision}) ·
-[AURA design](docs/AURA_DESIGN.md) · [AURA results](docs/AURA_RESULTS.md) · [Tessera design](docs/TESSERA_DESIGN.md) · [Tessera results](docs/TESSERA_RESULTS.md) · [Mnemorph design](docs/MNEMORPH_DESIGN.md) · [Odysseus design](docs/ODYSSEUS_DESIGN.md) · [MCO design](docs/MCO_DESIGN.md) · [Release guide](docs/HUGGINGFACE_RELEASE.md)
+[MOLT design](docs/MOLT_DESIGN.md) · [NexusFlow design](docs/NEXUSFLOW_DESIGN.md) · [Chronos design](docs/CHRONOS_DESIGN.md) · [METAMORPH results](docs/METAMORPH_RESULTS.md) · [AURA design](docs/AURA_DESIGN.md) · [Tessera design](docs/TESSERA_DESIGN.md) · [Release guide](docs/HUGGINGFACE_RELEASE.md)
 
 ## Components and activation
 
@@ -105,6 +106,11 @@ Version 0.8 introduces three biomimetic, macro-action, and memory archaeology ad
 | Supervised baseline | `runs/tidal/core.pt` | Comparison checkpoint, original embedded training state |
 | SmolLM2: 134,515,008 stored parameters | `models/language/model.safetensors` | Separate unchanged pretrained conversation backend |
 | LoRA: 61,440 parameters | `runs/language/adapter/` | Experimental candidate, inactive by default |
+| METAMORPH Controller | `poseidon/metamorph.py` | Unified developmental ecdysis, causal flux & cyclic sync controller, opt-in |
+| MOLT Morphogenesis | `poseidon/molt.py` | Larval/pupa/imago developmental instars & exuvia hashing |
+| NexusFlow Causal Flux | `poseidon/nexusflow.py` | Hydraulic replenishment gradients & superposition interference checking |
+| Chronos & Ghost Auditor | `poseidon/chronos.py` | Hardware cyclic sync pulses & Ghost counterfactual SDI tracking |
+| METAMORPH Receipt | `outputs/metamorph_experiments/RECEIPT.json` | Paired multi-arm evaluation benchmark receipt |
 | AURA Biomimetic Controller | `poseidon/aura.py` | 16-wedge CX-ring attractor & 128-KC sparse neuropil arbiter, opt-in controller |
 | Tessera Macro-Commons | `outputs/tessera_experiments/RECEIPT.json` | Independent dual-lineage ratified macro-actions, opt-in commons |
 | Mnemorph Memory Assays | `outputs/mnemorph/RECEIPT.json` | Typed structural lesion and associative regrowth receipts |
@@ -247,7 +253,7 @@ to avoid relicensing upstream artifacts as MIT.
 def package(output: Path, repo_id: str = REPO_ID) -> dict:
     sys.path.insert(0, str(ROOT))
     from poseidon import __version__
-    if __version__ != "0.8.0":
+    if __version__ != "0.9.0":
         raise ValueError(f"unsupported version {__version__}")
     if repo_id != REPO_ID:
         raise ValueError("this release card is bound to Kai9987kai/Supermix-Poseidon")
@@ -315,6 +321,7 @@ def package(output: Path, repo_id: str = REPO_ID) -> dict:
     from poseidon.aura_experiment import verify_aura_receipt
     from poseidon.tessera_experiment import verify_tessera_receipt
     from poseidon.mnemorph import verify_mnemorph_receipt
+    from poseidon.metamorph_experiment import verify_metamorph_receipt
     aura_experiment_verification = {
         name: verify_aura_receipt(json.loads((ROOT / "outputs/aura_experiments" / name).read_text(encoding="utf-8")))
         for name in AURA_EXPERIMENTS
@@ -324,6 +331,9 @@ def package(output: Path, repo_id: str = REPO_ID) -> dict:
     }
     mnemorph_experiment_verification = {
         "RECEIPT.json": verify_mnemorph_receipt(json.loads((ROOT / "outputs/mnemorph/RECEIPT.json").read_text(encoding="utf-8")))
+    }
+    metamorph_experiment_verification = {
+        "RECEIPT.json": verify_metamorph_receipt(json.loads((ROOT / "outputs/metamorph_experiments/RECEIPT.json").read_text(encoding="utf-8")))
     }
 
     experiment_verification = {name: load_and_verify(ROOT / "outputs/experiments" / name) for name in EXPERIMENTS}
@@ -390,6 +400,7 @@ def package(output: Path, repo_id: str = REPO_ID) -> dict:
         "outputs/mco_experiments/RECEIPT.json",
         "outputs/tessera_experiments/RECEIPT.json",
         "outputs/mnemorph/RECEIPT.json",
+        "outputs/metamorph_experiments/RECEIPT.json",
         "models/language/manifest.json", "data/language/manifest.json",
         "data/language/SOURCE_CARD.md",
     ] + [f"models/language/{name}" for name in upstream["files"]]
@@ -506,6 +517,7 @@ See runs/language/report.json, data/language/SOURCE_CARD.md and the root model c
         "aura_experiment_verification": aura_experiment_verification,
         "tessera_experiment_verification": tessera_experiment_verification,
         "mnemorph_experiment_verification": mnemorph_experiment_verification,
+        "metamorph_experiment_verification": metamorph_experiment_verification,
         "build_environment": {name: importlib.metadata.version(name) for name in
                               ("torch", "transformers", "peft", "safetensors", "numpy", "huggingface-hub")},
         "activation": {"core": "existing-dagger-selection", "language": "unchanged-upstream-base",
@@ -518,6 +530,7 @@ See runs/language/report.json, data/language/SOURCE_CARD.md and the root model c
                        "aura": "opt-in-biomimetic-controller",
                        "tessera": "ratified-macro-commons",
                        "mnemorph": "archaeological-memory-assays",
+                       "metamorph": "opt-in-metamorphic-controller",
                        "legacy_ensemble": "historical-unvalidated-not-loaded"},
     }
     write_json(output / "manifest.json", manifest)

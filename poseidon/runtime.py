@@ -149,6 +149,13 @@ class Poseidon:
     def aura_status(self):
         return {"ready": True, "type": "biomimetic_central_complex_and_neuropil"}
 
+    def metamorph(self):
+        from .metamorph import MetamorphController
+        return MetamorphController(core=self.core(), tessera=self.tessera())
+
+    def metamorph_status(self):
+        return {"ready": True, "type": "unified_metamorphic_biomimetic_causal_flux"}
+
     def mnemorph_status(self):
         relative = "outputs/mnemorph/RECEIPT.json"
         path = self.root / relative
@@ -456,6 +463,66 @@ class Poseidon:
             "verification": verification,
         }
 
+    def submit_metamorph_experiment(self, settings):
+        from .provenance import assert_source_current
+        from .world import _integer, _number
+        if not isinstance(settings, dict) or set(settings) - {"kind", "seed", "episodes", "max_steps", "scarcity"}:
+            raise ValueError("Unknown job setting.")
+        if settings.get("kind") != "metamorph-experiment":
+            raise ValueError("Unknown experiment job kind.")
+        seed = _integer(settings.get("seed", 199000001), "seed", 0, 2**63 - 9)
+        episodes = _integer(settings.get("episodes", 4), "episodes", 1, 8)
+        max_steps = _integer(settings.get("max_steps", 48), "max_steps", 16, 256)
+        scarcity = _number(settings.get("scarcity", 2.5), "scarcity", .5, 4)
+        assert_source_current()
+        if not self.lock.acquire(blocking=False):
+            raise RuntimeError("Poseidon is processing another model operation. Try again shortly.")
+        try:
+            self.core()
+        finally:
+            self.lock.release()
+        normalized = {"seed": seed, "episodes": episodes, "max_steps": max_steps, "scarcity": scarcity}
+        return self.jobs().submit("metamorph-experiment", normalized,
+            lambda progress: self.metamorph_experiment(**normalized, progress=progress), timeout_seconds=1800)
+
+    def metamorph_experiment(self, seed=199000001, episodes=4, max_steps=48, scarcity=2.5, progress=None):
+        import json
+        from .metamorph_experiment import run_metamorph_experiment, verify_metamorph_receipt
+        from .provenance import assert_source_current
+        from .world import _integer, _number
+        seed = _integer(seed, "seed", 0, 2**63 - 65)
+        episodes = _integer(episodes, "episodes", 1, 64)
+        max_steps = _integer(max_steps, "max_steps", 16, 512)
+        scarcity = _number(scarcity, "scarcity", .5, 4)
+        def check(event):
+            assert_source_current()
+            if progress:
+                progress(event)
+        while not self.lock.acquire(timeout=.2):
+            check({"phase": "waiting-for-model"})
+        try:
+            check({"phase": "starting"})
+            seeds = list(range(seed, seed + episodes))
+            result = run_metamorph_experiment(self.core(), seeds=seeds, max_steps=max_steps, scarcity=scarcity, progress=check)
+            check({"phase": "verifying"})
+            verification = verify_metamorph_receipt(result)
+            check({"phase": "publishing"})
+            receipt_dir = self.root / "outputs/metamorph_experiments"
+            receipt_dir.mkdir(parents=True, exist_ok=True)
+            path = receipt_dir / "RECEIPT.json"
+            path.write_text(json.dumps(result, indent=2, sort_keys=True), encoding="utf-8")
+            return {
+                "schema": result["schema"],
+                "experiment_id": result["experiment_id"],
+                "arm_stats": result["arm_stats"],
+                "metamorph_telemetry": result["metamorph_telemetry"],
+                "artifact_url": "/artifacts/" + path.relative_to(self.root / "outputs").as_posix(),
+                "receipt_sha256": result["receipt_sha256"],
+                "verification": verification,
+            }
+        finally:
+            self.lock.release()
+
     def _candidate_status(self, name):
         """Readiness may be cached while a world or experiment owns the model."""
         relative = f"outputs/{name}/atlas.json"
@@ -589,7 +656,7 @@ class Poseidon:
             core_ready = active_core_path(self.root).is_file()
         except (ValueError, TypeError, OSError) as error:
             core_ready, core_error = False, str(error)
-        result = {"version": __version__, "name": "Supermix Poseidon", "language_ready": (self.root/"models/language/model.safetensors").exists(), "core_ready": core_ready, "atlas": self.atlas_status(), "contrast": self.contrast_status(), "horizon": self.horizon_status(), "odyssey": self.odyssey_status(), "helm": self.helm_status(), "odysseus": self.odysseus_status(), "mco": self.mco_status(), "aura": self.aura_status(), "tessera": self.tessera_status(), "mnemorph": self.mnemorph_status(), "reports": reports, "limits": "Experimental composite system. Controlled geometric media. Tool-assisted maths. Synthetic survival."} | source_status()
+        result = {"version": __version__, "name": "Supermix Poseidon", "language_ready": (self.root/"models/language/model.safetensors").exists(), "core_ready": core_ready, "atlas": self.atlas_status(), "contrast": self.contrast_status(), "horizon": self.horizon_status(), "odyssey": self.odyssey_status(), "helm": self.helm_status(), "odysseus": self.odysseus_status(), "mco": self.mco_status(), "aura": self.aura_status(), "tessera": self.tessera_status(), "mnemorph": self.mnemorph_status(), "metamorph": self.metamorph_status(), "reports": reports, "limits": "Experimental composite system. Controlled geometric media. Tool-assisted maths. Synthetic survival."} | source_status()
         if core_error:
             result["core_error"] = core_error
         return result
@@ -628,10 +695,14 @@ class Poseidon:
                 from .world_controls import rollout_with_decisions
                 _integer(max_steps, "max_steps", 1, 10000)
                 scarcity = _number(scarcity, "scarcity", .5, 4)
-                if planner not in ("policy", "mpc", "hybrid", "risk_aware", "uncertainty", "atlas", "contrast", "horizon", "odyssey", "helm", "odysseus", "aura"):
+                if planner not in ("policy", "mpc", "hybrid", "risk_aware", "uncertainty", "atlas", "contrast", "horizon", "odyssey", "helm", "odysseus", "aura", "metamorph"):
                     raise ValueError("Unknown survival planner.")
                 core = self.core()
-                if planner == "aura":
+                if planner == "metamorph":
+                    controller = self.metamorph()
+                    controller.reset(scarcity)
+                    backend_desc = "METAMORPH developmental ecdysis (MOLT) + causal flux (NexusFlow) + cyclic beacon (Chronos) in TidePool"
+                elif planner == "aura":
                     controller = self.aura()
                     controller.reset(scarcity)
                     backend_desc = "AURA biomimetic Central Complex ring attractor + sparse neuropil arbiter in TidePool"
