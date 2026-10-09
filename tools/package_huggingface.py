@@ -294,7 +294,7 @@ def package(output: Path, repo_id: str = REPO_ID) -> dict:
         raise ValueError("Helm release requires a frozen complete evaluation profile")
     helm_experiment_verification = {
         name: verify_helm_receipt(stable_json(ROOT / "outputs/helm_experiments" / name)) for name in helm_names}
-    if any(stable_json(ROOT / "outputs/helm_experiments" / name)["helm"]["artifact_sha256"] != helm_hash for name in helm_names):
+    if any(stable_json(ROOT / "outputs/helm_experiments" / name)["critic"]["sha256"] != helm_hash for name in helm_names):
         raise ValueError("Helm evaluation is bound to a different fitted critic")
 
     experiment_verification = {name: load_and_verify(ROOT / "outputs/experiments" / name) for name in EXPERIMENTS}

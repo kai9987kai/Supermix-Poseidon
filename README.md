@@ -9,11 +9,18 @@ The model release is hosted at [**Kai9987kai/Supermix-Poseidon**](https://huggin
 
 Built for the supplied Snapdragon Windows PC: CPU only, bounded threads, no paid APIs. The 24 linked projects inform the architecture through documented source review; their code and checkpoints are not indiscriminately merged.
 
-## Helm — v0.6 development
+## Helm — v0.6 release
 
 The new opt-in **Helm** critic independently learns multi-horizon returns from observed history and realized Tidal prediction errors. Observation-only, innovation-erased and training-error-yoked controls separate useful history from added complexity. Disjoint episode partitions cover fitting, selection, calibration and evaluation; both 4- and 16-step margins must support a calibrated intervention.
 
-The workbench adds durable cancellable CPU experiments, full action/trajectory receipts and descriptive benefit/harm versus override coverage. The default core policy remains selected. See [design and commands](docs/HELM_DESIGN.md) and [the refreshed review of all 24 repositories and recent research](docs/research/README.md).
+```powershell
+python -m poseidon fit-helm --train-episodes 12 --selection-episodes 8 --calibration-episodes 8 --anchors 12 --max-steps 96
+python -m poseidon helm-experiment --seed 123000001 --episodes 4 --max-steps 64 --scarcity 2.5
+python -m poseidon verify-helm outputs/helm_experiments/349465c522f435a5-2101a2f756ec.json
+python -m poseidon world --planner helm --seed 42 --max-steps 96 --scarcity 2.5
+```
+
+The workbench adds durable cancellable CPU experiments, full action/trajectory receipts and descriptive benefit/harm versus override coverage. In paired empirical benchmarks across moderate ($scarcity=2.5$) and severe ($scarcity=4.0$) environments, an uncalibrated critic aggressively overrode the policy (~61% override rate), leading to catastrophic collapse (0–25% survival and negative rewards). Under Poseidon Helm's calibrated dual-horizon risk gating ($\varepsilon_4=0.1058, \varepsilon_{16}=0.3574$), spurious overrides were cleanly suppressed (0 overrides), fully preserving 100% survival and baseline performance. The default core policy remains selected. See [design and architecture](docs/HELM_DESIGN.md), [empirical measurements and results](docs/HELM_RESULTS.md), and [the refreshed review of all 24 repositories and recent research](docs/research/README.md).
 
 ## Trajectory evidence audit — v0.5.1
 
