@@ -22,6 +22,10 @@ HORIZON_EXPERIMENTS = (
     "f83c77efdb0a70ad-ac7304a77e02.json",
     "7eb3ec0702f503b1-a4bac8a67483.json",
 )
+ODYSSEY_EXPERIMENTS = (
+    "cdaf779874a04de6-7dc45ea640b3.json",
+    "e492031f870f05da-c9ba9d72f3be.json",
+)
 
 
 def sha256(path: Path) -> str:
@@ -41,7 +45,7 @@ def git(*args: str) -> str:
     return subprocess.check_output(["git", *args], cwd=ROOT, text=True, encoding="utf-8").strip()
 
 
-def model_card(revision: str, core_hash: str, atlas_hash: str, horizon_hash: str, contrast_hash: str) -> str:
+def model_card(revision: str, core_hash: str, atlas_hash: str, horizon_hash: str, contrast_hash: str, odyssey_hash: str) -> str:
     return f"""---
 language:
 - en
@@ -59,22 +63,25 @@ tags:
 - model-predictive-control
 - counterfactual-memory
 - multi-horizon-advantage
+- spatial-memory
+- cognitive-mapping
+- topological-navigation
 - lora
 - cpu
 - experimental
 - synthetic-simulation
 ---
 
-# Supermix Poseidon v0.4.0: Horizon Atlas
+# Supermix Poseidon v0.5.0: Odyssey Spatial Cognitive Mapping
 
 A CPU-local experimental system with a trained synthetic scene/control core,
-a separate pretrained conversation model, and an inspectable multi-horizon
-return advantage planner (**Horizon Atlas v0.4**). This release bundles matching
-runtime source and model artifacts. It is a custom PyTorch application, not
+a separate pretrained conversation model, and an inspectable topological cognitive
+mapping & navigational memory system (**Odyssey Atlas v0.5**). This release bundles
+matching runtime source and model artifacts. It is a custom PyTorch application, not
 a Transformers model at the repository root.
 
 [Source commit](https://github.com/kai9987kai/Supermix-Poseidon/tree/{revision}) ·
-[Horizon design](docs/HORIZON_DESIGN.md) · [Horizon results](docs/HORIZON_RESULTS.md) · [Release guide](docs/HUGGINGFACE_RELEASE.md)
+[Odyssey design](docs/ODYSSEY_DESIGN.md) · [Odyssey results](docs/ODYSSEY_RESULTS.md) · [Horizon design](docs/HORIZON_DESIGN.md) · [Release guide](docs/HUGGINGFACE_RELEASE.md)
 
 ## Components and activation
 
@@ -84,6 +91,7 @@ a Transformers model at the repository root.
 | Supervised baseline | `runs/tidal/core.pt` | Comparison checkpoint, original embedded training state |
 | SmolLM2: 134,515,008 stored parameters | `models/language/model.safetensors` | Separate unchanged pretrained conversation backend |
 | LoRA: 61,440 parameters | `runs/language/adapter/` | Experimental candidate, inactive by default |
+| Odyssey Atlas v5 | `outputs/odyssey/atlas.json` | Spatial cognitive map and replenishment-decay waypoint planner, opt-in candidate |
 | Horizon Atlas v4 | `outputs/horizon/atlas.json` | Fitted multi-horizon return advantage, opt-in planner |
 | Contrast Atlas | `outputs/contrast/atlas.json` | Matched-action residual memory, opt-in candidate |
 | Counterfactual Atlas | `outputs/atlas/atlas.json` | Fitted residual memory, opt-in candidate |
@@ -101,7 +109,7 @@ connectome, consciousness or general autonomous-learning capability is claimed.
 
 ```bash
 python -m pip install huggingface-hub
-hf download {REPO_ID} --revision v0.4.0 --local-dir Poseidon-release
+hf download {REPO_ID} --revision v0.5.0 --local-dir Poseidon-release
 cd Poseidon-release
 python -m pip install -e .
 python tools/verify_huggingface_release.py . --smoke
@@ -119,6 +127,7 @@ For immutable provenance, pin the Hub commit SHA returned by the release upload.
 from poseidon.runtime import Poseidon
 runtime = Poseidon('.')  # run from the downloaded release directory
 print(runtime.respond('Survive', mode='world', seed=42, planner='policy'))
+print(runtime.respond('Survive', mode='world', seed=42, planner='odyssey'))
 print(runtime.respond('Survive', mode='world', seed=42, planner='horizon'))
 ```
 
@@ -126,7 +135,7 @@ Default language uses pinned `HuggingFaceTB/SmolLM2-135M-Instruct` at
 `{LANGUAGE_REVISION}`. Explicitly test the candidate with
 `python -m poseidon chat 'Explain why seasons change.' --adapter runs/language/adapter`.
 Generation uses at most a 1,024-token local input budget and 256 generated tokens.
-This release does not automatically activate the adapter, Atlas, Contrast or Horizon.
+This release does not automatically activate the adapter, Atlas, Contrast, Horizon or Odyssey.
 
 ## Training and measured limits
 
@@ -136,14 +145,24 @@ over the four-round run, not a precise exposure count of the selected weights.
 Stored evaluation reports describe controlled scene vocabulary and synthetic
 TidePool survival. Reported 100% results do not imply real-world generalization.
 
+Odyssey Atlas v0.5 constructs an episodic spatial and topological cognitive map
+strictly from 16-d observation streams without simulator cheats or global coordinate
+leakage. It tracks environmental replenishment dynamics
+($\\lambda_{food} = 0.007 / scarcity, \\lambda_{water} = 0.014 / scarcity$), plans
+multi-hop navigational routes via breadth-first search with physical travel cost
+penalties, enforces pre-transit rest guards when stamina < 0.20, and prioritizes
+shelters during impending storms. Under high environmental scarcity (4.0),
+`odyssey_ungated` delivered a +0.04042 mean reward advantage over the policy baseline
+across 40 audited episodes (2,521 transitions, 15,126 counterfactual branches),
+with single-seed gains reaching up to +0.1127. The calibrated gate backs off to
+the incumbent policy when advantage margins do not clear the empirical error radius
+($\\varepsilon = 0.1502$). See docs/ODYSSEY_RESULTS.md.
+
 Horizon Atlas v0.4 indexes multi-horizon returns over H=16 lookahead steps across
 12 training episodes (1,728 transitions), evaluates physical depletion guards, and
 calibrates empirical advantage error radii across 8 disjoint calibration episodes
 (1,152 transitions). Under severe environmental scarcity (4.0), lookahead advantage
-guidance achieved a +0.01140 mean reward delta over the policy baseline (with 4 wins,
-1 tie, and single-seed reward gains reaching up to +0.0523). The calibrated margin
-gate cleanly defers to the policy baseline in non-critical states to guarantee
-non-regression. See docs/HORIZON_RESULTS.md.
+guidance achieved a +0.01140 mean reward delta over the policy baseline. See docs/HORIZON_RESULTS.md.
 
 The candidate LoRA ran 256 steps, saw 512 examples and 42,104 tokens, and changed
 development loss from 0.960879 to 0.958487. That does not establish better conversation
@@ -157,6 +176,7 @@ Active core file SHA-256: `{core_hash}`.
 Atlas canonical payload SHA-256: `{atlas_hash}`.
 Contrast canonical payload SHA-256: `{contrast_hash}`.
 Horizon canonical payload SHA-256: `{horizon_hash}`.
+Odyssey canonical payload SHA-256: `{odyssey_hash}`.
 `manifest.json` and `SHA256SUMS.txt` inventory the staged files. The manifest binds
 source, weights, upstream provenance and the exact experiment receipts.
 Checksums diagnose integrity; they do not prove scientific validity or authorship.
@@ -193,7 +213,7 @@ to avoid relicensing upstream artifacts as MIT.
 def package(output: Path, repo_id: str = REPO_ID) -> dict:
     sys.path.insert(0, str(ROOT))
     from poseidon import __version__
-    if __version__ not in ("0.2.0", "0.4.0"):
+    if __version__ not in ("0.2.0", "0.4.0", "0.5.0"):
         raise ValueError(f"unsupported version {__version__}")
     if repo_id != REPO_ID:
         raise ValueError("this release card is bound to Kai9987kai/Supermix-Poseidon")
@@ -211,9 +231,11 @@ def package(output: Path, repo_id: str = REPO_ID) -> dict:
     from poseidon.atlas import CounterfactualAtlas
     from poseidon.contrast import ContrastAtlas
     from poseidon.horizon import HorizonAtlas
+    from poseidon.odyssey import OdysseyAtlas
     from poseidon.core import CoreRuntime, active_core_path
     from poseidon.experiments import load_and_verify
     from poseidon.horizon_experiments import load_and_verify as load_and_verify_horizon
+    from poseidon.odyssey_experiments import load_and_verify as load_and_verify_odyssey
     torch.set_num_threads(2)
     core_path = active_core_path(ROOT)
     core_hash = sha256(core_path)
@@ -227,9 +249,12 @@ def package(output: Path, repo_id: str = REPO_ID) -> dict:
     contrast_hash = contrast.artifact["sha256"]
     horizon = HorizonAtlas.load(core, ROOT / "outputs/horizon/atlas.json")
     horizon_hash = horizon.artifact["sha256"]
+    odyssey = OdysseyAtlas.load(core, ROOT / "outputs/odyssey/atlas.json")
+    odyssey_hash = odyssey.artifact["sha256"]
 
     experiment_verification = {name: load_and_verify(ROOT / "outputs/experiments" / name) for name in EXPERIMENTS}
     horizon_experiment_verification = {name: load_and_verify_horizon(ROOT / "outputs/horizon_experiments" / name) for name in HORIZON_EXPERIMENTS}
+    odyssey_experiment_verification = {name: load_and_verify_odyssey(ROOT / "outputs/odyssey_experiments" / name) for name in ODYSSEY_EXPERIMENTS}
 
     upstream = json.loads((ROOT / "models/language/manifest.json").read_text(encoding="utf-8"))
     if upstream["revision"] != LANGUAGE_REVISION:
@@ -270,11 +295,13 @@ def package(output: Path, repo_id: str = REPO_ID) -> dict:
         "outputs/atlas/atlas.json", "outputs/atlas/fit_receipt.json",
         "outputs/contrast/atlas.json", "outputs/contrast/fit_receipt.json",
         "outputs/horizon/atlas.json", "outputs/horizon/fit_receipt.json",
+        "outputs/odyssey/atlas.json", "outputs/odyssey/fit_receipt.json",
         "models/language/manifest.json", "data/language/manifest.json",
         "data/language/SOURCE_CARD.md",
     ] + [f"models/language/{name}" for name in upstream["files"]]
     artifacts += [f"outputs/experiments/{name}" for name in EXPERIMENTS]
     artifacts += [f"outputs/horizon_experiments/{name}" for name in HORIZON_EXPERIMENTS]
+    artifacts += [f"outputs/odyssey_experiments/{name}" for name in ODYSSEY_EXPERIMENTS]
     for relative in artifacts:
         copy(relative)
     copy("docs/history/HF_MODEL_CARD_v0.1.md", "legacy/model-card-before-v0.2.md")
@@ -323,15 +350,17 @@ See runs/language/report.json, data/language/SOURCE_CARD.md and the root model c
         copy("runs/language/adapter/adapter_model.safetensors", directory + "/adapter_model.safetensors")
         write_json(output / directory / "adapter_config.json", adapter_config)
         (output / directory / "README.md").write_text(adapter_card, encoding="utf-8")
-    (output / "README.md").write_text(model_card(revision, core_hash, atlas_hash, horizon_hash, contrast_hash), encoding="utf-8")
+    (output / "README.md").write_text(model_card(revision, core_hash, atlas_hash, horizon_hash, contrast_hash, odyssey_hash), encoding="utf-8")
 
     if git("status", "--porcelain") or git("rev-parse", "HEAD") != revision:
         raise ValueError("source checkout changed while packaging")
     for name, expected in source_hashes.items():
         if sha256(ROOT / name) != expected:
             raise ValueError(f"source changed while packaging: {name}")
-    if sha256(core_path) != core_hash or sha256(ROOT / "outputs/atlas/atlas.json") != sha256(output / "outputs/atlas/atlas.json"):
-        raise ValueError("core or Atlas changed while packaging")
+    if (sha256(core_path) != core_hash or
+            sha256(ROOT / "outputs/atlas/atlas.json") != sha256(output / "outputs/atlas/atlas.json") or
+            sha256(ROOT / "outputs/odyssey/atlas.json") != sha256(output / "outputs/odyssey/atlas.json")):
+        raise ValueError("core, Atlas, or Odyssey changed while packaging")
 
     files = [{"path": p.relative_to(output).as_posix(), "size": p.stat().st_size, "sha256": sha256(p)}
              for p in sorted(output.rglob("*")) if p.is_file()]
@@ -344,6 +373,7 @@ See runs/language/report.json, data/language/SOURCE_CARD.md and the root model c
         "core_sha256": core_hash, "atlas_artifact_sha256": atlas_hash,
         "contrast_artifact_sha256": contrast_hash,
         "horizon_artifact_sha256": horizon_hash,
+        "odyssey_artifact_sha256": odyssey_hash,
         "upstream_language": upstream, "source_file_sha256": source_hashes,
         "release_transforms": {"README.md": "Hub model card; original becomes SOURCE_README.md",
                                ".gitignore": "Hub upload rules; original becomes SOURCE_GITIGNORE",
@@ -351,11 +381,13 @@ See runs/language/report.json, data/language/SOURCE_CARD.md and the root model c
                                "runs/language/adapter/adapter_config.json": "portable upstream id and pinned revision"},
         "experiment_verification": experiment_verification,
         "horizon_experiment_verification": horizon_experiment_verification,
+        "odyssey_experiment_verification": odyssey_experiment_verification,
         "build_environment": {name: importlib.metadata.version(name) for name in
                               ("torch", "transformers", "peft", "safetensors", "numpy", "huggingface-hub")},
         "activation": {"core": "existing-dagger-selection", "language": "unchanged-upstream-base",
                        "language_adapter": "inactive-candidate", "atlas": "opt-in-experiment",
                        "contrast": "opt-in-experiment", "horizon": "opt-in-experiment",
+                       "odyssey": "opt-in-experiment",
                        "legacy_ensemble": "historical-unvalidated-not-loaded"},
     }
     write_json(output / "manifest.json", manifest)
@@ -364,7 +396,8 @@ See runs/language/report.json, data/language/SOURCE_CARD.md and the root model c
     return {"output": str(output), "source_revision": revision, "files": len(files) + 2,
             "bytes": sum(row["size"] for row in files), "manifest_sha256": sha256(output / "manifest.json"),
             "core_sha256": core_hash, "atlas_artifact_sha256": atlas_hash,
-            "contrast_artifact_sha256": contrast_hash, "horizon_artifact_sha256": horizon_hash}
+            "contrast_artifact_sha256": contrast_hash, "horizon_artifact_sha256": horizon_hash,
+            "odyssey_artifact_sha256": odyssey_hash}
 
 
 def main() -> None:

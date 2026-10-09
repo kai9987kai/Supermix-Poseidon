@@ -21,6 +21,8 @@ class Poseidon:
         self._contrast_stamp = None
         self._horizon = None
         self._horizon_stamp = None
+        self._odyssey = None
+        self._odyssey_stamp = None
         self._candidate_status_snapshots = {}
         self.memory_path = self.root/"outputs/memory.json"
 
@@ -68,6 +70,21 @@ class Poseidon:
 
     def horizon_status(self):
         return self._candidate_status("horizon")
+
+    def odyssey(self):
+        from .odyssey import OdysseyAtlas
+        path = self.root / "outputs/odyssey/atlas.json"
+        if not path.is_file():
+            raise RuntimeError("Odyssey Atlas is not fitted. Run python -m poseidon odyssey-fit first.")
+        core = self.core()
+        stamp = (self._core_stamp, path.stat().st_mtime_ns, path.stat().st_size)
+        if self._odyssey is None or self._odyssey_stamp != stamp:
+            self._odyssey = OdysseyAtlas.load(core, path)
+            self._odyssey_stamp = stamp
+        return self._odyssey
+
+    def odyssey_status(self):
+        return self._candidate_status("odyssey")
 
     def _candidate_status(self, name):
         """Readiness may be cached while a world or experiment owns the model."""
@@ -134,6 +151,19 @@ class Poseidon:
                 "artifact_url": "/artifacts/" + path.relative_to(self.root / "outputs").as_posix(),
                 "receipt_sha256": result["receipt_sha256"], "verification": verification, "replay": replay}
 
+    def odyssey_experiment(self, seed=108000001, episodes=4, max_steps=64, scarcity=2.5):
+        from .experiments import ExperimentSpec
+        from .odyssey_experiments import run_experiment, verify_receipt, write_receipt
+        spec = ExperimentSpec(seed=seed, episodes=episodes, max_steps=max_steps, scarcity=scarcity)
+        with self.lock:
+            result = run_experiment(self.core(), self.atlas(), self.contrast(), self.horizon(), self.odyssey(), spec)
+            verification = verify_receipt(result)
+            path = write_receipt(result, self.root / "outputs/odyssey_experiments")
+            replay = next(episode for episode in result["episodes"] if episode["controller"] == "odyssey")
+            return {key: result[key] for key in ("schema", "experiment_id", "summary", "paired", "rows", "odyssey", "limits")} | {
+                "artifact_url": "/artifacts/" + path.relative_to(self.root / "outputs").as_posix(),
+                "receipt_sha256": result["receipt_sha256"], "verification": verification, "replay": replay}
+
     def core(self):
         from .core import active_core_path
         path = active_core_path(self.root)
@@ -172,7 +202,7 @@ class Poseidon:
             core_ready = active_core_path(self.root).is_file()
         except (ValueError, TypeError, OSError) as error:
             core_ready, core_error = False, str(error)
-        result = {"version": __version__, "name": "Supermix Poseidon", "language_ready": (self.root/"models/language/model.safetensors").exists(), "core_ready": core_ready, "atlas": self.atlas_status(), "contrast": self.contrast_status(), "horizon": self.horizon_status(), "reports": reports, "limits": "Experimental composite system. Controlled geometric media. Tool-assisted maths. Synthetic survival."} | source_status()
+        result = {"version": __version__, "name": "Supermix Poseidon", "language_ready": (self.root/"models/language/model.safetensors").exists(), "core_ready": core_ready, "atlas": self.atlas_status(), "contrast": self.contrast_status(), "horizon": self.horizon_status(), "odyssey": self.odyssey_status(), "reports": reports, "limits": "Experimental composite system. Controlled geometric media. Tool-assisted maths. Synthetic survival."} | source_status()
         if core_error:
             result["core_error"] = core_error
         return result
@@ -211,10 +241,13 @@ class Poseidon:
                 from .world_controls import rollout_with_decisions
                 _integer(max_steps, "max_steps", 1, 10000)
                 scarcity = _number(scarcity, "scarcity", .5, 4)
-                if planner not in ("policy", "mpc", "hybrid", "risk_aware", "uncertainty", "atlas", "contrast", "horizon"):
+                if planner not in ("policy", "mpc", "hybrid", "risk_aware", "uncertainty", "atlas", "contrast", "horizon", "odyssey"):
                     raise ValueError("Unknown survival planner.")
                 core = self.core()
-                if planner == "horizon":
+                if planner == "odyssey":
+                    controller = self.odyssey()
+                    backend_desc = "Odyssey cognitive topological mapping + navigational memory in TidePool"
+                elif planner == "horizon":
                     controller = self.horizon()
                     backend_desc = "Horizon Atlas multi-horizon advantage + depletion-aware empirical gate in TidePool"
                 elif planner == "contrast":

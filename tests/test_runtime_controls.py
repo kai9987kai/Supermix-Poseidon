@@ -295,7 +295,30 @@ def test_stale_source_is_visible_and_blocks_experiment_requests(control_server, 
     assert "restart" in body["error"].lower()
 
 
-@pytest.mark.parametrize("candidate", ["atlas", "contrast"])
+def test_odyssey_api_has_own_endpoint_and_bounded_settings(control_server, monkeypatch):
+    url, runtime = control_server
+    calls = []
+
+    def experiment(seed, episodes, max_steps, scarcity):
+        calls.append((seed, episodes, max_steps, scarcity))
+        return {"ok": True}
+
+    monkeypatch.setattr(runtime, "odyssey_experiment", experiment, raising=False)
+
+    def request(payload):
+        return urlopen(Request(url + "/api/odyssey-experiment", json.dumps(payload).encode(),
+                               {"Content-Type": "application/json"}), timeout=5)
+
+    result = json.load(request({"episodes": 1, "max_steps": 32, "scarcity": 3.5}))
+    assert result["ok"] is True
+    assert calls == [(110000001, 1, 32, 3.5)]
+    for settings in ({"episodes": 9}, {"episodes": True}, {"max_steps": 31}, {"extra": 1}):
+        with pytest.raises(HTTPError) as error:
+            request(settings)
+        assert error.value.code == 400
+
+
+@pytest.mark.parametrize("candidate", ["atlas", "contrast", "horizon", "odyssey"])
 def test_malformed_core_pointer_is_reported_without_breaking_status(tmp_path, candidate):
     (tmp_path / "runs").mkdir()
     (tmp_path / "runs/active_core.json").write_text('{"checkpoint":null}')

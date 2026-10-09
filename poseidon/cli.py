@@ -8,7 +8,8 @@ def main():
         "serve", "chat", "math", "image", "video", "mesh", "world", "status",
         "beyond-benchmark", "beyond-circuits", "beyond-memory", "beyond-moe", "beyond-scene",
         "atlas-fit", "experiment", "verify-experiment", "contrast-fit", "contrast-experiment", "verify-contrast",
-        "horizon-fit", "horizon-experiment", "verify-horizon"
+        "horizon-fit", "horizon-experiment", "verify-horizon",
+        "odyssey-fit", "odyssey-experiment", "verify-odyssey"
     ])
     p.add_argument("prompt", nargs="?", default="")
     p.add_argument("--root", default=".")
@@ -17,7 +18,7 @@ def main():
     p.add_argument("--episodes", type=int, default=None)
     p.add_argument("--scarcity", type=float, default=None)
     p.add_argument("--adapter")
-    p.add_argument("--planner", choices=["policy", "mpc", "hybrid", "risk_aware", "uncertainty", "atlas", "contrast", "horizon"], default="policy", help="world simulation planner")
+    p.add_argument("--planner", choices=["policy", "mpc", "hybrid", "risk_aware", "uncertainty", "atlas", "contrast", "horizon", "odyssey"], default="policy", help="world simulation planner")
     p.add_argument("--max-steps", type=int, default=None)
     p.add_argument("--anchors", type=int, default=24)
     p.add_argument("--train-episodes", type=int, default=12)
@@ -26,15 +27,18 @@ def main():
     args = p.parse_args()
     default_seeds = {"atlas-fit": 81000001, "experiment": 93000001,
                      "contrast-fit": 101000001, "contrast-experiment": 104000001,
-                     "horizon-fit": 107000001, "horizon-experiment": 108000001}
+                     "horizon-fit": 107000001, "horizon-experiment": 108000001,
+                     "odyssey-fit": 109000001, "odyssey-experiment": 110000001}
     args.seed = args.seed if args.seed is not None else default_seeds.get(args.command, 42)
-    args.episodes = args.episodes if args.episodes is not None else (4 if args.command in ("experiment", "contrast-experiment", "horizon-experiment") else 100)
+    args.episodes = args.episodes if args.episodes is not None else (4 if args.command in ("experiment", "contrast-experiment", "horizon-experiment", "odyssey-experiment") else 100)
     args.scarcity = args.scarcity if args.scarcity is not None else (1.0 if args.command == "world" else 2.5)
-    args.calibration_episodes = args.calibration_episodes if args.calibration_episodes is not None else (8 if args.command in ("contrast-fit", "horizon-fit") else 6)
+    args.calibration_episodes = args.calibration_episodes if args.calibration_episodes is not None else (8 if args.command in ("contrast-fit", "horizon-fit", "odyssey-fit") else 6)
 
-    if args.command in ("verify-experiment", "verify-contrast", "verify-horizon"):
+    if args.command in ("verify-experiment", "verify-contrast", "verify-horizon", "verify-odyssey"):
         from pathlib import Path
-        if args.command == "verify-horizon":
+        if args.command == "verify-odyssey":
+            from .odyssey_experiments import load_and_verify
+        elif args.command == "verify-horizon":
             from .horizon_experiments import load_and_verify
         elif args.command == "verify-contrast":
             from .contrast_experiments import load_and_verify
@@ -121,9 +125,39 @@ def main():
         print(json.dumps({key: value for key, value in receipt.items() if key != "calibration_anchor_rows"}, indent=2))
         return
 
-    if args.command in ("experiment", "contrast-experiment", "horizon-experiment"):
+    if args.command == "odyssey-fit":
+        from .odyssey import OdysseyAtlas, OdysseyConfig
+        from pathlib import Path
+        import os
+        import tempfile
+        if any(not 1 <= value <= 64 for value in (args.train_episodes, args.calibration_episodes)) or not 0 <= args.seed <= 2**63 - 2000100:
+            p.error("odyssey-fit needs 1–64 episodes per partition and room for disjoint calibration seeds")
         runtime = Poseidon(args.root)
-        if args.command == "horizon-experiment":
+        config = OdysseyConfig(scarcity=args.scarcity)
+        atlas, receipt = OdysseyAtlas.fit(runtime.core(),
+            train_seeds=list(range(args.seed, args.seed + args.train_episodes)),
+            calibration_seeds=list(range(args.seed + 1000000, args.seed + 1000000 + args.calibration_episodes)),
+            anchors_per_episode=args.anchors, max_steps=args.max_steps if args.max_steps is not None else 128,
+            config=config)
+        directory = Path(args.root) / "outputs/odyssey"
+        directory.mkdir(parents=True, exist_ok=True)
+        atlas.save(directory / "atlas.json")
+        descriptor, temporary = tempfile.mkstemp(prefix="fit-", suffix=".tmp", dir=directory)
+        try:
+            with os.fdopen(descriptor, "w", encoding="utf-8") as stream:
+                json.dump(receipt, stream, indent=2, allow_nan=False)
+            os.replace(temporary, directory / "fit_receipt.json")
+        finally:
+            if os.path.exists(temporary):
+                os.unlink(temporary)
+        print(json.dumps({key: value for key, value in receipt.items() if key != "calibration_anchor_rows"}, indent=2))
+        return
+
+    if args.command in ("experiment", "contrast-experiment", "horizon-experiment", "odyssey-experiment"):
+        runtime = Poseidon(args.root)
+        if args.command == "odyssey-experiment":
+            experiment = runtime.odyssey_experiment
+        elif args.command == "horizon-experiment":
             experiment = runtime.horizon_experiment
         elif args.command == "contrast-experiment":
             experiment = runtime.contrast_experiment

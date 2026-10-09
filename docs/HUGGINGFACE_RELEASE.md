@@ -1,16 +1,16 @@
-# Poseidon v0.4.0 model release
+# Poseidon v0.5.0 model release
 
 The release target is [Kai9987kai/Supermix-Poseidon](https://huggingface.co/Kai9987kai/Supermix-Poseidon).
 Its `manifest.json` binds a clean Git source commit to every packaged file's size
 and SHA-256. `SHA256SUMS.txt` provides an additional file integrity inventory.
-Publishing these artifacts introduces the opt-in Horizon Atlas v0.4 candidate without altering the default DAgger policy core.
+Publishing these artifacts introduces the opt-in Odyssey Atlas v0.5 candidate without altering the default DAgger policy core.
 
 ## Download and run
 
 ```powershell
 # Install the Hub CLI in a Python environment with compatible CPU PyTorch.
 python -m pip install huggingface-hub
-hf download Kai9987kai/Supermix-Poseidon --revision v0.4.0 --local-dir Poseidon-release
+hf download Kai9987kai/Supermix-Poseidon --revision v0.5.0 --local-dir Poseidon-release
 cd Poseidon-release
 python -m pip install -e .
 python tools/verify_huggingface_release.py . --smoke
@@ -18,7 +18,7 @@ python -m poseidon serve --port 8787
 ```
 
 Open http://127.0.0.1:8787. For a reproducible download, add `--revision` with the
-release's Hub commit SHA or `v0.4.0` tag. Python 3.10+ and PyTorch 2.6+ are required;
+release's Hub commit SHA or `v0.5.0` tag. Python 3.10+ and PyTorch 2.6+ are required;
 the native custom core is loaded with `torch.load(..., weights_only=True)`.
 Transformers remote code is disabled. This is a custom PyTorch application, so
 `AutoModel.from_pretrained` on the Hub repository root is not supported.
@@ -34,6 +34,7 @@ are preserved in `SOURCE_GITIGNORE`.
 ```powershell
 python -m poseidon chat "Explain why seasons change."
 python -m poseidon world --planner policy --seed 42
+python -m poseidon world --planner odyssey --seed 42
 python -m poseidon world --planner horizon --seed 42
 python -m poseidon world --planner contrast --seed 42
 python -m poseidon world --planner atlas --seed 42
@@ -41,7 +42,7 @@ python -m poseidon chat "Explain why seasons change." --adapter runs/language/ad
 ```
 
 The LoRA command is an explicit candidate test. Default conversation uses the
-unchanged, pinned SmolLM2 base. Horizon Atlas, Contrast and Atlas are also opt-in. User carrier memory, raw
+unchanged, pinned SmolLM2 base. Odyssey Atlas, Horizon Atlas, Contrast and Atlas are also opt-in. User carrier memory, raw
 language datasets, caches, generated media and optimizer continuation artifacts
 are excluded. The supervised baseline checkpoint retains its original embedded
 training state; the selected DAgger checkpoint has no optimizer state. No claim of
@@ -51,13 +52,13 @@ a complete resumable language-training package is made.
 
 ```powershell
 # Commit all intended source changes first; packaging rejects a dirty checkout.
-python tools/package_huggingface.py --output outputs/releases/poseidon-v0.4.0
-python tools/verify_huggingface_release.py outputs/releases/poseidon-v0.4.0 --smoke
-hf upload Kai9987kai/Supermix-Poseidon outputs/releases/poseidon-v0.4.0 . --commit-message "Release Poseidon v0.4.0 Horizon Atlas"
+python tools/package_huggingface.py --output outputs/releases/poseidon-v0.5.0
+python tools/verify_huggingface_release.py outputs/releases/poseidon-v0.5.0 --smoke
+hf upload Kai9987kai/Supermix-Poseidon outputs/releases/poseidon-v0.5.0 . --commit-message "Release Poseidon v0.5.0 Odyssey Spatial Cognitive Mapping"
 ```
 
 Packaging checks upstream language hashes, the actual active core hash, Atlas
-checkpoint binding and both experiment receipts. It refuses an occupied output
+checkpoint binding and experiment receipts. It refuses an occupied output
 directory and retrieves two historical assets from the explicitly pinned previous
 Hub revision. Verification checks file bytes and then, with `--smoke`, runs the
 bundled code in a separate process for core, Atlas, language, candidate LoRA and

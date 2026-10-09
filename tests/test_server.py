@@ -71,3 +71,16 @@ def test_unknown_planner_is_rejected_without_loading_model(server):
     with pytest.raises(HTTPError) as error:
         post(url+"/api/respond", {"prompt": "Survive", "mode": "world", "planner": "invented"})
     assert error.value.code == 400
+
+
+def test_odyssey_experiment_request_is_bounded_and_requires_checkpoint(server):
+    url, _ = server
+    for settings in ({"episodes": 9}, {"max_steps": 1000}, {"episodes": True}, {"unknown": 1}):
+        with pytest.raises(HTTPError) as error:
+            post(url+"/api/odyssey-experiment", settings)
+        assert error.value.code == 400
+    with pytest.raises(HTTPError) as error:
+        post(url+"/api/odyssey-experiment", {"episodes": 1, "max_steps": 32})
+    assert error.value.code == 500
+    assert "checkpoint" in json.load(error.value)["error"].lower()
+

@@ -126,15 +126,19 @@ def verify_hashes(package_dir: str | Path) -> tuple[dict, dict]:
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     if not isinstance(manifest, dict) or manifest.get("schema") != SCHEMA:
         raise ValueError("Unsupported release manifest schema")
-    if manifest.get("version") not in ("0.2.0", "0.4.0") or not HEX40.fullmatch(str(manifest.get("source_revision", ""))):
+    if manifest.get("version") not in ("0.2.0", "0.4.0", "0.5.0") or not HEX40.fullmatch(str(manifest.get("source_revision", ""))):
         raise ValueError("Invalid release version or source revision")
     if not isinstance(manifest.get("repo_id"), str) or not re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", manifest["repo_id"]):
         raise ValueError("Invalid Hugging Face repository identity")
     for key in ("core_sha256", "atlas_artifact_sha256"):
         if not isinstance(manifest.get(key), str) or not HEX64.fullmatch(manifest[key]):
             raise ValueError("Invalid release digest: " + key)
-    if manifest.get("version") == "0.4.0":
+    if manifest.get("version") in ("0.4.0", "0.5.0"):
         for key in ("horizon_artifact_sha256", "contrast_artifact_sha256"):
+            if not isinstance(manifest.get(key), str) or not HEX64.fullmatch(manifest[key]):
+                raise ValueError("Invalid release digest: " + key)
+    if manifest.get("version") == "0.5.0":
+        for key in ("odyssey_artifact_sha256",):
             if not isinstance(manifest.get(key), str) or not HEX64.fullmatch(manifest[key]):
                 raise ValueError("Invalid release digest: " + key)
     files = manifest.get("files")
@@ -181,6 +185,7 @@ def verify_hashes(package_dir: str | Path) -> tuple[dict, dict]:
         "core_sha256": manifest["core_sha256"], "atlas_artifact_sha256": manifest["atlas_artifact_sha256"],
         "horizon_artifact_sha256": manifest.get("horizon_artifact_sha256"),
         "contrast_artifact_sha256": manifest.get("contrast_artifact_sha256"),
+        "odyssey_artifact_sha256": manifest.get("odyssey_artifact_sha256"),
         "ignored_local_metadata": ignored_metadata,
     }
     return manifest, receipt
@@ -203,8 +208,10 @@ runtime = Poseidon(root)
 status = runtime.status()
 assert status["version"] == manifest["version"]
 assert status["core_ready"] and status["language_ready"] and status["atlas"]["ready"], "Packaged model readiness failed"
-if manifest["version"] == "0.4.0":
+if manifest["version"] in ("0.4.0", "0.5.0"):
     assert status["horizon"]["ready"] and status["contrast"]["ready"], "Horizon and Contrast readiness failed"
+if manifest["version"] == "0.5.0":
+    assert status["odyssey"]["ready"], "Odyssey readiness failed"
 core, atlas = runtime.core(), runtime.atlas()
 def digest(path):
     h = hashlib.sha256()
@@ -216,11 +223,14 @@ assert digest(core.path) == manifest["core_sha256"], "Active core digest differs
 pointer = json.loads((root / "runs/active_core.json").read_text(encoding="utf-8"))
 assert pointer["sha256"] == manifest["core_sha256"], "Active core pointer has a stale digest"
 assert atlas.artifact["sha256"] == manifest["atlas_artifact_sha256"], "Atlas digest differs from manifest"
-if manifest["version"] == "0.4.0":
+if manifest["version"] in ("0.4.0", "0.5.0"):
     horizon = runtime.horizon()
     assert horizon.artifact["sha256"] == manifest["horizon_artifact_sha256"], "Horizon digest differs from manifest"
     contrast = runtime.contrast()
     assert contrast.artifact["sha256"] == manifest["contrast_artifact_sha256"], "Contrast digest differs from manifest"
+if manifest["version"] == "0.5.0":
+    odyssey = runtime.odyssey()
+    assert odyssey.artifact["sha256"] == manifest["odyssey_artifact_sha256"], "Odyssey digest differs from manifest"
 def finite(value):
     if isinstance(value, torch.Tensor):
         flat = value.detach().reshape(-1)
@@ -244,10 +254,16 @@ observation = TidePool(99000001, max_steps=32).observe()
 decision = atlas.plan(observation)
 assert len(decision["candidates"]) == 6 and decision["artifact_sha256"] == manifest["atlas_artifact_sha256"]
 finite(decision)
+if manifest["version"] == "0.5.0":
+    odyssey_decision = odyssey.plan(observation)
+    assert len(odyssey_decision["candidates"]) == 6 and odyssey_decision["artifact_sha256"] == manifest["odyssey_artifact_sha256"]
+    finite(odyssey_decision)
 worlds = {}
 controllers = [("policy", core), ("atlas", atlas)]
-if manifest["version"] == "0.4.0":
+if manifest["version"] in ("0.4.0", "0.5.0"):
     controllers.extend([("horizon", horizon), ("contrast", contrast)])
+if manifest["version"] == "0.5.0":
+    controllers.append(("odyssey", odyssey))
 for name, controller in controllers:
     episode = rollout(controller, seed=99000001, max_steps=32)
     assert 1 <= episode["steps"] <= 32 and isinstance(episode["survived"], bool)
@@ -256,6 +272,9 @@ for name, controller in controllers:
 arithmetic = runtime.respond("3*x + 7 = 22", mode="math")
 assert arithmetic["verified"] and arithmetic["answer"] == "5", "Exact arithmetic failed"
 del runtime, core, atlas
+if "horizon" in locals(): del horizon
+if "contrast" in locals(): del contrast
+if "odyssey" in locals(): del odyssey
 gc.collect()
 languages = {}
 for name, adapter in (("base", None), ("candidate_lora", root / "runs/language/adapter")):

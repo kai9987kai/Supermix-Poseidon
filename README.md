@@ -9,6 +9,26 @@ The model release is hosted at [**Kai9987kai/Supermix-Poseidon**](https://huggin
 
 Built for the supplied Snapdragon Windows PC: CPU only, bounded threads, no paid APIs. The 24 linked projects inform the architecture through documented source review; their code and checkpoints are not indiscriminately merged.
 
+## Odyssey Atlas — v0.5 release
+
+The new opt-in **Odyssey Atlas** equips Poseidon with an episodic topological cognitive map and navigational memory constructed strictly from 16-d observation streams without simulator cheats or global coordinate leaks.
+
+Key innovations:
+- **Zero-Coordinate Spatial Fingerprinting**: Observation-native static terrain and shelter values identify patches ($P_k$) without leaking global grid coordinates.
+- **Topological Discovery**: Transitions under action 4 (`explore`) and 5 (`flee`) establish graph edges, enabling breadth-first search (BFS) shortest-path waypoint planning.
+- **Replenishment Dynamics**: Models environmental replenishment ($\lambda_{\text{food}} = 0.007 / \text{scarcity}$, $\lambda_{\text{water}} = 0.014 / \text{scarcity}$) to revisit replenished resource patches once recovered.
+- **Physiological Travel Costs & Pre-Transit Rest**: Accounts for multi-hop travel costs ($d \times (0.038 \text{ energy} + 0.037 \text{ hyd} + 0.112 \text{ stam})$) and boosts resting (action 0) when stamina $< 0.20$ before embarking on long journeys.
+- **Impending Storm Evacuation**: Automatically routes to shelter when storm risk is high and shelter is low.
+
+```powershell
+python -m poseidon odyssey-fit
+python -m poseidon odyssey-experiment --seed 112000001 --episodes 8 --max-steps 128 --scarcity 4.0
+python -m poseidon world --planner odyssey --seed 42 --scarcity 4.0 --max-steps 128
+python -m poseidon verify-odyssey outputs/odyssey_experiments/RECEIPT.json
+```
+
+On a 40-episode benchmark suite at high environmental scarcity ($4.0$), `odyssey_ungated` delivered a **+0.04042 mean reward advantage over the policy baseline** (with single-seed reward gains reaching up to +0.1127), discovering 12.25–13.0 patches per episode. The calibrated margin gate defers safely to the incumbent policy when advantage margins do not clear the empirical error radius ($\varepsilon = 0.1502$). See [design](docs/ODYSSEY_DESIGN.md) and [measured results](docs/ODYSSEY_RESULTS.md).
+
 ## Horizon Atlas — v0.4 release
 
 The new opt-in **Horizon Atlas** models multi-step trajectory advantages ($H=16$, $\gamma=0.96$) to improve episode reward over the frozen policy baseline under environmental scarcity, while protecting the agent against physical resource depletion traps.
