@@ -68,19 +68,21 @@ def make_handler(runtime, port):
                     raise ValueError("Expected a JSON object.")
             except (ValueError, UnicodeDecodeError) as error:
                 self.send_json(400, {"error": str(error)}); return
-            if self.path not in ("/api/respond", "/api/remember", "/api/experiment", "/api/contrast-experiment", "/api/horizon-experiment"):
+            if self.path not in ("/api/respond", "/api/remember", "/api/experiment", "/api/contrast-experiment", "/api/horizon-experiment", "/api/odyssey-experiment"):
                 self.send_json(404, {"error": "Not found"}); return
             if not busy.acquire(blocking=False):
                 self.send_json(409, {"error": "Poseidon is processing another request. Try again shortly."}); return
             try:
-                if self.path in ("/api/experiment", "/api/contrast-experiment", "/api/horizon-experiment"):
+                if self.path in ("/api/experiment", "/api/contrast-experiment", "/api/horizon-experiment", "/api/odyssey-experiment"):
                     if set(payload) - {"seed", "episodes", "max_steps", "scarcity"}:
                         raise ValueError("Unknown experiment setting.")
                     episodes, max_steps = payload.get("episodes", 4), payload.get("max_steps", 64)
                     if type(episodes) is not int or not 1 <= episodes <= 8 or type(max_steps) is not int or not 32 <= max_steps <= 256:
                         raise ValueError("Workbench experiments require 1–8 paired episodes and 32–256 steps.")
                     assert_source_current()
-                    if self.path == "/api/horizon-experiment":
+                    if self.path == "/api/odyssey-experiment":
+                        result = runtime.odyssey_experiment(payload.get("seed", 110000001), episodes, max_steps, payload.get("scarcity", 2.5))
+                    elif self.path == "/api/horizon-experiment":
                         result = runtime.horizon_experiment(payload.get("seed", 108000001), episodes, max_steps, payload.get("scarcity", 2.5))
                     elif self.path == "/api/contrast-experiment":
                         result = runtime.contrast_experiment(payload.get("seed", 104000001), episodes, max_steps, payload.get("scarcity", 2.5))
@@ -112,9 +114,13 @@ def serve(root=".", port=8787, adapter=None):
     server.daemon_threads = True
     print(f"Supermix Poseidon: http://127.0.0.1:{port}", flush=True)
     try:
-        server.serve_forever()
-    except KeyboardInterrupt:
-        pass
+        while True:
+            try:
+                server.serve_forever()
+            except (KeyboardInterrupt, SystemExit):
+                break
+            except Exception as e:
+                print(f"Server error recovered: {e}", flush=True)
     finally:
         server.server_close()
 
