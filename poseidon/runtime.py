@@ -126,7 +126,7 @@ class Poseidon:
         from .world import _integer, _number
         if not isinstance(settings, dict) or set(settings) - {"kind", "seed", "episodes", "max_steps", "scarcity"}:
             raise ValueError("Unknown job setting.")
-        if settings.get("kind") != "helm-experiment":
+        if settings.get("kind", "helm-experiment") != "helm-experiment":
             raise ValueError("Unknown experiment job kind.")
         seed = _integer(settings.get("seed", 112000001), "seed", 0, 2**63 - 9)
         episodes = _integer(settings.get("episodes", 4), "episodes", 1, 8)

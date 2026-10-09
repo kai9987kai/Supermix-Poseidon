@@ -109,7 +109,7 @@ def make_handler(runtime, port):
                 self.send_json(409, {"error": "Poseidon is processing another request. Try again shortly."}); return
             try:
                 if self.path in ("/api/experiment", "/api/contrast-experiment", "/api/horizon-experiment", "/api/odyssey-experiment", "/api/helm-experiment"):
-                    if set(payload) - {"seed", "episodes", "max_steps", "scarcity"}:
+                    if set(payload) - {"kind", "seed", "episodes", "max_steps", "scarcity"}:
                         raise ValueError("Unknown experiment setting.")
                     episodes, max_steps = payload.get("episodes", 4), payload.get("max_steps", 64)
                     if type(episodes) is not int or not 1 <= episodes <= 8 or type(max_steps) is not int or not 32 <= max_steps <= 256:

@@ -254,7 +254,7 @@ $('#experimentForm').onsubmit=async event=>{
   event.preventDefault();if(experimentBusy||requestBusy||serverBusy||restartRequired||!protocolReady())return;
   if(!$('#experimentForm').checkValidity()){$('#experimentForm').reportValidity();return;}
   const protocol=selectedProtocol();
-  const payload={seed:Number($('#experimentSeed').value),scarcity:Number($('#scarcity').value),episodes:Number($('#episodes').value),max_steps:Number($('#maxSteps').value)};
+  const payload={kind:protocol==='helm'?'helm-experiment':protocol,seed:Number($('#experimentSeed').value),scarcity:Number($('#scarcity').value),episodes:Number($('#episodes').value),max_steps:Number($('#maxSteps').value)};
   stopWorld();
   experimentBusy=true;currentExperiment=null;experimentOutcome='running';$('#experimentResults').hidden=true;
   $('#decisionPanel').hidden=true;
