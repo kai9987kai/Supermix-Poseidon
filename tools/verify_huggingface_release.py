@@ -237,6 +237,17 @@ from poseidon.language import LanguageRuntime
 from poseidon.world import TidePool, rollout
 from poseidon.experiments import load_and_verify
 import torch
+def finite(value):
+    if isinstance(value, torch.Tensor):
+        flat = value.detach().reshape(-1)
+        for start in range(0, flat.numel(), 1048576):
+            assert torch.isfinite(flat[start:start+1048576]).all().item(), "Non-finite native model tensor"
+    elif isinstance(value, dict):
+        for child in value.values(): finite(child)
+    elif isinstance(value, (tuple, list)):
+        for child in value: finite(child)
+    elif isinstance(value, float):
+        assert math.isfinite(value), "Non-finite native model value"
 manifest = json.loads((root / "manifest.json").read_text(encoding="utf-8"))
 torch.set_num_threads(2)
 torch.manual_seed(0)
@@ -310,17 +321,6 @@ if manifest["version"] == "1.2.0":
     titan_world = runtime.respond("Survive", mode="world", planner="titan", seed=99000001, max_steps=32, scarcity=2.5)
     assert len(titan_world["episode"]["trajectory"]) == titan_world["episode"]["steps"]
     assert all("decision" in event for event in titan_world["episode"]["trajectory"]), "TITAN transition feedback or decision evidence missing"
-def finite(value):
-    if isinstance(value, torch.Tensor):
-        flat = value.detach().reshape(-1)
-        for start in range(0, flat.numel(), 1048576):
-            assert torch.isfinite(flat[start:start+1048576]).all().item(), "Non-finite native model tensor"
-    elif isinstance(value, dict):
-        for child in value.values(): finite(child)
-    elif isinstance(value, (tuple, list)):
-        for child in value: finite(child)
-    elif isinstance(value, float):
-        assert math.isfinite(value), "Non-finite native model value"
 native_checkpoints = sorted(root.glob("runs/**/*.pt"))
 assert native_checkpoints, "Native checkpoint missing"
 for checkpoint in native_checkpoints:
