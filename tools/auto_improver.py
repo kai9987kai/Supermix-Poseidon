@@ -29,12 +29,18 @@ import subprocess
 import sys
 import time
 
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+
 print = functools.partial(print, flush=True)
 
 # Ensure CPU safety
 os.environ["OMP_NUM_THREADS"] = "2"
 os.environ["MKL_NUM_THREADS"] = "2"
 os.environ["TORCH_NUM_THREADS"] = "2"
+os.environ["PYTHONIOENCODING"] = "utf-8"
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -187,7 +193,7 @@ SEARCH_SPACE = [
 
 def git_revert() -> None:
     """Restores working tree to last clean git commit."""
-    subprocess.run(["git", "restore", "poseidon/", "tests/"], cwd=ROOT, check=False)
+    subprocess.run(["git", "restore", "."], cwd=ROOT, check=False)
 
 
 def run_tests() -> bool:
@@ -335,110 +341,116 @@ def main():
         print(f"    Target: {spec['file']}")
         print(f"    Mutation: {curr_val} -> {spec['fmt'].format(new_val)}")
 
-        # Apply mutation to disk
-        write_param_value(spec, new_val)
+        try:
+            # Apply mutation to disk
+            write_param_value(spec, new_val)
 
-        # Test verification gate
-        test_passed = run_tests()
-        if not test_passed:
-            print("    [Gating 1 FAILED] Unit tests failed. Reverting...")
-            git_revert()
-            rejected_count += 1
-            record = {
-                "iteration": iteration,
-                "timestamp": datetime.now().isoformat(),
-                "name": spec["name"],
-                "file": spec["file"],
-                "old": curr_val,
-                "new": new_val,
-                "status": "REJECTED_TESTS_FAILED",
-                "delta_reward": 0.0,
-            }
+            # Test verification gate
+            test_passed = run_tests()
+            if not test_passed:
+                print("    [Gating 1 FAILED] Unit tests failed. Reverting...")
+                git_revert()
+                rejected_count += 1
+                record = {
+                    "iteration": iteration,
+                    "timestamp": datetime.now().isoformat(),
+                    "name": spec["name"],
+                    "file": spec["file"],
+                    "old": curr_val,
+                    "new": new_val,
+                    "status": "REJECTED_TESTS_FAILED",
+                    "delta_reward": 0.0,
+                }
+                with open(HISTORY_FILE, "a", encoding="utf-8") as f:
+                    f.write(json.dumps(record) + "\n")
+                continue
+
+            # Benchmark gate
+            try:
+                cand_res = run_benchmark()
+            except Exception as e:
+                print(f"    [Gating 2 FAILED] Benchmark crashed: {e}. Reverting...")
+                git_revert()
+                rejected_count += 1
+                continue
+
+            cand_reward = cand_res["mean_reward"]
+            cand_survival = cand_res["survival_rate"]
+            delta_rew = cand_reward - champ_reward
+            delta_surv = cand_survival - champ_survival
+
+            print(f"    Candidate: Reward={cand_reward:.4f} (delta={delta_rew:+.4f}), Survival={cand_survival:.1%} (delta={delta_surv:+.1%})")
+
+            # Acceptance Criteria
+            is_improved = False
+            if cand_survival > champ_survival and delta_rew >= -0.05:
+                is_improved = True
+                reason = "Higher survival rate with non-catastrophic reward"
+            elif cand_survival >= champ_survival and delta_rew > 0.005:
+                is_improved = True
+                reason = f"Positive paired reward gain (+{delta_rew:.4f})"
+
+            if is_improved:
+                print(f"    *** [ACCEPTED IMPROVEMENT] {reason} ***")
+                champ_reward = cand_reward
+                champ_survival = cand_survival
+                accepted_count += 1
+
+                # Commit improvement to git
+                commit_msg = (
+                    f"auto-improve: [ACCEPTED #{accepted_count}] {spec['name']} "
+                    f"({curr_val} -> {spec['fmt'].format(new_val)}) dR={delta_rew:+.4f}"
+                )
+                subprocess.run(["git", "add", spec["file"]], cwd=ROOT, check=True)
+                subprocess.run(["git", "commit", "-m", commit_msg], cwd=ROOT, check=True)
+
+                # Record receipt
+                receipt_path = RECEIPTS_DIR / f"receipt_iter_{iteration:04d}.json"
+                receipt_data = {
+                    "iteration": iteration,
+                    "timestamp": datetime.now().isoformat(),
+                    "mutation": {"name": spec["name"], "file": spec["file"], "old": curr_val, "new": new_val},
+                    "champion": {"reward": champ_reward, "survival": champ_survival},
+                    "delta_reward": delta_rew,
+                }
+                receipt_path.write_text(json.dumps(receipt_data, indent=2), encoding="utf-8")
+
+                record = {
+                    "iteration": iteration,
+                    "timestamp": datetime.now().isoformat(),
+                    "name": spec["name"],
+                    "file": spec["file"],
+                    "old": curr_val,
+                    "new": new_val,
+                    "status": "ACCEPTED",
+                    "delta_reward": delta_rew,
+                    "champ_reward": champ_reward,
+                    "champ_survival": champ_survival,
+                }
+            else:
+                print("    [REJECTED] Performance did not exceed champion baseline. Reverting...")
+                git_revert()
+                rejected_count += 1
+                record = {
+                    "iteration": iteration,
+                    "timestamp": datetime.now().isoformat(),
+                    "name": spec["name"],
+                    "file": spec["file"],
+                    "old": curr_val,
+                    "new": new_val,
+                    "status": "REJECTED_NO_IMPROVEMENT",
+                    "delta_reward": delta_rew,
+                    "cand_reward": cand_reward,
+                    "cand_survival": cand_survival,
+                }
+
             with open(HISTORY_FILE, "a", encoding="utf-8") as f:
                 f.write(json.dumps(record) + "\n")
-            continue
 
-        # Benchmark gate
-        try:
-            cand_res = run_benchmark()
-        except Exception as e:
-            print(f"    [Gating 2 FAILED] Benchmark crashed: {e}. Reverting...")
+        except Exception as iteration_err:
+            print(f"    [ERROR] Unexpected error in iteration {iteration}: {iteration_err}. Reverting...")
             git_revert()
             rejected_count += 1
-            continue
-
-        cand_reward = cand_res["mean_reward"]
-        cand_survival = cand_res["survival_rate"]
-        delta_rew = cand_reward - champ_reward
-        delta_surv = cand_survival - champ_survival
-
-        print(f"    Candidate: Reward={cand_reward:.4f} (Δ={delta_rew:+.4f}), Survival={cand_survival:.1%} (Δ={delta_surv:+.1%})")
-
-        # Acceptance Criteria
-        is_improved = False
-        if cand_survival > champ_survival and delta_rew >= -0.05:
-            is_improved = True
-            reason = "Higher survival rate with non-catastrophic reward"
-        elif cand_survival >= champ_survival and delta_rew > 0.005:
-            is_improved = True
-            reason = f"Positive paired reward gain (+{delta_rew:.4f})"
-
-        if is_improved:
-            print(f"    >>> [ACCEPTED IMPROVEMENT] {reason} <<<")
-            champ_reward = cand_reward
-            champ_survival = cand_survival
-            accepted_count += 1
-
-            # Commit improvement to git
-            commit_msg = (
-                f"auto-improve: [ACCEPTED #{accepted_count}] {spec['name']} "
-                f"({curr_val} -> {spec['fmt'].format(new_val)}) ΔR={delta_rew:+.4f}"
-            )
-            subprocess.run(["git", "add", spec["file"]], cwd=ROOT, check=True)
-            subprocess.run(["git", "commit", "-m", commit_msg], cwd=ROOT, check=True)
-
-            # Record receipt
-            receipt_path = RECEIPTS_DIR / f"receipt_iter_{iteration:04d}.json"
-            receipt_data = {
-                "iteration": iteration,
-                "timestamp": datetime.now().isoformat(),
-                "mutation": {"name": spec["name"], "file": spec["file"], "old": curr_val, "new": new_val},
-                "champion": {"reward": champ_reward, "survival": champ_survival},
-                "delta_reward": delta_rew,
-            }
-            receipt_path.write_text(json.dumps(receipt_data, indent=2), encoding="utf-8")
-
-            record = {
-                "iteration": iteration,
-                "timestamp": datetime.now().isoformat(),
-                "name": spec["name"],
-                "file": spec["file"],
-                "old": curr_val,
-                "new": new_val,
-                "status": "ACCEPTED",
-                "delta_reward": delta_rew,
-                "champ_reward": champ_reward,
-                "champ_survival": champ_survival,
-            }
-        else:
-            print("    [REJECTED] Performance did not exceed champion baseline. Reverting...")
-            git_revert()
-            rejected_count += 1
-            record = {
-                "iteration": iteration,
-                "timestamp": datetime.now().isoformat(),
-                "name": spec["name"],
-                "file": spec["file"],
-                "old": curr_val,
-                "new": new_val,
-                "status": "REJECTED_NO_IMPROVEMENT",
-                "delta_reward": delta_rew,
-                "cand_reward": cand_reward,
-                "cand_survival": cand_survival,
-            }
-
-        with open(HISTORY_FILE, "a", encoding="utf-8") as f:
-            f.write(json.dumps(record) + "\n")
 
         time.sleep(1)
 
