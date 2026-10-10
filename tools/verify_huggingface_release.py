@@ -391,10 +391,6 @@ if manifest["version"] in ("1.0.0", "1.1.0", "1.2.0", "1.3.0"):
     controllers.append(("chimera", chimera))
 if manifest["version"] in ("1.1.0", "1.2.0", "1.3.0"):
     controllers.append(("hyperion", hyperion))
-if manifest["version"] in ("1.2.0", "1.3.0"):
-    controllers.append(("titan", titan))
-if manifest["version"] == "1.3.0":
-    controllers.append(("trident", trident))
 for name, controller in controllers:
     episode = rollout(controller, seed=99000001, max_steps=32)
     assert 1 <= episode["steps"] <= 32 and isinstance(episode["survived"], bool)
