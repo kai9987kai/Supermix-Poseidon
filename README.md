@@ -5,13 +5,15 @@
 
 Poseidon is a local research workbench with separate components for language, a compact learned scene-and-control policy, a deterministic survival simulation, procedural media, exact arithmetic, and external memory. It is a software system, not a single multimodal foundation model.
 
-## v1.2.0 research upgrade
+## v1.3.0 TRIDENT research upgrade
 
-The opt-in **TITAN** controller combines selected ideas from the reviewed project portfolio around the existing Tidal policy. Its six-arm experiment compares the frozen core, AURA, METAMORPH, CHIMERA, HYPERION, and TITAN on matched seeds. Receipts contain decisions and observed transitions, then replay both controller outputs and TidePool outcomes. A controller receives reward only after the environment returns it. These measurements describe a synthetic task; they do not establish general-agent or real-world capability, and the experiment never promotes or replaces a model.
+Version 1.3.0 adds **TRIDENT**, an opt-in controller around the unchanged Tidal core. It corrects one-step predictions with recent observed prediction errors, admits directed travel only after enough local visits unless that transition has been observed, and requires an override to beat erased and time-shifted residual controls by configured margins. It does not change or train model weights.
 
-The upgrade also adds deterministic per-episode resets for TITAN's auxiliary Genesis ecology and Tessera action memory. Archimedes fluid calculations, Genesis ecology, classical state-vector circuits, simulated intermittent-energy storage, synthetic scanline telemetry, and static action hooks are local software mechanisms. They do not operate physical devices or provide biological evidence.
+The six-arm paired benchmark compares the frozen core, TRIDENT, erased residual, shifted residual, directed-support gate-off, and residual-gate-off controls on identical seeds. Receipts retain decisions and observed transitions and can replay both controller outputs and TidePool outcomes. The bundled four-seed result is descriptive synthetic evidence, not proof of a general performance gain; it does not promote a model.
 
-See the [TITAN design](docs/TITAN_DESIGN.md), [TITAN results](docs/TITAN_RESULTS.md), [Archimedes design](docs/ARCHIMEDES_DESIGN.md), [Genesis design](docs/GENESIS_DESIGN.md), and [review of the supplied repositories and research](docs/research/README.md).
+Earlier TITAN mechanisms remain optional software simulations. Archimedes fluid calculations, Genesis ecology, classical state-vector circuits, intermittent-energy storage, scanline telemetry, and static action hooks do not operate physical devices or establish biological evidence.
+
+See the [TRIDENT design](docs/TRIDENT_DESIGN.md), [TRIDENT results](docs/TRIDENT_RESULTS.md), [TITAN design](docs/TITAN_DESIGN.md), [TITAN results](docs/TITAN_RESULTS.md), and [review of the supplied repositories and research](docs/research/README.md).
 
 ## Run locally
 
@@ -23,17 +25,17 @@ python -m poseidon status
 python -m poseidon serve --port 8792
 ```
 
-Open `http://127.0.0.1:8792`. The workbench can also run a seeded TITAN episode from the command line:
+Open `http://127.0.0.1:8792`. The workbench can run a seeded TRIDENT episode from the command line:
 
 ```powershell
-python -m poseidon world --planner titan --seed 42 --max-steps 64 --scarcity 2.5
+python -m poseidon world --planner trident --seed 42 --max-steps 64 --scarcity 2.5
 ```
 
-Run and replay the paired experiment:
+Run and replay the paired TRIDENT experiment:
 
 ```powershell
-python -m poseidon titan-experiment --episodes 4 --max-steps 64 --scarcity 2.5 --seed 99100000
-python -m poseidon verify-titan outputs/titan_experiments/RECEIPT.json
+python -m poseidon trident-experiment --episodes 4 --max-steps 64 --scarcity 2.5 --seed 88000000
+python -m poseidon verify-trident outputs/trident_experiments/RECEIPT.json
 ```
 
 The receipt records all six arms and is sealed to the core checkpoint and TidePool source hashes. A short benchmark is useful for reproducibility checks, not for a robust performance conclusion.
@@ -44,7 +46,7 @@ The receipt records all six arms and is sealed to the core checkpoint and TidePo
 |---|---|---|
 | Tidal | Compact locally trained scene, action, and dynamics policy | Existing selected checkpoint; unchanged in this upgrade |
 | SmolLM2 | Pretrained conversation model | Separate backend with its own upstream license |
-| TITAN and other planners | Optional controllers for TidePool | Experimental; no default-policy promotion |
+| TITAN, TRIDENT, and other planners | Optional controllers for TidePool | Experimental; no default-policy promotion |
 | Image, video, and mesh tools | Bounded procedural outputs | Separate software paths |
 | Math and carrier memory | Exact solver and external retrieval | Separate tools; not weights in Tidal |
 

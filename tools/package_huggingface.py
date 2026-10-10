@@ -57,7 +57,7 @@ def git(*args: str) -> str:
     return subprocess.check_output(["git", *args], cwd=ROOT, text=True, encoding="utf-8").strip()
 
 
-def model_card(revision: str, core_hash: str, atlas_hash: str, horizon_hash: str, contrast_hash: str, odyssey_hash: str, version: str, helm_hash: str = "", odysseus_hash: str = "", titan_hash: str = "") -> str:
+def model_card(revision: str, core_hash: str, atlas_hash: str, horizon_hash: str, contrast_hash: str, odyssey_hash: str, version: str, helm_hash: str = "", odysseus_hash: str = "", titan_hash: str = "", trident_hash: str = "") -> str:
     return fr"""---
 language:
 - en
@@ -85,21 +85,24 @@ tags:
 - vector-symbolic-architecture
 - holographic-memory
 - grid-cells
+- causal-residuals
+- identity-gating
 - lora
 - cpu
 - experimental
 - synthetic-simulation
 ---
 
-# Supermix Poseidon v{version}: TITAN Experimental Composite
+# Supermix Poseidon v{version}: TRIDENT Experimental Controller
 
-Version 1.2.0 adds **TITAN**, an opt-in controller around the unchanged Tidal checkpoint. It composes selected mechanisms from the reviewed project portfolio and records real environment feedback before storing a transition. TITAN is an experimental controller for the synthetic TidePool world, not a newly trained foundation model.
+Version 1.3.0 adds **TRIDENT**, an opt-in controller around the unchanged Tidal checkpoint. It corrects one-step predictions with recent observed prediction errors, admits directed travel only after enough local visits unless that transition has been observed, and requires an override to beat erased and time-shifted residual controls by configured margins. TRIDENT is experimental software for synthetic TidePool; it does not modify or train model weights.
 
-The six-arm profile pairs TITAN, the frozen Tidal core, AURA, METAMORPH, CHIMERA and HYPERION on identical seeds. The receipt stores actions and transitions and independently replays both controller decisions and world outcomes. Reward, survival and telemetry remain descriptive measurements; they do not activate or promote a model.
+The six-arm paired benchmark compares the frozen core, TRIDENT, erased residual, shifted residual, directed-support-gate-off, and residual-gate-off controls on identical seeds. The receipt stores actions and transitions and independently replays controller decisions and world outcomes. Its four-seed results are descriptive synthetic evidence, not proof of a general performance gain; they do not promote a model.
 
 Additional modules are software simulations or heuristics: Archimedes computes synthetic fluid telemetry; Genesis runs an auxiliary toy ecology; S-Video encodes telemetry; Universal Modder applies static Python hooks; QuantumBot uses a classical state-vector simulator. They do not provide physical RF harvesting, NTAG hardware, analog video, hot-patching, quantum hardware, biological evidence or real-world survival capability. Causeway uses deterministic maximum-probability selection in this controller.
 
 [Source commit](https://github.com/kai9987kai/Supermix-Poseidon/tree/{revision}) ·
+[TRIDENT design](docs/TRIDENT_DESIGN.md) · [TRIDENT results](docs/TRIDENT_RESULTS.md) ·
 [TITAN design](docs/TITAN_DESIGN.md) · [TITAN results](docs/TITAN_RESULTS.md) ·
 [HYPERION results](docs/HYPERION_RESULTS.md) · [Morpheus design](docs/MORPHEUS_DESIGN.md) · [Prometheus design](docs/PROMETHEUS_DESIGN.md) · [Intermittent design](docs/INTERMITTENT_DESIGN.md) · [CHIMERA results](docs/CHIMERA_RESULTS.md) · [Causeway design](docs/CAUSEWAY_DESIGN.md) · [Release guide](docs/HUGGINGFACE_RELEASE.md)
 
@@ -111,6 +114,8 @@ Additional modules are software simulations or heuristics: Archimedes computes s
 | Supervised baseline | `runs/tidal/core.pt` | Comparison checkpoint, original embedded training state |
 | SmolLM2: 134,515,008 stored parameters | `models/language/model.safetensors` | Separate unchanged pretrained conversation backend |
 | LoRA: 61,440 parameters | `runs/language/adapter/` | Experimental candidate, inactive by default |
+| TRIDENT Identity-Gated Controller | `poseidon/trident.py` | Identity-gated, observed-topology causal residual controller around frozen core; opt-in |
+| TRIDENT Paired Replay Receipt | `outputs/trident_experiments/RECEIPT.json` | Six-arm matched-seed controller and world replay; no promotion |
 | TITAN Composite Controller | `poseidon/titan.py` | Selected project mechanisms around the frozen Tidal core; opt-in |
 | TITAN Paired Replay Receipt | `outputs/titan_experiments/RECEIPT.json` | Six-arm matched-seed controller and world replay; no promotion |
 | HYPERION Super-Controller | `poseidon/hyperion.py` | Separate opt-in experimental controller |
@@ -236,6 +241,7 @@ Horizon canonical payload SHA-256: `{horizon_hash}`.
 Odyssey canonical payload SHA-256: `{odyssey_hash}`.
 Helm canonical payload SHA-256: `{helm_hash}`.
 TITAN receipt SHA-256: `{titan_hash}`.
+TRIDENT receipt SHA-256: `{trident_hash}`.
 `manifest.json` and `SHA256SUMS.txt` inventory the staged files. The manifest binds
 source, weights, upstream provenance and the exact experiment receipts.
 Checksums diagnose integrity; they do not prove scientific validity or authorship.
@@ -272,7 +278,7 @@ to avoid relicensing upstream artifacts as MIT.
 def package(output: Path, repo_id: str = REPO_ID) -> dict:
     sys.path.insert(0, str(ROOT))
     from poseidon import __version__
-    if __version__ != "1.2.0":
+    if __version__ != "1.3.0":
         raise ValueError(f"unsupported version {__version__}")
     if repo_id != REPO_ID:
         raise ValueError("this release card is bound to Kai9987kai/Supermix-Poseidon")
@@ -344,6 +350,7 @@ def package(output: Path, repo_id: str = REPO_ID) -> dict:
     from poseidon.chimera_experiment import verify_chimera_receipt
     from poseidon.hyperion_experiment import verify_hyperion_receipt
     from poseidon.titan_experiment import verify_titan_receipt
+    from poseidon.trident_experiment import verify_trident_receipt
     aura_experiment_verification = {
         name: verify_aura_receipt(json.loads((ROOT / "outputs/aura_experiments" / name).read_text(encoding="utf-8")))
         for name in AURA_EXPERIMENTS
@@ -369,6 +376,12 @@ def package(output: Path, repo_id: str = REPO_ID) -> dict:
         "RECEIPT.json": verify_titan_receipt(titan_receipt, core_path=core_path)
     }
     titan_receipt_hash = sha256(titan_receipt_path)
+    trident_receipt_path = ROOT / "outputs/trident_experiments/RECEIPT.json"
+    trident_receipt = json.loads(trident_receipt_path.read_text(encoding="utf-8"))
+    trident_experiment_verification = {
+        "RECEIPT.json": verify_trident_receipt(trident_receipt, core_path=core_path)
+    }
+    trident_receipt_hash = sha256(trident_receipt_path)
 
     experiment_verification = {name: load_and_verify(ROOT / "outputs/experiments" / name) for name in EXPERIMENTS}
     evidence_artifacts = load_artifacts(ROOT)
@@ -438,6 +451,7 @@ def package(output: Path, repo_id: str = REPO_ID) -> dict:
         "outputs/chimera_experiments/RECEIPT.json",
         "outputs/hyperion_experiments/RECEIPT.json",
         "outputs/titan_experiments/RECEIPT.json",
+        "outputs/trident_experiments/RECEIPT.json",
         "models/language/manifest.json", "data/language/manifest.json",
         "data/language/SOURCE_CARD.md",
     ] + [f"models/language/{name}" for name in upstream["files"]]
@@ -508,7 +522,7 @@ See runs/language/report.json, data/language/SOURCE_CARD.md and the root model c
         copy("runs/language/adapter/adapter_model.safetensors", directory + "/adapter_model.safetensors")
         write_json(output / directory / "adapter_config.json", adapter_config)
         (output / directory / "README.md").write_text(adapter_card, encoding="utf-8")
-    (output / "README.md").write_text(model_card(revision, core_hash, atlas_hash, horizon_hash, contrast_hash, odyssey_hash, __version__, helm_hash, odysseus_hash, titan_receipt_hash), encoding="utf-8")
+    (output / "README.md").write_text(model_card(revision, core_hash, atlas_hash, horizon_hash, contrast_hash, odyssey_hash, __version__, helm_hash, odysseus_hash, titan_receipt_hash, trident_receipt_hash), encoding="utf-8")
 
     status_output = git("status", "--porcelain")
     if status_output or git("rev-parse", "HEAD") != revision:
@@ -560,6 +574,8 @@ See runs/language/report.json, data/language/SOURCE_CARD.md and the root model c
         "hyperion_experiment_verification": hyperion_experiment_verification,
         "titan_receipt_sha256": titan_receipt_hash,
         "titan_experiment_verification": titan_experiment_verification,
+        "trident_receipt_sha256": trident_receipt_hash,
+        "trident_experiment_verification": trident_experiment_verification,
         "build_environment": {name: importlib.metadata.version(name) for name in
                               ("torch", "transformers", "peft", "safetensors", "numpy", "huggingface-hub")},
         "activation": {"core": "existing-dagger-selection", "language": "unchanged-upstream-base",
@@ -576,6 +592,7 @@ See runs/language/report.json, data/language/SOURCE_CARD.md and the root model c
                        "chimera": "opt-in-classical-composite-controller",
                        "hyperion": "opt-in-composite-controller",
                        "titan": "opt-in-experimental-composite-controller-no-promotion",
+                       "trident": "opt-in-identity-gated-directed-residual-controller-no-promotion",
                        "morpheus": "simulated-transition-trace-and-replay",
                        "prometheus": "synthetic-entropy-and-drive-heuristics",
                        "intermittent": "simulated-energy-state-and-compact-frame",
@@ -591,7 +608,8 @@ See runs/language/report.json, data/language/SOURCE_CARD.md and the root model c
             "contrast_artifact_sha256": contrast_hash, "horizon_artifact_sha256": horizon_hash,
             "odyssey_artifact_sha256": odyssey_hash, "helm_artifact_sha256": helm_hash,
             "odysseus_artifact_sha256": odysseus_hash,
-            "titan_receipt_sha256": titan_receipt_hash}
+            "titan_receipt_sha256": titan_receipt_hash,
+            "trident_receipt_sha256": trident_receipt_hash}
 
 
 def main() -> None:
