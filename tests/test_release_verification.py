@@ -28,28 +28,30 @@ def _package(root, version="0.5.1"):
         "core_sha256": "2" * 64, "atlas_artifact_sha256": "3" * 64,
         "files": [{"path": "model.bin", "size": len(payload), "sha256": _digest(payload)}],
     }
-    if version in ("0.4.0", "0.5.0", "0.5.1", "0.6.0", "0.7.0", "0.8.0", "0.9.0"):
+    if version in ("0.4.0", "0.5.0", "0.5.1", "0.6.0", "0.7.0", "0.8.0", "0.9.0", "1.0.0"):
         manifest.update(horizon_artifact_sha256="4" * 64, contrast_artifact_sha256="5" * 64)
-    if version in ("0.5.0", "0.5.1", "0.6.0", "0.7.0", "0.8.0", "0.9.0"):
+    if version in ("0.5.0", "0.5.1", "0.6.0", "0.7.0", "0.8.0", "0.9.0", "1.0.0"):
         manifest["odyssey_artifact_sha256"] = "6" * 64
-    if version in ("0.6.0", "0.7.0", "0.8.0", "0.9.0"):
+    if version in ("0.6.0", "0.7.0", "0.8.0", "0.9.0", "1.0.0"):
         manifest["helm_artifact_sha256"] = "7" * 64
         manifest["helm_experiment_verification"] = {"test.json": {"verified": True}}
-    if version in ("0.7.0", "0.8.0", "0.9.0"):
+    if version in ("0.7.0", "0.8.0", "0.9.0", "1.0.0"):
         manifest["odysseus_artifact_sha256"] = "8" * 64
         manifest["odysseus_experiment_verification"] = {"test.json": {"verified": True}}
         manifest["mco_experiment_verification"] = {"RECEIPT.json": {"verified": True}}
-    if version in ("0.8.0", "0.9.0"):
+    if version in ("0.8.0", "0.9.0", "1.0.0"):
         manifest["aura_experiment_verification"] = {"test.json": {"verified": True}}
         manifest["tessera_experiment_verification"] = {"RECEIPT.json": {"verified": True}}
         manifest["mnemorph_experiment_verification"] = {"RECEIPT.json": {"verified": True}}
-    if version == "0.9.0":
+    if version in ("0.9.0", "1.0.0"):
         manifest["metamorph_experiment_verification"] = {"RECEIPT.json": {"verified": True}}
+    if version == "1.0.0":
+        manifest["chimera_experiment_verification"] = {"RECEIPT.json": {"verified": True}}
     _seal(root, manifest)
     return manifest
 
 
-@pytest.mark.parametrize("version", ("0.2.0", "0.4.0", "0.5.0", "0.5.1", "0.6.0", "0.7.0", "0.8.0", "0.9.0"))
+@pytest.mark.parametrize("version", ("0.2.0", "0.4.0", "0.5.0", "0.5.1", "0.6.0", "0.7.0", "0.8.0", "0.9.0", "1.0.0"))
 def test_hash_verification_preserves_supported_release_versions(tmp_path, version):
     manifest = _package(tmp_path, version)
     actual, receipt = release.verify_hashes(tmp_path)
@@ -80,6 +82,15 @@ def test_odysseus_and_mco_release_requires_bound_evidence(tmp_path, key):
 @pytest.mark.parametrize("key", ("metamorph_experiment_verification",))
 def test_metamorph_release_requires_bound_evidence(tmp_path, key):
     manifest = _package(tmp_path, "0.9.0")
+    manifest.pop(key)
+    _seal(tmp_path, manifest)
+    with pytest.raises(ValueError):
+        release.verify_hashes(tmp_path)
+
+
+@pytest.mark.parametrize("key", ("chimera_experiment_verification",))
+def test_chimera_release_requires_bound_evidence(tmp_path, key):
+    manifest = _package(tmp_path, "1.0.0")
     manifest.pop(key)
     _seal(tmp_path, manifest)
     with pytest.raises(ValueError):

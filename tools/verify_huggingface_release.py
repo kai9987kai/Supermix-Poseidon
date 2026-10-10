@@ -126,44 +126,47 @@ def verify_hashes(package_dir: str | Path) -> tuple[dict, dict]:
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     if not isinstance(manifest, dict) or manifest.get("schema") != SCHEMA:
         raise ValueError("Unsupported release manifest schema")
-    if manifest.get("version") not in ("0.2.0", "0.4.0", "0.5.0", "0.5.1", "0.6.0", "0.7.0", "0.8.0", "0.9.0") or not HEX40.fullmatch(str(manifest.get("source_revision", ""))):
+    if manifest.get("version") not in ("0.2.0", "0.4.0", "0.5.0", "0.5.1", "0.6.0", "0.7.0", "0.8.0", "0.9.0", "1.0.0") or not HEX40.fullmatch(str(manifest.get("source_revision", ""))):
         raise ValueError("Invalid release version or source revision")
     if not isinstance(manifest.get("repo_id"), str) or not re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", manifest["repo_id"]):
         raise ValueError("Invalid Hugging Face repository identity")
     for key in ("core_sha256", "atlas_artifact_sha256"):
         if not isinstance(manifest.get(key), str) or not HEX64.fullmatch(manifest[key]):
             raise ValueError("Invalid release digest: " + key)
-    if manifest.get("version") in ("0.4.0", "0.5.0", "0.5.1", "0.6.0", "0.7.0", "0.8.0", "0.9.0"):
+    if manifest.get("version") in ("0.4.0", "0.5.0", "0.5.1", "0.6.0", "0.7.0", "0.8.0", "0.9.0", "1.0.0"):
         for key in ("horizon_artifact_sha256", "contrast_artifact_sha256"):
             if not isinstance(manifest.get(key), str) or not HEX64.fullmatch(manifest[key]):
                 raise ValueError("Invalid release digest: " + key)
-    if manifest.get("version") in ("0.5.0", "0.5.1", "0.6.0", "0.7.0", "0.8.0", "0.9.0"):
+    if manifest.get("version") in ("0.5.0", "0.5.1", "0.6.0", "0.7.0", "0.8.0", "0.9.0", "1.0.0"):
         for key in ("odyssey_artifact_sha256",):
             if not isinstance(manifest.get(key), str) or not HEX64.fullmatch(manifest[key]):
                 raise ValueError("Invalid release digest: " + key)
     files = manifest.get("files")
-    if manifest.get("version") in ("0.6.0", "0.7.0", "0.8.0", "0.9.0"):
+    if manifest.get("version") in ("0.6.0", "0.7.0", "0.8.0", "0.9.0", "1.0.0"):
         if not isinstance(manifest.get("helm_artifact_sha256"), str) or not HEX64.fullmatch(manifest["helm_artifact_sha256"]):
             raise ValueError("Invalid release digest: helm_artifact_sha256")
         if not isinstance(manifest.get("helm_experiment_verification"), dict) or not manifest["helm_experiment_verification"]:
             raise ValueError("Helm evidence verification is missing")
-    if manifest.get("version") in ("0.7.0", "0.8.0", "0.9.0"):
+    if manifest.get("version") in ("0.7.0", "0.8.0", "0.9.0", "1.0.0"):
         if not isinstance(manifest.get("odysseus_artifact_sha256"), str) or not HEX64.fullmatch(manifest["odysseus_artifact_sha256"]):
             raise ValueError("Invalid release digest: odysseus_artifact_sha256")
         if not isinstance(manifest.get("odysseus_experiment_verification"), dict) or not manifest["odysseus_experiment_verification"]:
             raise ValueError("Odysseus evidence verification is missing")
         if not isinstance(manifest.get("mco_experiment_verification"), dict) or not manifest["mco_experiment_verification"]:
             raise ValueError("MCO evidence verification is missing")
-    if manifest.get("version") in ("0.8.0", "0.9.0"):
+    if manifest.get("version") in ("0.8.0", "0.9.0", "1.0.0"):
         if not isinstance(manifest.get("aura_experiment_verification"), dict) or not manifest["aura_experiment_verification"]:
             raise ValueError("Aura evidence verification is missing")
         if not isinstance(manifest.get("tessera_experiment_verification"), dict) or not manifest["tessera_experiment_verification"]:
             raise ValueError("Tessera evidence verification is missing")
         if not isinstance(manifest.get("mnemorph_experiment_verification"), dict) or not manifest["mnemorph_experiment_verification"]:
             raise ValueError("Mnemorph evidence verification is missing")
-    if manifest.get("version") == "0.9.0":
+    if manifest.get("version") in ("0.9.0", "1.0.0"):
         if not isinstance(manifest.get("metamorph_experiment_verification"), dict) or not manifest["metamorph_experiment_verification"]:
             raise ValueError("Metamorph evidence verification is missing")
+    if manifest.get("version") == "1.0.0":
+        if not isinstance(manifest.get("chimera_experiment_verification"), dict) or not manifest["chimera_experiment_verification"]:
+            raise ValueError("Chimera evidence verification is missing")
     if not isinstance(files, list) or not 1 <= len(files) <= 10000:
         raise ValueError("Manifest must contain 1-10000 files")
     expected, seen = {}, set()
@@ -232,11 +235,11 @@ runtime = Poseidon(root)
 status = runtime.status()
 assert status["version"] == manifest["version"]
 assert status["core_ready"] and status["language_ready"] and status["atlas"]["ready"], "Packaged model readiness failed"
-if manifest["version"] in ("0.4.0", "0.5.0", "0.5.1", "0.6.0", "0.7.0", "0.8.0", "0.9.0"):
+if manifest["version"] in ("0.4.0", "0.5.0", "0.5.1", "0.6.0", "0.7.0", "0.8.0", "0.9.0", "1.0.0"):
     assert status["horizon"]["ready"] and status["contrast"]["ready"], "Horizon and Contrast readiness failed"
-if manifest["version"] in ("0.5.0", "0.5.1", "0.6.0", "0.7.0", "0.8.0", "0.9.0"):
+if manifest["version"] in ("0.5.0", "0.5.1", "0.6.0", "0.7.0", "0.8.0", "0.9.0", "1.0.0"):
     assert status["odyssey"]["ready"], "Odyssey readiness failed"
-if manifest["version"] in ("0.6.0", "0.7.0", "0.8.0", "0.9.0"):
+if manifest["version"] in ("0.6.0", "0.7.0", "0.8.0", "0.9.0", "1.0.0"):
     assert status["helm"]["ready"], "Helm readiness failed"
 if manifest["version"] == "0.6.0":
     helm = runtime.helm()
@@ -254,30 +257,35 @@ assert digest(core.path) == manifest["core_sha256"], "Active core digest differs
 pointer = json.loads((root / "runs/active_core.json").read_text(encoding="utf-8"))
 assert pointer["sha256"] == manifest["core_sha256"], "Active core pointer has a stale digest"
 assert atlas.artifact["sha256"] == manifest["atlas_artifact_sha256"], "Atlas digest differs from manifest"
-if manifest["version"] in ("0.4.0", "0.5.0", "0.5.1", "0.6.0", "0.7.0", "0.8.0", "0.9.0"):
+if manifest["version"] in ("0.4.0", "0.5.0", "0.5.1", "0.6.0", "0.7.0", "0.8.0", "0.9.0", "1.0.0"):
     horizon = runtime.horizon()
     assert horizon.artifact["sha256"] == manifest["horizon_artifact_sha256"], "Horizon digest differs from manifest"
     contrast = runtime.contrast()
     assert contrast.artifact["sha256"] == manifest["contrast_artifact_sha256"], "Contrast digest differs from manifest"
-if manifest["version"] in ("0.5.0", "0.5.1", "0.6.0", "0.7.0", "0.8.0", "0.9.0"):
+if manifest["version"] in ("0.5.0", "0.5.1", "0.6.0", "0.7.0", "0.8.0", "0.9.0", "1.0.0"):
     odyssey = runtime.odyssey()
     assert odyssey.artifact["sha256"] == manifest["odyssey_artifact_sha256"], "Odyssey digest differs from manifest"
-if manifest["version"] in ("0.6.0", "0.7.0", "0.8.0", "0.9.0"):
+if manifest["version"] in ("0.6.0", "0.7.0", "0.8.0", "0.9.0", "1.0.0"):
     helm = runtime.helm()
     assert helm.artifact["sha256"] == manifest["helm_artifact_sha256"], "Helm digest differs from manifest"
-if manifest["version"] in ("0.7.0", "0.8.0", "0.9.0"):
+if manifest["version"] in ("0.7.0", "0.8.0", "0.9.0", "1.0.0"):
     odysseus = runtime.odysseus()
     assert odysseus.artifact["sha256"] == manifest["odysseus_artifact_sha256"], "Odysseus digest differs from manifest"
-if manifest["version"] in ("0.8.0", "0.9.0"):
+if manifest["version"] in ("0.8.0", "0.9.0", "1.0.0"):
     assert status["aura"]["ready"] and status["tessera"]["ready"] and status["mnemorph"]["ready"], "AURA, Tessera, and Mnemorph readiness failed"
     aura = runtime.aura()
     aura_world = runtime.respond("Survive", mode="world", planner="aura", seed=99000001, max_steps=32, scarcity=2.5)
     assert len(aura_world["episode"]["trajectory"]) == aura_world["episode"]["steps"]
-if manifest["version"] == "0.9.0":
+if manifest["version"] in ("0.9.0", "1.0.0"):
     assert status["metamorph"]["ready"], "METAMORPH readiness failed"
     metamorph = runtime.metamorph()
     metamorph_world = runtime.respond("Survive", mode="world", planner="metamorph", seed=99000001, max_steps=32, scarcity=2.5)
     assert len(metamorph_world["episode"]["trajectory"]) == metamorph_world["episode"]["steps"]
+if manifest["version"] == "1.0.0":
+    assert status["chimera"]["ready"], "CHIMERA readiness failed"
+    chimera = runtime.chimera()
+    chimera_world = runtime.respond("Survive", mode="world", planner="chimera", seed=99000001, max_steps=32, scarcity=2.5)
+    assert len(chimera_world["episode"]["trajectory"]) == chimera_world["episode"]["steps"]
 def finite(value):
     if isinstance(value, torch.Tensor):
         flat = value.detach().reshape(-1)
@@ -301,36 +309,42 @@ observation = TidePool(99000001, max_steps=32).observe()
 decision = atlas.plan(observation)
 assert len(decision["candidates"]) == 6 and decision["artifact_sha256"] == manifest["atlas_artifact_sha256"]
 finite(decision)
-if manifest["version"] in ("0.5.0", "0.5.1", "0.6.0", "0.7.0", "0.8.0", "0.9.0"):
+if manifest["version"] in ("0.5.0", "0.5.1", "0.6.0", "0.7.0", "0.8.0", "0.9.0", "1.0.0"):
     odyssey_decision = odyssey.plan(observation)
     assert len(odyssey_decision["candidates"]) == 6 and odyssey_decision["artifact_sha256"] == manifest["odyssey_artifact_sha256"]
     finite(odyssey_decision)
-if manifest["version"] in ("0.7.0", "0.8.0", "0.9.0"):
+if manifest["version"] in ("0.7.0", "0.8.0", "0.9.0", "1.0.0"):
     odysseus_decision = odysseus.plan(observation)
     assert len(odysseus_decision["candidates"]) == 6 and odysseus_decision["artifact_sha256"] == manifest["odysseus_artifact_sha256"]
     finite(odysseus_decision)
-if manifest["version"] in ("0.8.0", "0.9.0"):
+if manifest["version"] in ("0.8.0", "0.9.0", "1.0.0"):
     aura_decision = aura.plan(observation)
     assert 0 <= aura_decision["action"] <= 5 and "pva_coherence" in aura_decision
     finite(aura_decision)
-if manifest["version"] == "0.9.0":
+if manifest["version"] in ("0.9.0", "1.0.0"):
     metamorph_decision = metamorph.plan(observation)
     assert 0 <= metamorph_decision["action"] <= 5 and "instar_stage" in metamorph_decision
     finite(metamorph_decision)
+if manifest["version"] == "1.0.0":
+    chimera_decision = chimera.plan(observation)
+    assert 0 <= chimera_decision["action"] <= 5 and "causeway" in chimera_decision
+    finite(chimera_decision)
 worlds = {}
 controllers = [("policy", core), ("atlas", atlas)]
-if manifest["version"] in ("0.4.0", "0.5.0", "0.5.1", "0.6.0", "0.7.0", "0.8.0", "0.9.0"):
+if manifest["version"] in ("0.4.0", "0.5.0", "0.5.1", "0.6.0", "0.7.0", "0.8.0", "0.9.0", "1.0.0"):
     controllers.extend([("horizon", horizon), ("contrast", contrast)])
-if manifest["version"] in ("0.5.0", "0.5.1", "0.6.0", "0.7.0", "0.8.0", "0.9.0"):
+if manifest["version"] in ("0.5.0", "0.5.1", "0.6.0", "0.7.0", "0.8.0", "0.9.0", "1.0.0"):
     controllers.append(("odyssey", odyssey))
-if manifest["version"] in ("0.6.0", "0.7.0", "0.8.0", "0.9.0"):
+if manifest["version"] in ("0.6.0", "0.7.0", "0.8.0", "0.9.0", "1.0.0"):
     controllers.append(("helm", helm))
-if manifest["version"] in ("0.7.0", "0.8.0", "0.9.0"):
+if manifest["version"] in ("0.7.0", "0.8.0", "0.9.0", "1.0.0"):
     controllers.append(("odysseus", odysseus))
-if manifest["version"] in ("0.8.0", "0.9.0"):
+if manifest["version"] in ("0.8.0", "0.9.0", "1.0.0"):
     controllers.append(("aura", aura))
-if manifest["version"] == "0.9.0":
+if manifest["version"] in ("0.9.0", "1.0.0"):
     controllers.append(("metamorph", metamorph))
+if manifest["version"] == "1.0.0":
+    controllers.append(("chimera", chimera))
 for name, controller in controllers:
     episode = rollout(controller, seed=99000001, max_steps=32)
     assert 1 <= episode["steps"] <= 32 and isinstance(episode["survived"], bool)
@@ -346,6 +360,7 @@ if "helm" in locals(): del helm
 if "odysseus" in locals(): del odysseus
 if "aura" in locals(): del aura
 if "metamorph" in locals(): del metamorph
+if "chimera" in locals(): del chimera
 gc.collect()
 languages = {}
 for name, adapter in (("base", None), ("candidate_lora", root / "runs/language/adapter")):
@@ -365,7 +380,7 @@ for path in sorted((root / "outputs/experiments").glob("*.json")):
     replays.append({"path":path.relative_to(root).as_posix(), **load_and_verify(path)})
 assert replays, "Packaged experiment receipts are missing"
 odyssey_replays, trajectory_replays = [], []
-if manifest["version"] in ("0.5.1", "0.6.0", "0.7.0", "0.8.0", "0.9.0"):
+if manifest["version"] in ("0.5.1", "0.6.0", "0.7.0", "0.8.0", "0.9.0", "1.0.0"):
     from poseidon.trajectory_audit import load_artifacts, load_json, verify_parent, verify_audit
     artifacts = load_artifacts(root)
     packaged_files = {row["path"] for row in manifest["files"]}
@@ -400,7 +415,7 @@ if manifest["version"] in ("0.5.1", "0.6.0", "0.7.0", "0.8.0", "0.9.0"):
         check_recorded(checked, recorded)
         trajectory_replays.append({"path": relative, "parent_path": recorded["parent_path"], **checked})
 helm_replays = []
-if manifest["version"] in ("0.6.0", "0.7.0", "0.8.0", "0.9.0"):
+if manifest["version"] in ("0.6.0", "0.7.0", "0.8.0", "0.9.0", "1.0.0"):
     from poseidon.helm import stable_json
     from poseidon.helm_experiment import verify_helm_receipt
     for name, recorded in manifest["helm_experiment_verification"].items():
@@ -411,7 +426,7 @@ if manifest["version"] in ("0.6.0", "0.7.0", "0.8.0", "0.9.0"):
     assert len(helm_replays) >= 2, "Complete Helm regime evidence missing"
 odysseus_replays = []
 mco_replays = []
-if manifest["version"] in ("0.7.0", "0.8.0", "0.9.0"):
+if manifest["version"] in ("0.7.0", "0.8.0", "0.9.0", "1.0.0"):
     from poseidon.odysseus_experiment import verify_odysseus_receipt
     from poseidon.mco import verify_mco_receipt
     for name, recorded in manifest.get("odysseus_experiment_verification", {}).items():
@@ -429,7 +444,7 @@ if manifest["version"] in ("0.7.0", "0.8.0", "0.9.0"):
 aura_replays = []
 tessera_replays = []
 mnemorph_replays = []
-if manifest["version"] in ("0.8.0", "0.9.0"):
+if manifest["version"] in ("0.8.0", "0.9.0", "1.0.0"):
     from poseidon.aura_experiment import verify_aura_receipt
     from poseidon.tessera_experiment import verify_tessera_receipt
     from poseidon.mnemorph import verify_mnemorph_receipt
@@ -452,7 +467,7 @@ if manifest["version"] in ("0.8.0", "0.9.0"):
     assert len(tessera_replays) >= 1, "Complete Tessera experiment evidence missing"
     assert len(mnemorph_replays) >= 1, "Complete Mnemorph experiment evidence missing"
 metamorph_replays = []
-if manifest["version"] == "0.9.0":
+if manifest["version"] in ("0.9.0", "1.0.0"):
     from poseidon.metamorph_experiment import verify_metamorph_receipt
     for name, recorded in manifest.get("metamorph_experiment_verification", {}).items():
         relative = "outputs/metamorph_experiments/" + name
@@ -460,6 +475,15 @@ if manifest["version"] == "0.9.0":
         check_recorded(actual, recorded)
         metamorph_replays.append({"path": relative, **actual})
     assert len(metamorph_replays) >= 1, "Complete Metamorph experiment evidence missing"
+chimera_replays = []
+if manifest["version"] == "1.0.0":
+    from poseidon.chimera_experiment import verify_chimera_receipt
+    for name, recorded in manifest.get("chimera_experiment_verification", {}).items():
+        relative = "outputs/chimera_experiments/" + name
+        actual = verify_chimera_receipt(json.loads(evidence_path(relative, "outputs/chimera_experiments").read_text(encoding="utf-8")))
+        check_recorded(actual, recorded)
+        chimera_replays.append({"path": relative, **actual})
+    assert len(chimera_replays) >= 1, "Complete Chimera experiment evidence missing"
 print("POSEIDON_RELEASE_SMOKE=" + json.dumps({
     "verified": True, "package_source": str(pathlib.Path(poseidon.__file__).resolve()),
     "native_checkpoints_verified": len(native_checkpoints), "scene": {k:scene[k] for k in ("shape","color","motion","count","scale")},
@@ -483,6 +507,7 @@ print("POSEIDON_RELEASE_SMOKE=" + json.dumps({
     "tessera_replays": tessera_replays,
     "mnemorph_replays": mnemorph_replays,
     "metamorph_replays": metamorph_replays,
+    "chimera_replays": chimera_replays,
 }, allow_nan=False, sort_keys=True))
 '''
 

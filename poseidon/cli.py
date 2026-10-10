@@ -18,6 +18,7 @@ def main():
         "tessera-experiment", "verify-tessera",
         "mnemorph-experiment", "verify-mnemorph",
         "metamorph-experiment", "verify-metamorph",
+        "chimera-experiment", "verify-chimera",
     ])
     p.add_argument("prompt", nargs="?", default="")
     p.add_argument("--root", default=".")
@@ -26,7 +27,7 @@ def main():
     p.add_argument("--episodes", type=int, default=None)
     p.add_argument("--scarcity", type=float, default=None)
     p.add_argument("--adapter")
-    p.add_argument("--planner", choices=["policy", "mpc", "hybrid", "risk_aware", "uncertainty", "atlas", "contrast", "horizon", "odyssey", "helm", "odysseus", "aura", "metamorph"], default="policy", help="world simulation planner")
+    p.add_argument("--planner", choices=["policy", "mpc", "hybrid", "risk_aware", "uncertainty", "atlas", "contrast", "horizon", "odyssey", "helm", "odysseus", "aura", "metamorph", "chimera"], default="policy", help="world simulation planner")
     p.add_argument("--max-steps", type=int, default=None)
     p.add_argument("--anchors", type=int, default=24)
     p.add_argument("--train-episodes", type=int, default=12)
@@ -45,9 +46,9 @@ def main():
                      "fit-odysseus": 131000001, "odysseus-experiment": 133000001,
                      "mco-experiment": 140000001, "aura-experiment": 144000001,
                      "tessera-experiment": 155000001, "mnemorph-experiment": 160000001,
-                     "metamorph-experiment": 199000001}
+                     "metamorph-experiment": 199000001, "chimera-experiment": 202000001}
     args.seed = args.seed if args.seed is not None else default_seeds.get(args.command, 42)
-    args.episodes = args.episodes if args.episodes is not None else (4 if args.command in ("experiment", "contrast-experiment", "horizon-experiment", "odyssey-experiment", "helm-experiment", "odysseus-experiment", "aura-experiment", "metamorph-experiment") else 100)
+    args.episodes = args.episodes if args.episodes is not None else (4 if args.command in ("experiment", "contrast-experiment", "horizon-experiment", "odyssey-experiment", "helm-experiment", "odysseus-experiment", "aura-experiment", "metamorph-experiment", "chimera-experiment") else 100)
     args.scarcity = args.scarcity if args.scarcity is not None else (1.0 if args.command == "world" else 2.5)
     args.calibration_episodes = args.calibration_episodes if args.calibration_episodes is not None else (8 if args.command in ("contrast-fit", "horizon-fit", "odyssey-fit", "fit-helm", "fit-odysseus") else 6)
 
@@ -354,9 +355,23 @@ def main():
         print(json.dumps(verify_metamorph_receipt(data), indent=2))
         return
 
-    if args.command in ("experiment", "contrast-experiment", "horizon-experiment", "odyssey-experiment", "helm-experiment", "odysseus-experiment", "aura-experiment", "metamorph-experiment"):
+    if args.command == "verify-chimera":
+        from pathlib import Path
+        from .chimera_experiment import verify_chimera_receipt
+        if not args.prompt:
+            p.error("verify-chimera requires a receipt path")
+        path = Path(args.prompt)
+        if not path.is_absolute():
+            path = Path(args.root) / path
+        data = json.loads(path.read_text(encoding="utf-8"))
+        print(json.dumps(verify_chimera_receipt(data), indent=2))
+        return
+
+    if args.command in ("experiment", "contrast-experiment", "horizon-experiment", "odyssey-experiment", "helm-experiment", "odysseus-experiment", "aura-experiment", "metamorph-experiment", "chimera-experiment"):
         runtime = Poseidon(args.root)
-        if args.command == "metamorph-experiment":
+        if args.command == "chimera-experiment":
+            experiment = runtime.chimera_experiment
+        elif args.command == "metamorph-experiment":
             experiment = runtime.metamorph_experiment
         elif args.command == "aura-experiment":
             experiment = runtime.aura_experiment

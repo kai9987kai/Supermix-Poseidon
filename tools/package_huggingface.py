@@ -81,22 +81,26 @@ tags:
 - bayesian-replenishment
 - empirical-transitions
 - memory-carrier-observatory
+- quantum-superposition
+- vector-symbolic-architecture
+- holographic-memory
+- grid-cells
 - lora
 - cpu
 - experimental
 - synthetic-simulation
 ---
 
-# Supermix Poseidon v{version}: METAMORPH Developmental Ecdysis, NexusFlow Causal Flux & Chronos Synchronization
+# Supermix Poseidon v{version}: CHIMERA Quantum Superposition, Holographic Concept Memory & Diamond Lattice Neuropil
 
-Version 0.9 introduces metamorphic developmental stages, hydraulic causal flux routing, and hardware-synchronized cyclic introspection:
-1. **MOLT Life-Stage Transmutation & Morphogenesis**: Three distinct developmental instars (`larval`, `pupa`, `imago`) governing dynamic sensory gains, chitinous diapause hardening, ecdysis biomass triggers, and cryptographic exuvia hashing.
-2. **NexusFlow Directed Causal Flux & Superposition Routing**: Topological potential flow gradients $\Phi_{{ij}} = \exp(-d_{{ij}}/\tau) \cdot \Delta P_{{ij}}$ across replenishment corridors, coupled with coherent superposition wave interference checking $I(a, b) = 2\sqrt{{V_a V_b}}\cos(\Delta\theta)$ mitigating destructive directional bifurcations.
-3. **Chronos Cyclic Beacon & Ghost Trace Auditor**: Hardware-clock cyclic beacon clock ($T_{{\text{{sync}}}} = 8$ ticks) phase-synchronizing module expiration and concept consolidation, with a Ghost Trace Auditor tracking the Spectral Divergence Index (SDI) against frozen core counterfactuals.
-4. **Unified METAMORPH Controller**: Integrated controller combining AURA biomimetic steering, MOLT life-stage adaptation, NexusFlow topological gradient flow, and Chronos synchronization.
+Version 1.0.0 synthesizes the architectural paradigms of all 24 reference projects into a unified super-controller operating on the immutable Tidal core:
+1. **Causeway Quantum Superposition Decision Engine**: 6-dimensional complex state vector |psi> evolving under non-Hermitian gain potential evolution and unitary phase rotations exp(gamma * (V_a - mean(V))) * exp(-i * (V_a + phi_a) * dt), real-time pairwise wave interference I(a, b) = 2 * Re(alpha_a^* * alpha_b) mitigating cognitive conflicts, von Neumann entropy decoherence tracking S(rho) = -sum(p_a * ln(p_a)), and peak Born-rule eigenstate collapse.
+2. **Holographic Reduced Representation (HRR) Associative Concept Memory**: Constant 256-dimensional Vector Symbolic Architecture using discrete circular convolution binding z = x (*) y, circular correlation unbinding, trace bundling with decay, and cosine clean-up resonance.
+3. **Diamond Lattice Entorhinal Neuropil**: Multi-scale 3D tetrahedral / Face-Centered Cubic (FCC) geodesic grid cells (lambda_1 = 3.0, lambda_2 = 8.0, lambda_3 = 20.0) with continuous toroidal velocity phase integration and lattice coherence tracking C_lattice in [0, 1].
+4. **Unified CHIMERA Super-Controller**: Integrated super-controller combining Tidal core, AURA ring compass, MOLT developmental instars, NexusFlow causal flux, Chronos cyclic beaconing, Diamond Lattice, Holographic Memory, and Causeway superposition into an integrated agentic controller achieving 100% survival and 4.6478 mean reward.
 
 [Source commit](https://github.com/kai9987kai/Supermix-Poseidon/tree/{revision}) ·
-[MOLT design](docs/MOLT_DESIGN.md) · [NexusFlow design](docs/NEXUSFLOW_DESIGN.md) · [Chronos design](docs/CHRONOS_DESIGN.md) · [METAMORPH results](docs/METAMORPH_RESULTS.md) · [AURA design](docs/AURA_DESIGN.md) · [Tessera design](docs/TESSERA_DESIGN.md) · [Release guide](docs/HUGGINGFACE_RELEASE.md)
+[Causeway design](docs/CAUSEWAY_DESIGN.md) · [Holographic design](docs/HOLOGRAPHIC_DESIGN.md) · [Lattice design](docs/LATTICE_DESIGN.md) · [CHIMERA results](docs/CHIMERA_RESULTS.md) · [MOLT design](docs/MOLT_DESIGN.md) · [NexusFlow design](docs/NEXUSFLOW_DESIGN.md) · [Chronos design](docs/CHRONOS_DESIGN.md) · [Release guide](docs/HUGGINGFACE_RELEASE.md)
 
 ## Components and activation
 
@@ -106,6 +110,11 @@ Version 0.9 introduces metamorphic developmental stages, hydraulic causal flux r
 | Supervised baseline | `runs/tidal/core.pt` | Comparison checkpoint, original embedded training state |
 | SmolLM2: 134,515,008 stored parameters | `models/language/model.safetensors` | Separate unchanged pretrained conversation backend |
 | LoRA: 61,440 parameters | `runs/language/adapter/` | Experimental candidate, inactive by default |
+| CHIMERA Super-Controller | `poseidon/chimera.py` | Unified quantum superposition, holographic memory & diamond lattice, opt-in |
+| Causeway Decision Engine | `poseidon/causeway.py` | 6D complex superposition, non-Hermitian gain & Born collapse |
+| Holographic Concept Memory | `poseidon/hologram.py` | 256-d HRR circular convolution binding & associative clean-up |
+| Diamond Lattice Neuropil | `poseidon/lattice.py` | 3D FCC tetrahedral geodesic multi-scale grid cells |
+| CHIMERA Receipt | `outputs/chimera_experiments/RECEIPT.json` | Paired multi-arm evaluation benchmark receipt |
 | METAMORPH Controller | `poseidon/metamorph.py` | Unified developmental ecdysis, causal flux & cyclic sync controller, opt-in |
 | MOLT Morphogenesis | `poseidon/molt.py` | Larval/pupa/imago developmental instars & exuvia hashing |
 | NexusFlow Causal Flux | `poseidon/nexusflow.py` | Hydraulic replenishment gradients & superposition interference checking |
@@ -253,7 +262,7 @@ to avoid relicensing upstream artifacts as MIT.
 def package(output: Path, repo_id: str = REPO_ID) -> dict:
     sys.path.insert(0, str(ROOT))
     from poseidon import __version__
-    if __version__ != "0.9.0":
+    if __version__ != "1.0.0":
         raise ValueError(f"unsupported version {__version__}")
     if repo_id != REPO_ID:
         raise ValueError("this release card is bound to Kai9987kai/Supermix-Poseidon")
@@ -322,6 +331,7 @@ def package(output: Path, repo_id: str = REPO_ID) -> dict:
     from poseidon.tessera_experiment import verify_tessera_receipt
     from poseidon.mnemorph import verify_mnemorph_receipt
     from poseidon.metamorph_experiment import verify_metamorph_receipt
+    from poseidon.chimera_experiment import verify_chimera_receipt
     aura_experiment_verification = {
         name: verify_aura_receipt(json.loads((ROOT / "outputs/aura_experiments" / name).read_text(encoding="utf-8")))
         for name in AURA_EXPERIMENTS
@@ -334,6 +344,9 @@ def package(output: Path, repo_id: str = REPO_ID) -> dict:
     }
     metamorph_experiment_verification = {
         "RECEIPT.json": verify_metamorph_receipt(json.loads((ROOT / "outputs/metamorph_experiments/RECEIPT.json").read_text(encoding="utf-8")))
+    }
+    chimera_experiment_verification = {
+        "RECEIPT.json": verify_chimera_receipt(json.loads((ROOT / "outputs/chimera_experiments/RECEIPT.json").read_text(encoding="utf-8")))
     }
 
     experiment_verification = {name: load_and_verify(ROOT / "outputs/experiments" / name) for name in EXPERIMENTS}
@@ -401,6 +414,7 @@ def package(output: Path, repo_id: str = REPO_ID) -> dict:
         "outputs/tessera_experiments/RECEIPT.json",
         "outputs/mnemorph/RECEIPT.json",
         "outputs/metamorph_experiments/RECEIPT.json",
+        "outputs/chimera_experiments/RECEIPT.json",
         "models/language/manifest.json", "data/language/manifest.json",
         "data/language/SOURCE_CARD.md",
     ] + [f"models/language/{name}" for name in upstream["files"]]
@@ -518,6 +532,7 @@ See runs/language/report.json, data/language/SOURCE_CARD.md and the root model c
         "tessera_experiment_verification": tessera_experiment_verification,
         "mnemorph_experiment_verification": mnemorph_experiment_verification,
         "metamorph_experiment_verification": metamorph_experiment_verification,
+        "chimera_experiment_verification": chimera_experiment_verification,
         "build_environment": {name: importlib.metadata.version(name) for name in
                               ("torch", "transformers", "peft", "safetensors", "numpy", "huggingface-hub")},
         "activation": {"core": "existing-dagger-selection", "language": "unchanged-upstream-base",
@@ -531,6 +546,7 @@ See runs/language/report.json, data/language/SOURCE_CARD.md and the root model c
                        "tessera": "ratified-macro-commons",
                        "mnemorph": "archaeological-memory-assays",
                        "metamorph": "opt-in-metamorphic-controller",
+                       "chimera": "opt-in-quantum-holographic-super-controller",
                        "legacy_ensemble": "historical-unvalidated-not-loaded"},
     }
     write_json(output / "manifest.json", manifest)
