@@ -243,6 +243,7 @@ torch.manual_seed(0)
 runtime = Poseidon(root)
 status = runtime.status()
 assert status["version"] == manifest["version"]
+observation = TidePool(99000001, max_steps=32).observe()
 assert status["core_ready"] and status["language_ready"] and status["atlas"]["ready"], "Packaged model readiness failed"
 if manifest["version"] in ("0.4.0", "0.5.0", "0.5.1", "0.6.0", "0.7.0", "0.8.0", "0.9.0", "1.0.0", "1.1.0", "1.2.0"):
     assert status["horizon"]["ready"] and status["contrast"]["ready"], "Horizon and Contrast readiness failed"
@@ -328,7 +329,6 @@ for checkpoint in native_checkpoints:
 scene = core.scene("Create two small cyan spheres with orbit motion.")
 assert {k:scene[k] for k in ("shape","color","motion","count","scale")} == {"shape":"sphere","color":"cyan","motion":"orbit","count":2,"scale":"small"}, "Controlled scene prediction failed"
 finite(scene)
-observation = TidePool(99000001, max_steps=32).observe()
 decision = atlas.plan(observation)
 assert len(decision["candidates"]) == 6 and decision["artifact_sha256"] == manifest["atlas_artifact_sha256"]
 finite(decision)
