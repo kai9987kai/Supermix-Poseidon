@@ -424,7 +424,7 @@ def package(output: Path, repo_id: str = REPO_ID) -> dict:
             raise ValueError(f"source artifact changed while copying: {relative}")
         copied_sources[relative] = expected
 
-    output.mkdir(parents=True)
+    output.mkdir(parents=True, exist_ok=True)
     source_files = git("ls-files", "-z").split("\0")
     for name in source_files:
         if name:
