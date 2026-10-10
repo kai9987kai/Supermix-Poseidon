@@ -91,6 +91,10 @@ class ExuviaRecord:
         }, sort_keys=True)
         self.digest = hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
+    @property
+    def exuvia_sha256(self) -> str:
+        return self.digest
+
     def to_dict(self) -> Dict[str, Any]:
         return {
             "from_stage": self.from_stage.value,
