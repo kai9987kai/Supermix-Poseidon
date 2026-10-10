@@ -29,7 +29,7 @@ from typing import Any, Sequence
 @dataclass(frozen=True)
 class MetacognitionConfig:
     window_size: int = 16
-    volatility_threshold_elevated: float = 0.15
+    volatility_threshold_elevated: float = 0.16
     volatility_threshold_critical: float = 0.30
     energy_deep_horizon_threshold: float = 0.50
     stamina_shallow_horizon_threshold: float = 0.20

@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import argparse
 from datetime import datetime, timedelta
+import functools
 import json
 import math
 import os
@@ -27,6 +28,8 @@ import re
 import subprocess
 import sys
 import time
+
+print = functools.partial(print, flush=True)
 
 # Ensure CPU safety
 os.environ["OMP_NUM_THREADS"] = "2"
