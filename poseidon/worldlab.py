@@ -125,6 +125,28 @@ class POMDPTidePool:
             info=info,
         )
 
+    def snapshot(self) -> dict[str, Any]:
+        return self.underlying.snapshot()
+
+    def state(self) -> dict[str, Any]:
+        return self.underlying.state()
+
+    @property
+    def tick(self) -> int:
+        return self.underlying.tick
+
+    @property
+    def alive(self) -> bool:
+        return self.underlying.alive
+
+    @property
+    def health(self) -> float:
+        return self.underlying.health
+
+    @property
+    def death_reason(self) -> str:
+        return self.underlying.death_reason
+
 
 class WorldBridgeProtocol:
     """Standardized serialization and message exchange protocol for external 3D simulators."""

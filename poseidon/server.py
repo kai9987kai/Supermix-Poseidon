@@ -112,6 +112,8 @@ def make_handler(runtime, port):
                             self.send_json(202, runtime.submit_mco_experiment(payload))
                         elif kind == "helm-experiment":
                             self.send_json(202, runtime.submit_helm_experiment(payload))
+                        elif kind == "cognitive-experiment":
+                            self.send_json(202, runtime.submit_cognitive_experiment(payload))
                         else:
                             raise ValueError(f"Unknown experiment job kind: {kind}")
                     else:

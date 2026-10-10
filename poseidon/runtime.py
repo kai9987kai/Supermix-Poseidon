@@ -959,6 +959,29 @@ class Poseidon:
         finally:
             self.lock.release()
 
+    def submit_cognitive_experiment(self, settings):
+        from .provenance import assert_source_current
+        from .world import _integer, _number
+        if not isinstance(settings, dict) or set(settings) - {"kind", "seed", "episodes", "max_steps", "scarcity", "use_pomdp"}:
+            raise ValueError("Unknown job setting.")
+        if settings.get("kind") != "cognitive-experiment":
+            raise ValueError("Unknown experiment job kind.")
+        seed = _integer(settings.get("seed", 90000000), "seed", 0, 2**63 - 9)
+        episodes = _integer(settings.get("episodes", 4), "episodes", 1, 8)
+        max_steps = _integer(settings.get("max_steps", 64), "max_steps", 16, 256)
+        scarcity = _number(settings.get("scarcity", 2.5), "scarcity", .5, 4)
+        use_pomdp = bool(settings.get("use_pomdp", False))
+        assert_source_current()
+        if not self.lock.acquire(blocking=False):
+            raise RuntimeError("Poseidon is processing another model operation. Try again shortly.")
+        try:
+            self.core()
+        finally:
+            self.lock.release()
+        normalized = {"seed": seed, "episodes": episodes, "max_steps": max_steps, "scarcity": scarcity, "use_pomdp": use_pomdp}
+        return self.jobs().submit("cognitive-experiment", normalized,
+            lambda progress: self.cognitive_experiment(**normalized, progress=progress), timeout_seconds=1800)
+
     def cognitive_experiment(self, seed=90000000, episodes=4, max_steps=32, scarcity=2.5, use_pomdp=False, progress=None):
         import json
         import os
@@ -998,13 +1021,33 @@ class Poseidon:
             temporary = path.with_suffix(".json.tmp")
             temporary.write_text(json.dumps(result, indent=2, sort_keys=True, allow_nan=False), encoding="utf-8")
             os.replace(temporary, path)
+
+            # Format paired for UI display
+            paired_for_ui = {}
+            for pair_name, pair_val in result.get("paired", {}).items():
+                paired_for_ui[pair_name] = {
+                    "mean_reward_delta": pair_val.get("mean_reward_advantage", 0.0),
+                    "wins": pair_val.get("wins", 0),
+                    "ties": pair_val.get("ties", 0),
+                    "losses": pair_val.get("losses", 0),
+                    "per_seed": [{"reward_delta": d} for d in pair_val.get("deltas", [])],
+                }
+
+            intact_replay = (
+                result.get("episodes_data", {}).get("intact", [{}])[0]
+                if result.get("episodes_data", {}).get("intact")
+                else None
+            )
+
             return {
                 "schema": result["schema"],
                 "experiment_id": result.get("sha256", "")[:32],
                 "receipt_sha256": result.get("sha256"),
+                "summary": result.get("arms"),
                 "arms": result.get("arms"),
-                "paired": result.get("paired"),
+                "paired": paired_for_ui,
                 "verification": verification,
+                "replay": intact_replay,
                 "artifact_url": "/artifacts/" + path.relative_to(self.root / "outputs").as_posix(),
                 "cognitive_status": self.cognitive_agent_status(),
             }

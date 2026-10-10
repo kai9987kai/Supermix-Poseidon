@@ -48,6 +48,7 @@ def _run_single_seed(
     else:
         env = TidePool(scarcity=scarcity, seed=seed, max_steps=max_steps)
 
+    initial_snap = env.snapshot() if hasattr(env, "snapshot") else None
     obs = env.reset(seed=seed) if hasattr(env, "reset") else env.observe()
 
     if arm == "frozen_tidal":
@@ -55,6 +56,7 @@ def _run_single_seed(
         steps = 0
         survived = True
         decisions = []
+        trajectory = []
         for _ in range(max_steps):
             act = core.act(obs)
             if use_pomdp:
@@ -62,12 +64,24 @@ def _run_single_seed(
                 next_obs = res.observation
                 reward = res.reward
                 done = res.done
+                info = res.info
             else:
                 next_obs, reward, done, info = env.step(act)
 
             total_reward += reward
             steps += 1
-            decisions.append({"action": act, "override": False})
+            dec = {"action": act, "action_name": ACTIONS[act], "override": False}
+            decisions.append(dec)
+            trajectory.append({
+                "observation": obs,
+                "action": act,
+                "action_name": ACTIONS[act],
+                "reward": reward,
+                "next_observation": next_obs,
+                "state": env.state() if hasattr(env, "state") else {"position": [0, 0]},
+                "info": info if 'info' in locals() else {},
+                "decision": dec,
+            })
 
             if next_obs[0] <= 0.0 or done:
                 survived = (next_obs[0] > 0.0)
@@ -83,6 +97,8 @@ def _run_single_seed(
             "final_health": float(obs[0]),
             "overrides": 0,
             "override_rate": 0.0,
+            "initial_snapshot": initial_snap,
+            "trajectory": trajectory,
         }
 
     else:
@@ -97,6 +113,8 @@ def _run_single_seed(
             "final_health": rollout_out["final_health"],
             "overrides": rollout_out["overrides"],
             "override_rate": rollout_out["override_rate"],
+            "initial_snapshot": rollout_out.get("initial_snapshot") or initial_snap,
+            "trajectory": rollout_out.get("trajectory", []),
         }
 
 

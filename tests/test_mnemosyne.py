@@ -111,6 +111,12 @@ def test_spatial_cognitive_map_bayesian_updates():
     assert patch.food_lcb(current_tick=10) > 0.0
     assert patch.water_lcb(current_tick=10) > 0.0
 
+    # Frontier detection & coverage
+    frontiers = spatial.frontier_patches()
+    assert len(frontiers) == 1
+    assert spatial.topological_coverage(36) == 1 / 36
+    assert spatial.best_replenished_patch(current_tick=10, need="food") == patch.patch_id
+
 
 def test_mnemosyne_integrated_lesion_assays():
     for mode in MNEMOSYNE_MODES:

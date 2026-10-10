@@ -296,6 +296,30 @@ class SpatialCognitiveMap:
         counts = self.transitions.get(patch_id, {}).get(action, {})
         return {dest: c / attempts for dest, c in counts.items()}
 
+    def frontier_patches(self) -> list[str]:
+        """Identifies discovered patches that have unattempted exploratory actions."""
+        frontiers = []
+        for pid in self.patches:
+            counts = self.action_counts.get(pid, {})
+            # Actions 1, 2, 4 (forage, drink, explore)
+            unattempted = [a for a in (1, 2, 4) if counts.get(a, 0) == 0]
+            if unattempted:
+                frontiers.append(pid)
+        return frontiers
+
+    def topological_coverage(self, total_expected_patches: int = 36) -> float:
+        """Computes ratio of mapped spatial patches to total world grid."""
+        return min(1.0, len(self.patches) / max(1, total_expected_patches))
+
+    def best_replenished_patch(self, current_tick: int, need: str = "food") -> str | None:
+        """Finds patch with highest Lower Confidence Bound resource replenishment."""
+        if not self.patches:
+            return None
+        if need == "food":
+            return max(self.patches.keys(), key=lambda pid: self.patches[pid].food_lcb(current_tick, self.lcb_z))
+        else:
+            return max(self.patches.keys(), key=lambda pid: self.patches[pid].water_lcb(current_tick, self.lcb_z))
+
 
 @dataclass
 class MnemosyneConfig:
