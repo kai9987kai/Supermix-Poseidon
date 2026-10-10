@@ -1,19 +1,26 @@
-# Supermix Poseidon
+# Supermix Poseidon v2.0: Cognitive Platform
 
 [![Hugging Face](https://img.shields.io/badge/Hugging%20Face-Supermix--Poseidon-yellow)](https://huggingface.co/Kai9987kai/Supermix-Poseidon)
 [![GitHub](https://img.shields.io/badge/GitHub-Supermix--Poseidon-blue)](https://github.com/kai9987kai/Supermix-Poseidon)
 
-Poseidon is a local research workbench with separate components for language, a compact learned scene-and-control policy, a deterministic survival simulation, procedural media, exact arithmetic, and external memory. It is a software system, not a single multimodal foundation model.
+Poseidon v2.0 evolves the workbench into an experimental **cognitive AI platform** that predicts, remembers, plans, and adapts through experience while scientifically evaluating its own decisions across matched lesion assays and partially observable environments (POMDP).
 
-## v1.3.0 TRIDENT research upgrade
+## v2.0 Cognitive Platform Architecture
 
-Version 1.3.0 adds **TRIDENT**, an opt-in controller around the unchanged Tidal core. It corrects one-step predictions with recent observed prediction errors, admits directed travel only after enough local visits unless that transition has been observed, and requires an override to beat erased and time-shifted residual controls by configured margins. It does not change or train model weights.
+Poseidon v2.0 unifies six cognitive subsystems around the immutable, frozen Tidal core checkpoint:
 
-The six-arm paired benchmark compares the frozen core, TRIDENT, erased residual, shifted residual, directed-support gate-off, and residual-gate-off controls on identical seeds. Receipts retain decisions and observed transitions and can replay both controller outputs and TidePool outcomes. The bundled four-seed result is descriptive synthetic evidence, not proof of a general performance gain; it does not promote a model.
+1. **ORACLE (`poseidon/oracle.py`)**: Bootstrapped predictive world-model ensemble ($K$-head) with empirical quantile-calibrated uncertainty $U_{\text{cal}}(s, a)$ and multi-step recursive trajectory imagination.
+2. **MNEMOSYNE (`poseidon/mnemosyne.py`)**: Biologically inspired 3-tier memory hierarchy:
+   - **Tier 1 (Working Memory)**: Recurrent GRU context cell dynamically updated by prediction surprise ($e_{t-1} = \|o_t - \hat{o}_t\|_2$).
+   - **Tier 2 (Episodic Store)**: Value-gated experiential memory weighted by reward, surprise, and recency.
+   - **Tier 3 (Spatial Map)**: Online Bayesian replenishment estimation with conservative lower-confidence bounds (LCB).
+   - **Matched Lesion Assays**: Validated across `intact`, `erased`, `shifted`, `random_retrieval`, and `memory_free` modes.
+3. **HORIZON-X (`poseidon/horizon_x.py`)**: Multi-horizon ($H \in \{1, 4, 8, 16, 32\}$) risk-sensitive planner with dynamic metabolic reserve modulation ($\lambda_t = \lambda_0 \cdot \max(\mu_{\min}, \text{health} \cdot \min(\text{energy}, \text{hydration}))$) to avoid the "pessimism trap" under starvation.
+4. **ADAPT (`poseidon/adapt.py`)**: Evidence-gated continual learning pipeline with prioritized transition replay, anti-forgetting anchor datasets ($D_{\text{KL}}$ regularization), and audited promotion gates ($\le 2\%$ anchor regression).
+5. **NEURO (`poseidon/neuro.py`)**: Neuromodulated sparse connectome routing implementing small-world Watts-Strogatz graph masks and metabolic gain scaling.
+6. **WORLDLAB (`poseidon/worldlab.py`)**: High-fidelity partially observable Markov decision processes (`POMDPTidePool`) with fog-of-war scent occlusion, sensor noise, dynamic tidal oscillations, and a standardized simulation bridge (`WorldBridgeProtocol`).
 
-Earlier TITAN mechanisms remain optional software simulations. Archimedes fluid calculations, Genesis ecology, classical state-vector circuits, intermittent-energy storage, scanline telemetry, and static action hooks do not operate physical devices or establish biological evidence.
-
-See the [TRIDENT design](docs/TRIDENT_DESIGN.md), [TRIDENT results](docs/TRIDENT_RESULTS.md), [TITAN design](docs/TITAN_DESIGN.md), [TITAN results](docs/TITAN_RESULTS.md), and [review of the supplied repositories and research](docs/research/README.md).
+See the complete research documentation in [docs/POSEIDON_V2_RESEARCH.md](docs/POSEIDON_V2_RESEARCH.md).
 
 ## Run locally
 

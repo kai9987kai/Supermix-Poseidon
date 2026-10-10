@@ -22,6 +22,8 @@ def main():
         "hyperion-experiment", "verify-hyperion",
         "titan-experiment", "verify-titan",
         "trident-experiment", "verify-trident",
+        "cognitive-experiment", "verify-cognitive",
+        "oracle-fit", "oracle-evaluate", "verify-oracle-fit", "verify-oracle-evaluation",
     ])
     p.add_argument("prompt", nargs="?", default="")
     p.add_argument("--root", default=".")
@@ -30,7 +32,8 @@ def main():
     p.add_argument("--episodes", type=int, default=None)
     p.add_argument("--scarcity", type=float, default=None)
     p.add_argument("--adapter")
-    p.add_argument("--planner", choices=["policy", "mpc", "hybrid", "risk_aware", "uncertainty", "atlas", "contrast", "horizon", "odyssey", "helm", "odysseus", "aura", "metamorph", "chimera", "hyperion", "titan", "trident"], default="policy", help="world simulation planner")
+    p.add_argument("--planner", choices=["policy", "mpc", "hybrid", "risk_aware", "uncertainty", "atlas", "contrast", "horizon", "odyssey", "helm", "odysseus", "aura", "metamorph", "chimera", "hyperion", "titan", "trident", "cognitive"], default="policy", help="world simulation planner")
+    p.add_argument("--use-pomdp", action="store_true", help="use partially observable POMDP TidePool environment")
     p.add_argument("--max-steps", type=int, default=None)
     p.add_argument("--anchors", type=int, default=24)
     p.add_argument("--train-episodes", type=int, default=12)
@@ -40,6 +43,18 @@ def main():
     p.add_argument("--stride", type=int, default=32, help="regular trajectory-audit anchor interval")
     p.add_argument("--horizon", type=int, default=16, help="trajectory-audit return horizon")
     p.add_argument("--max-anchors", type=int, default=256, help="trajectory-audit anchor budget")
+    p.add_argument("--output", help="optional output directory for ORACLE fit/evaluation")
+    p.add_argument("--oracle-train-episodes", type=int, default=32)
+    p.add_argument("--oracle-selection-episodes", type=int, default=8)
+    p.add_argument("--oracle-calibration-episodes", type=int, default=12)
+    p.add_argument("--oracle-updates", type=int, default=256)
+    p.add_argument("--oracle-batch-size", type=int, default=128)
+    p.add_argument("--oracle-hidden-size", type=int, default=128)
+    p.add_argument("--oracle-ensemble-size", type=int, default=5)
+    p.add_argument("--oracle-coverage", type=float, default=0.90)
+    p.add_argument("--eval-episodes", type=int, default=32, help="fresh episodes per ORACLE evaluation condition")
+    p.add_argument("--bootstrap-reps", type=int, default=2000)
+    p.add_argument("--skip-replay", action="store_true", help="verify receipt hashes without regenerating episodes")
     args = p.parse_args()
     default_seeds = {"atlas-fit": 81000001, "experiment": 93000001,
                      "contrast-fit": 101000001, "contrast-experiment": 104000001,
@@ -51,11 +66,79 @@ def main():
                      "tessera-experiment": 155000001, "mnemorph-experiment": 160000001,
                      "metamorph-experiment": 199000001, "chimera-experiment": 202000001,
                      "hyperion-experiment": 303000001, "titan-experiment": 99000000,
-                     "trident-experiment": 88000000}
+                     "trident-experiment": 88000000, "cognitive-experiment": 90000000,
+                     "oracle-fit": 442000000, "oracle-evaluate": 442000000}
     args.seed = args.seed if args.seed is not None else default_seeds.get(args.command, 42)
-    args.episodes = args.episodes if args.episodes is not None else (4 if args.command in ("experiment", "contrast-experiment", "horizon-experiment", "odyssey-experiment", "helm-experiment", "odysseus-experiment", "aura-experiment", "metamorph-experiment", "chimera-experiment", "hyperion-experiment", "titan-experiment", "trident-experiment") else 100)
+    args.episodes = args.episodes if args.episodes is not None else (4 if args.command in ("experiment", "contrast-experiment", "horizon-experiment", "odyssey-experiment", "helm-experiment", "odysseus-experiment", "aura-experiment", "metamorph-experiment", "chimera-experiment", "hyperion-experiment", "titan-experiment", "trident-experiment", "cognitive-experiment") else 100)
     args.scarcity = args.scarcity if args.scarcity is not None else (1.0 if args.command == "world" else 2.5)
     args.calibration_episodes = args.calibration_episodes if args.calibration_episodes is not None else (8 if args.command in ("contrast-fit", "horizon-fit", "odyssey-fit", "fit-helm", "fit-odysseus") else 6)
+
+    if args.command == "oracle-fit":
+        from pathlib import Path
+        from .research.oracle_training import fit_oracle
+        root = Path(args.root).resolve()
+        output = Path(args.output) if args.output else root / "outputs" / f"oracle-fit-{args.seed}"
+        if not output.is_absolute():
+            output = root / output
+        def progress(event):
+            import sys
+            print(json.dumps(event, allow_nan=False), file=sys.stderr, flush=True)
+        receipt = fit_oracle(
+            output,
+            base_seed=args.seed,
+            train_episodes=args.oracle_train_episodes,
+            selection_episodes=args.oracle_selection_episodes,
+            calibration_episodes=args.oracle_calibration_episodes,
+            max_steps=args.max_steps if args.max_steps is not None else 96,
+            training_updates=args.oracle_updates,
+            batch_size=args.oracle_batch_size,
+            hidden_size=args.oracle_hidden_size,
+            ensemble_size=args.oracle_ensemble_size,
+            coverage=args.oracle_coverage,
+            progress=progress,
+        )
+        print(json.dumps(receipt, indent=2, ensure_ascii=False))
+        return
+
+    if args.command == "oracle-evaluate":
+        from pathlib import Path
+        from .research.candidate_evaluation import evaluate_oracle
+        root = Path(args.root).resolve()
+        if not args.prompt:
+            p.error("oracle-evaluate requires the ORACLE artifact path")
+        artifact = Path(args.prompt)
+        if not artifact.is_absolute():
+            artifact = root / artifact
+        output = Path(args.output) if args.output else root / "outputs" / f"oracle-eval-{args.seed}"
+        if not output.is_absolute():
+            output = root / output
+        receipt = evaluate_oracle(artifact, output, base_seed=args.seed,
+                                  episodes_per_condition=args.eval_episodes,
+                                  bootstrap_reps=args.bootstrap_reps)
+        print(json.dumps(receipt, indent=2, ensure_ascii=False))
+        return
+
+    if args.command == "verify-oracle-fit":
+        from pathlib import Path
+        from .research.oracle_training import verify_fit_receipt
+        if not args.prompt:
+            p.error("verify-oracle-fit requires a fit receipt path")
+        path = Path(args.prompt)
+        if not path.is_absolute():
+            path = Path(args.root) / path
+        print(json.dumps(verify_fit_receipt(path, replay_data=not args.skip_replay), indent=2))
+        return
+
+    if args.command == "verify-oracle-evaluation":
+        from pathlib import Path
+        from .research.candidate_evaluation import verify_evaluation_receipt
+        if not args.prompt:
+            p.error("verify-oracle-evaluation requires an evaluation receipt path")
+        path = Path(args.prompt)
+        if not path.is_absolute():
+            path = Path(args.root) / path
+        print(json.dumps(verify_evaluation_receipt(path, replay=not args.skip_replay), indent=2))
+        return
 
     if args.command == "verify-helm":
         from pathlib import Path
@@ -404,9 +487,23 @@ def main():
         print(json.dumps(verify_trident_receipt(data), indent=2))
         return
 
-    if args.command in ("experiment", "contrast-experiment", "horizon-experiment", "odyssey-experiment", "helm-experiment", "odysseus-experiment", "aura-experiment", "metamorph-experiment", "chimera-experiment", "hyperion-experiment", "titan-experiment", "trident-experiment"):
+    if args.command == "verify-cognitive":
+        from pathlib import Path
+        from .cognitive_experiment import verify_cognitive_receipt
+        target = Path(args.prompt) if args.prompt else (Path(args.root) / "outputs/cognitive_experiments/RECEIPT.json")
+        if not target.is_absolute():
+            target = Path(args.root) / target
+        data = json.loads(target.read_text(encoding="utf-8"))
+        print(json.dumps({"verified": verify_cognitive_receipt(data), "sha256": data.get("sha256")}, indent=2))
+        return
+
+    if args.command in ("experiment", "contrast-experiment", "horizon-experiment", "odyssey-experiment", "helm-experiment", "odysseus-experiment", "aura-experiment", "metamorph-experiment", "chimera-experiment", "hyperion-experiment", "titan-experiment", "trident-experiment", "cognitive-experiment"):
         runtime = Poseidon(args.root)
-        if args.command == "hyperion-experiment":
+        if args.command == "cognitive-experiment":
+            result = runtime.cognitive_experiment(args.seed, args.episodes, args.max_steps if args.max_steps is not None else 32, args.scarcity, use_pomdp=args.use_pomdp)
+            print(json.dumps(result, indent=2))
+            return
+        elif args.command == "hyperion-experiment":
             experiment = runtime.hyperion_experiment
         elif args.command == "trident-experiment":
             experiment = runtime.trident_experiment

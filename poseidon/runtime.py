@@ -265,6 +265,47 @@ class Poseidon:
             return {"ready": True, "type": "identity_gated_directed_residual_controller", "receipt_ready": False,
                     "path": relative, "error": "TRIDENT receipt is malformed or from an unsupported schema."}
 
+    def cognitive_agent(self, mode: str = "intact"):
+        from .cognitive_agent import CognitiveAgent
+        return CognitiveAgent(core=self.core(), mode=mode)
+
+    def cognitive_agent_status(self):
+        relative = "outputs/cognitive_experiments/RECEIPT.json"
+        path = self.root / relative
+        if not path.is_file():
+            return {
+                "ready": True,
+                "version": "2.0.0",
+                "type": "unified_cognitive_agent_coordinator",
+                "subsystems": ["oracle", "mnemosyne", "horizon_x", "adapt", "neuro", "worldlab"],
+                "core_frozen": True,
+                "receipt_ready": False,
+                "path": relative,
+            }
+        try:
+            receipt = json.loads(path.read_text(encoding="utf-8"))
+            return {
+                "ready": True,
+                "version": "2.0.0",
+                "type": "unified_cognitive_agent_coordinator",
+                "subsystems": ["oracle", "mnemosyne", "horizon_x", "adapt", "neuro", "worldlab"],
+                "core_frozen": True,
+                "receipt_ready": True,
+                "path": relative,
+                "receipt_sha256": receipt.get("sha256"),
+                "summary": receipt.get("arms"),
+                "paired": receipt.get("paired"),
+            }
+        except Exception:
+            return {
+                "ready": True,
+                "version": "2.0.0",
+                "type": "unified_cognitive_agent_coordinator",
+                "receipt_ready": False,
+                "path": relative,
+                "error": "Cognitive experiment receipt is malformed.",
+            }
+
     def mnemorph_status(self):
         relative = "outputs/mnemorph/RECEIPT.json"
         path = self.root / relative
@@ -918,6 +959,58 @@ class Poseidon:
         finally:
             self.lock.release()
 
+    def cognitive_experiment(self, seed=90000000, episodes=4, max_steps=32, scarcity=2.5, use_pomdp=False, progress=None):
+        import json
+        import os
+        from .cognitive_experiment import run_cognitive_benchmark, verify_cognitive_receipt
+        from .provenance import assert_source_current
+        from .world import _integer, _number
+        seed = _integer(seed, "seed", 0, 2**63 - 9)
+        episodes = _integer(episodes, "episodes", 1, 32)
+        if seed > 2**63 - episodes:
+            raise ValueError("seed cannot form the requested nonnegative seed range")
+        max_steps = _integer(max_steps, "max_steps", 1, 512)
+        scarcity = _number(scarcity, "scarcity", .5, 4)
+        def check(event):
+            assert_source_current()
+            if progress:
+                progress(event)
+        while not self.lock.acquire(timeout=.2):
+            check({"phase": "waiting-for-model"})
+        try:
+            check({"phase": "starting"})
+            core = self.core()
+            result = run_cognitive_benchmark(
+                core_path=core.path,
+                seed_base=seed,
+                episodes=episodes,
+                max_steps=max_steps,
+                scarcity=scarcity,
+                use_pomdp=use_pomdp,
+                progress=check,
+            )
+            check({"phase": "verifying"})
+            verification = verify_cognitive_receipt(result, core_path=core.path)
+            check({"phase": "publishing"})
+            receipt_dir = self.root / "outputs/cognitive_experiments"
+            receipt_dir.mkdir(parents=True, exist_ok=True)
+            path = receipt_dir / "RECEIPT.json"
+            temporary = path.with_suffix(".json.tmp")
+            temporary.write_text(json.dumps(result, indent=2, sort_keys=True, allow_nan=False), encoding="utf-8")
+            os.replace(temporary, path)
+            return {
+                "schema": result["schema"],
+                "experiment_id": result.get("sha256", "")[:32],
+                "receipt_sha256": result.get("sha256"),
+                "arms": result.get("arms"),
+                "paired": result.get("paired"),
+                "verification": verification,
+                "artifact_url": "/artifacts/" + path.relative_to(self.root / "outputs").as_posix(),
+                "cognitive_status": self.cognitive_agent_status(),
+            }
+        finally:
+            self.lock.release()
+
     def _candidate_status(self, name):
         """Readiness may be cached while a world or experiment owns the model."""
         relative = f"outputs/{name}/atlas.json"
@@ -1090,10 +1183,14 @@ class Poseidon:
                 from .world_controls import rollout_with_decisions
                 _integer(max_steps, "max_steps", 1, 10000)
                 scarcity = _number(scarcity, "scarcity", .5, 4)
-                if planner not in ("policy", "mpc", "hybrid", "risk_aware", "uncertainty", "atlas", "contrast", "horizon", "odyssey", "helm", "odysseus", "aura", "metamorph", "chimera", "hyperion", "titan", "trident"):
+                if planner not in ("policy", "mpc", "hybrid", "risk_aware", "uncertainty", "atlas", "contrast", "horizon", "odyssey", "helm", "odysseus", "aura", "metamorph", "chimera", "hyperion", "titan", "trident", "cognitive"):
                     raise ValueError("Unknown survival planner.")
                 core = self.core()
-                if planner == "trident":
+                if planner == "cognitive":
+                    controller = self.cognitive_agent()
+                    controller.reset()
+                    backend_desc = "Supermix Poseidon v2.0 Cognitive Agent (Oracle + Mnemosyne + Horizon-X + Neuro) in TidePool"
+                elif planner == "trident":
                     controller = self.trident()
                     controller.reset(scarcity, seed=seed, max_steps=max_steps)
                     backend_desc = "TRIDENT identity-gated residual control with observed directed topology in synthetic TidePool"
@@ -1153,7 +1250,7 @@ class Poseidon:
                 else:
                     controller = core
                     backend_desc = "learned Tidal policy in TidePool"
-                if planner in ("titan", "trident"):
+                if planner in ("titan", "trident", "cognitive"):
                     from .world_controls import rollout_with_observed_transitions
                     episode = rollout_with_observed_transitions(controller, seed=seed, max_steps=max_steps, scarcity=scarcity)
                 else:
