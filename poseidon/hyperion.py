@@ -274,6 +274,7 @@ class HyperionController:
             "pva_coherence": round(pva_coherence, 4),
             "winning_channel": winning_channel,
             "lattice_coherence": round(lattice_coherence, 4),
+            "hyperion_coherence": round(pva_coherence * lattice_coherence, 4),
             "lattice_pos": [round(p, 4) for p in self.lattice.estimated_pos],
             "quantum_entropy": causeway_telemetry["von_neumann_entropy"],
             "quantum_coherence_length": causeway_telemetry["coherence_length"],
