@@ -510,8 +510,9 @@ See runs/language/report.json, data/language/SOURCE_CARD.md and the root model c
         (output / directory / "README.md").write_text(adapter_card, encoding="utf-8")
     (output / "README.md").write_text(model_card(revision, core_hash, atlas_hash, horizon_hash, contrast_hash, odyssey_hash, __version__, helm_hash, odysseus_hash, titan_receipt_hash), encoding="utf-8")
 
-    if git("status", "--porcelain") or git("rev-parse", "HEAD") != revision:
-        raise ValueError("source checkout changed while packaging")
+    status_output = git("status", "--porcelain")
+    if status_output or git("rev-parse", "HEAD") != revision:
+        raise ValueError(f"source checkout changed while packaging: {status_output!r}")
     for name, expected in source_hashes.items():
         if sha256(ROOT / name) != expected:
             raise ValueError(f"source changed while packaging: {name}")
