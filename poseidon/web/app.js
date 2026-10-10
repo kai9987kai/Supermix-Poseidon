@@ -79,8 +79,8 @@ let lastFrame=0;function animateWorld(time=0){animationHandle=null;if(!playing||
 $('#scrub').oninput=()=>{stopWorld();frame=Number($('#scrub').value);drawWorld();};$('#replay').onclick=()=>{if(!episode?.trajectory?.length)return;stopWorld();frame=0;lastFrame=0;playing=true;animateWorld();};
 $('#remember').onclick=async()=>{if($('#remember').disabled)return;requestBusy=true;syncControls();try{const r=await request('/api/remember',{text:$('#memoryText').value,carrier:$('#carrier').value});$('#memoryStatus').textContent=r.saved?'Fact saved locally.':'Not saved';$('#memoryText').value='';}catch(e){$('#memoryStatus').textContent=e.message;}finally{requestBusy=false;serverBusy=false;syncControls();refreshStatus();}};
 $('#recall').onclick=async()=>{if($('#recall').disabled)return;requestBusy=true;syncControls();try{const r=await request('/api/respond',{prompt:$('#prompt').value||'memory',mode:'memory',disabled_carriers:excluded()});$('#memoryStatus').textContent=r.text;}catch(e){$('#memoryStatus').textContent=e.message;}finally{requestBusy=false;serverBusy=false;syncControls();refreshStatus();}};
-function selectedProtocol(){return $('#experimentType').value||'chimera';}
-function protocolReady(){const p=selectedProtocol();return (p==='chimera'||p==='metamorph'||p==='aura'||p==='tessera'||p==='mnemorph'||p==='mco')?true:p==='odysseus'?odysseusReady:p==='helm'?helmReady:p==='odyssey'?odysseyReady&&horizonReady&&contrastReady&&atlasReady:p==='horizon'?horizonReady&&contrastReady&&atlasReady:p==='contrast'?contrastReady&&atlasReady:atlasReady;}
+function selectedProtocol(){return $('#experimentType').value||'hyperion';}
+function protocolReady(){const p=selectedProtocol();return (p==='hyperion'||p==='chimera'||p==='metamorph'||p==='aura'||p==='tessera'||p==='mnemorph'||p==='mco')?true:p==='odysseus'?odysseusReady:p==='helm'?helmReady:p==='odyssey'?odysseyReady&&horizonReady&&contrastReady&&atlasReady:p==='horizon'?horizonReady&&contrastReady&&atlasReady:p==='contrast'?contrastReady&&atlasReady:atlasReady;}
 let seedChosen=false;
 $('#experimentSeed').addEventListener('input',()=>seedChosen=true);
 $('#experimentType').onchange=()=>{protocolChosen=true;experimentOutcome='idle';updateProtocol();};
@@ -98,8 +98,9 @@ function syncControls(){
 }
 function updateProtocol(){
   const protocol=selectedProtocol();
-  if(!seedChosen)$('#experimentSeed').value=protocol==='chimera'?'202000001':protocol==='metamorph'?'199000001':protocol==='aura'?'150000001':protocol==='tessera'?'160000001':protocol==='mnemorph'?'170000001':protocol==='odysseus'?'133000001':protocol==='mco'?'140000001':protocol==='helm'?'123000001':protocol==='odyssey'?'110000001':protocol==='horizon'?'109000001':protocol==='contrast'?'104000001':'93000001';
-  $('#protocolNote').textContent=protocol==='chimera'?'CHIMERA super-controller: Causeway quantum superposition (Schrödinger gain & Born collapse), 256-d HRR holographic associative memory, and 3D Diamond Lattice geodesic grid cells on identical worlds.':protocol==='metamorph'?'METAMORPH developmental life-stage ecdysis (MOLT), NexusFlow causal potential flux, and Chronos cyclic beaconing on identical worlds.':protocol==='aura'?'Biomimetic ring attractor heading tracking and sparse Kenyon cell neuropil arbitration on identical worlds.':protocol==='tessera'?'Independent-lineage verified macro-action commons and finite-domain semantic safety pre-checks on identical seeds.':protocol==='mnemorph'?'Mnemorph archaeological memory assays: hub vs periphery structural lesions, context shift, and associative regrowth.':protocol==='odysseus'?'Six paired arms evaluate Odysseus calibrated routing, ungated, no-memory, Odyssey, random against the frozen policy baseline.':protocol==='mco'?'Full causal factorial evaluation across 16 carrier combinations and 3 falsifiable negative controls on standard knowledge benchmarks.':protocol==='helm'?'Six paired arms compare Helm selected, observation-only, no-innovation, yoked and ungated critics against the frozen policy baseline.':protocol==='odyssey'?'Ten paired controllers compare Odyssey cognitive mapping against Horizon Atlas, Contrast Atlas, Atlas v2, Neural MPC and policy.':protocol==='horizon'?'Nine paired controllers separate multi-horizon return advantages, depletion-trap guards, memory removal and uncalibrated interventions on identical worlds.':protocol==='contrast'?'Nine paired controllers separate action advantage, absolute bounds, memory removal and unfiltered corrections. Atlas v2 is retained as a baseline.':'Six paired controllers compare the original Atlas v2 with memory removed, neural MPC, policy, heuristic and random controls.';
+  if(!seedChosen)$('#experimentSeed').value=protocol==='hyperion'?'303000001':protocol==='chimera'?'202000001':protocol==='metamorph'?'199000001':protocol==='aura'?'150000001':protocol==='tessera'?'160000001':protocol==='mnemorph'?'170000001':protocol==='odysseus'?'133000001':protocol==='mco'?'140000001':protocol==='helm'?'123000001':protocol==='odyssey'?'110000001':protocol==='horizon'?'109000001':protocol==='contrast'?'104000001':'93000001';
+  $('#protocolNote').textContent=protocol==='hyperion'?'HYPERION frontier super-controller: Morpheus dream consolidation & hippocampal replay, Prometheus meta-plasticity & homeostatic allostasis, and NTAG intermittent RF energy harvesting on identical worlds.':protocol==='chimera'?'CHIMERA super-controller: Causeway quantum superposition (Schrödinger gain & Born collapse), 256-d HRR holographic associative memory, and 3D Diamond Lattice geodesic grid cells on identical worlds.':protocol==='metamorph'?'METAMORPH developmental life-stage ecdysis (MOLT), NexusFlow causal potential flux, and Chronos cyclic beaconing on identical worlds.':protocol==='aura'?'Biomimetic ring attractor heading tracking and sparse Kenyon cell neuropil arbitration on identical worlds.':protocol==='tessera'?'Independent-lineage verified macro-action commons and finite-domain semantic safety pre-checks on identical seeds.':protocol==='mnemorph'?'Mnemorph archaeological memory assays: hub vs periphery structural lesions, context shift, and associative regrowth.':protocol==='odysseus'?'Six paired arms evaluate Odysseus calibrated routing, ungated, no-memory, Odyssey, random against the frozen policy baseline.':protocol==='mco'?'Full causal factorial evaluation across 16 carrier combinations and 3 falsifiable negative controls on standard knowledge benchmarks.':protocol==='helm'?'Six paired arms compare Helm selected, observation-only, no-innovation, yoked and ungated critics against the frozen policy baseline.':protocol==='odyssey'?'Ten paired controllers compare Odyssey cognitive mapping against Horizon Atlas, Contrast Atlas, Atlas v2, Neural MPC and policy.':protocol==='horizon'?'Nine paired controllers separate multi-horizon return advantages, depletion-trap guards, memory removal and uncalibrated interventions on identical worlds.':protocol==='contrast'?'Nine paired controllers separate action advantage, absolute bounds, memory removal and unfiltered corrections. Atlas v2 is retained as a baseline.':'Six paired controllers compare the original Atlas v2 with memory removed, neural MPC, policy, heuristic and random controls.';
+  $('#hyperionSetup').hidden=(protocol!=='hyperion');
   $('#chimeraSetup').hidden=(protocol!=='chimera');
   $('#metamorphSetup').hidden=(protocol!=='metamorph');
   $('#auraSetup').hidden=(protocol!=='aura');
@@ -118,12 +119,13 @@ function updateProtocol(){
 }
 function setCandidateStatus(kind,status){
   candidateStatus[kind]=status;
-  const ready=status?.ready===true,label=kind==='chimera'?'CHIMERA Super-Controller':kind==='aura'?'AURA Biomimetic Central Complex':kind==='tessera'?'Tessera Macro-Commons':kind==='mnemorph'?'Mnemorph Archaeological Memory':kind==='odysseus'?'Odysseus Navigator':kind==='helm'?'Helm Critic v0.6':kind==='odyssey'?'Odyssey Atlas v5':kind==='horizon'?'Horizon Atlas v4':kind==='contrast'?'Contrast Atlas':'Atlas v2';
-  if(kind==='chimera')chimeraReady=ready;else if(kind==='aura')auraReady=ready;else if(kind==='tessera')tesseraReady=ready;else if(kind==='mnemorph')mnemorphReady=ready;else if(kind==='odysseus')odysseusReady=ready;else if(kind==='helm')helmReady=ready;else if(kind==='odyssey')odysseyReady=ready;else if(kind==='horizon')horizonReady=ready;else if(kind==='contrast')contrastReady=ready;else atlasReady=ready;
+  const ready=status?.ready===true,label=kind==='hyperion'?'HYPERION Frontier Super-Controller':kind==='chimera'?'CHIMERA Super-Controller':kind==='aura'?'AURA Biomimetic Central Complex':kind==='tessera'?'Tessera Macro-Commons':kind==='mnemorph'?'Mnemorph Archaeological Memory':kind==='odysseus'?'Odysseus Navigator':kind==='helm'?'Helm Critic v0.6':kind==='odyssey'?'Odyssey Atlas v5':kind==='horizon'?'Horizon Atlas v4':kind==='contrast'?'Contrast Atlas':'Atlas v2';
+  if(kind==='hyperion')hyperionReady=ready;else if(kind==='chimera')chimeraReady=ready;else if(kind==='aura')auraReady=ready;else if(kind==='tessera')tesseraReady=ready;else if(kind==='mnemorph')mnemorphReady=ready;else if(kind==='odysseus')odysseusReady=ready;else if(kind==='helm')helmReady=ready;else if(kind==='odyssey')odysseyReady=ready;else if(kind==='horizon')horizonReady=ready;else if(kind==='contrast')contrastReady=ready;else atlasReady=ready;
   if($('#'+kind+'State')){$('#'+kind+'State').textContent=ready?'OPT-IN CANDIDATE':'FIT NOT READY';$('#'+kind+'State').classList.toggle('available',ready);}
   const receipt=status?.fit_receipt,selection=receipt?.selection,calibration=receipt?.calibration;
   const sampleCount=receipt?.training_samples;
   let detail=ready?'A fitted candidate is available. ':label+' is unavailable. '+(status?.error||'Fit it with the local command below.')+' ';
+  if(ready&&kind==='hyperion')detail='Morpheus dream consolidation (SWS & REM), Prometheus meta-plasticity, and NTAG intermittent RF energy harvesting. ';
   if(ready&&kind==='chimera')detail='Causeway quantum superposition (6-d state vector), 256-d HRR holographic associative concept memory & 3D diamond geodesic neuropil. ';
   if(ready&&kind==='aura')detail='16-wedge ring attractor compass (PVA coherence) & 128 Kenyon cell sparse neuropil arbiter (k=8 WTA). ';
   if(ready&&kind==='tessera')detail='Independent dual-lineage ratified macro-actions with finite-domain safety assertions. ';
@@ -265,17 +267,17 @@ $('#experimentForm').onsubmit=async event=>{
   event.preventDefault();if(experimentBusy||requestBusy||serverBusy||restartRequired||!protocolReady())return;
   if(!$('#experimentForm').checkValidity()){$('#experimentForm').reportValidity();return;}
   const protocol=selectedProtocol();
-  const payload={kind:protocol==='aura'?'aura-experiment':protocol==='tessera'?'tessera-experiment':protocol==='mnemorph'?'mnemorph-experiment':protocol==='helm'?'helm-experiment':protocol,seed:Number($('#experimentSeed').value),scarcity:Number($('#scarcity').value),episodes:Number($('#episodes').value),max_steps:Number($('#maxSteps').value)};
+  const payload={kind:protocol==='hyperion'?'hyperion-experiment':protocol==='aura'?'aura-experiment':protocol==='tessera'?'tessera-experiment':protocol==='mnemorph'?'mnemorph-experiment':protocol==='helm'?'helm-experiment':protocol,seed:Number($('#experimentSeed').value),scarcity:Number($('#scarcity').value),episodes:Number($('#episodes').value),max_steps:Number($('#maxSteps').value)};
   stopWorld();
   experimentBusy=true;currentExperiment=null;experimentOutcome='running';$('#experimentResults').hidden=true;
   $('#decisionPanel').hidden=true;
   $('#experimentPanel').setAttribute('aria-busy','true');
   $('#experimentStatus').classList.remove('error');
-  $('#experimentStatus').textContent='Running '+(protocol==='chimera'?'four':protocol==='aura'?'five':protocol==='atlas'||protocol==='helm'||protocol==='odysseus'?'six':protocol==='contrast'||protocol==='horizon'?'nine':'ten')+' controllers on '+payload.episodes+' paired episodes each, up to '+payload.max_steps+' steps. Local CPU work may take a while…';
+  $('#experimentStatus').textContent='Running '+(protocol==='hyperion'?'five':protocol==='chimera'?'four':protocol==='aura'?'five':protocol==='atlas'||protocol==='helm'||protocol==='odysseus'?'six':protocol==='contrast'||protocol==='horizon'?'nine':'ten')+' controllers on '+payload.episodes+' paired episodes each, up to '+payload.max_steps+' steps. Local CPU work may take a while…';
   syncControls();
-  if(protocol==='chimera'||protocol==='aura'||protocol==='tessera'||protocol==='mnemorph'||protocol==='helm'||protocol==='odysseus'||protocol==='mco'){
+  if(protocol==='hyperion'||protocol==='chimera'||protocol==='aura'||protocol==='tessera'||protocol==='mnemorph'||protocol==='helm'||protocol==='odysseus'||protocol==='mco'){
     try{
-      const payload={kind:protocol==='chimera'?'chimera-experiment':protocol==='aura'?'aura-experiment':protocol==='tessera'?'tessera-experiment':protocol==='mnemorph'?'mnemorph-experiment':protocol==='mco'?'mco-experiment':protocol==='odysseus'?'odysseus-experiment':'helm-experiment',seed:Number($('#experimentSeed').value),scarcity:Number($('#scarcity').value),episodes:Number($('#episodes').value),max_steps:Number($('#maxSteps').value)};
+      const payload={kind:protocol==='hyperion'?'hyperion-experiment':protocol==='chimera'?'chimera-experiment':protocol==='aura'?'aura-experiment':protocol==='tessera'?'tessera-experiment':protocol==='mnemorph'?'mnemorph-experiment':protocol==='mco'?'mco-experiment':protocol==='odysseus'?'odysseus-experiment':'helm-experiment',seed:Number($('#experimentSeed').value),scarcity:Number($('#scarcity').value),episodes:Number($('#episodes').value),max_steps:Number($('#maxSteps').value)};
       const jobRes=await fetch('/api/jobs',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
       const jobData=await jobRes.json();
       if(!jobRes.ok)throw Error(jobData.error||jobRes.statusText);
@@ -312,10 +314,11 @@ $('#experimentForm').onsubmit=async event=>{
     }
   }
   try{
-    const url=protocol==='chimera'?'/api/chimera-experiment':protocol==='metamorph'?'/api/metamorph-experiment':protocol==='aura'?'/api/aura-experiment':protocol==='tessera'?'/api/tessera-experiment':protocol==='mnemorph'?'/api/mnemorph-experiment':protocol==='odysseus'?'/api/odysseus-experiment':protocol==='mco'?'/api/mco-experiment':protocol==='odyssey'?'/api/odyssey-experiment':protocol==='horizon'?'/api/horizon-experiment':protocol==='contrast'?'/api/contrast-experiment':'/api/experiment';
+    const url=protocol==='hyperion'?'/api/hyperion-experiment':protocol==='chimera'?'/api/chimera-experiment':protocol==='metamorph'?'/api/metamorph-experiment':protocol==='aura'?'/api/aura-experiment':protocol==='tessera'?'/api/tessera-experiment':protocol==='mnemorph'?'/api/mnemorph-experiment':protocol==='odysseus'?'/api/odysseus-experiment':protocol==='mco'?'/api/mco-experiment':protocol==='odyssey'?'/api/odyssey-experiment':protocol==='horizon'?'/api/horizon-experiment':protocol==='contrast'?'/api/contrast-experiment':'/api/experiment';
     const data=await request(url,payload);
     showExperiment(data);experimentOutcome='complete';
     $('#experimentStatus').textContent='Completed locally. Compare controllers or benchmark factorial subsets below.';
+    if(data.hyperion)setCandidateStatus('hyperion',data.hyperion);
     if(data.chimera)setCandidateStatus('chimera',data.chimera);
     if(data.metamorph)setCandidateStatus('metamorph',data.metamorph);
     if(data.aura)setCandidateStatus('aura',data.aura);
@@ -351,9 +354,9 @@ async function refreshStatus(){
     $('#corpus').textContent=counts?Object.values(counts).reduce((a,b)=>a+b,0).toLocaleString()+' rows':'Preparing';
     $('#evidence').textContent=JSON.stringify(r,null,2);
     setCandidateStatus('atlas',data.atlas);setCandidateStatus('contrast',data.contrast);setCandidateStatus('horizon',data.horizon);setCandidateStatus('odyssey',data.odyssey);setCandidateStatus('helm',data.helm);setCandidateStatus('odysseus',data.odysseus);
-    setCandidateStatus('aura',data.aura);setCandidateStatus('tessera',data.tessera);setCandidateStatus('mnemorph',data.mnemorph);setCandidateStatus('metamorph',data.metamorph);setCandidateStatus('chimera',data.chimera);
+    setCandidateStatus('aura',data.aura);setCandidateStatus('tessera',data.tessera);setCandidateStatus('mnemorph',data.mnemorph);setCandidateStatus('metamorph',data.metamorph);setCandidateStatus('chimera',data.chimera);setCandidateStatus('hyperion',data.hyperion);
     if(data.mco?.ready)mcoReady=true;
-    if(!protocolChosen){$('#experimentType').value='chimera';protocolChosen=true;}
+    if(!protocolChosen){$('#experimentType').value='hyperion';protocolChosen=true;}
     updateProtocol();
   }catch{$('#connection').textContent='Offline · start the local server';}
   finally{statusInFlight=false;syncControls();}

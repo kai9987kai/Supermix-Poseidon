@@ -40,6 +40,13 @@ class NexusFlowNetwork:
         self.total_flux_transferred = 0.0
         self.interference_events = 0
 
+    def reset(self) -> None:
+        """Reset all registered waypoints and flux matrices."""
+        self.waypoints.clear()
+        self.flux_matrix.clear()
+        self.total_flux_transferred = 0.0
+        self.interference_events = 0
+
     def register_waypoint(
         self,
         node_id: str,

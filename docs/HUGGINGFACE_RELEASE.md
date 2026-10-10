@@ -1,19 +1,19 @@
-# Poseidon v1.0.0 model release
+# Poseidon v1.1.0 model release
 
-The v1.0.0 release bundles **CHIMERA** unified quantum superposition, holographic concept memory, and diamond lattice neuropil control, **Causeway** quantum superposition decision engine (6-dimensional complex state vector $|\psi\rangle \in \mathbb{C}^6$, continuous non-Hermitian gain potential evolution, unitary phase rotations, pairwise wave interference $I(a, b) = 2\text{Re}(\alpha_a^* \alpha_b)$, von Neumann entropy decoherence tracking, and peak Born-rule eigenstate collapse), **Holographic Concept Memory** (256-d Vector Symbolic Architecture with circular convolution binding, circular correlation unbinding, trace bundling with temporal decay, and vocabulary clean-up resonance), **Diamond Lattice Entorhinal Neuropil** (multi-scale 3D tetrahedral / Face-Centered Cubic geodesic grid cells with continuous toroidal velocity phase integration), **METAMORPH** developmental and topological control, **MOLT** life-stage developmental morphogenesis, **NexusFlow** directed causal flux routing, **Chronos** cyclic beacon synchronization, **AURA** biomimetic Central Complex controller, **Tessera** lineage-ratified macro-action commons, **Mnemorph** archaeological memory assay suite, **Odysseus** empirical cognitive navigator, **Memory Carrier Observatory (MCO)** causal factorial evaluation suite, and complete evaluation receipts with weightless replay verification. It retains all historical receipts and discloses evidence limits.
+The v1.1.0 release bundles **HYPERION** unified frontier super-controller, **Morpheus** offline oneiric sleep engine (Slow-Wave Sleep memory compression and Rapid Eye Movement counterfactual trajectory replays with quantum phase annealing), **Prometheus** meta-plasticity (rolling Shannon scarcity entropy and homeostatic drive allostasis), **Intermittent** computing engine (passive RF ambient energy harvesting and 38-byte binary NTAG 215 ephemeral state checkpointing with zero-power resuscitation), **NexusSearch** federated hybrid associative vector and spatial search, **CHIMERA** quantum superposition, holographic concept memory, and diamond lattice neuropil control, **Causeway** quantum superposition decision engine, **Holographic Concept Memory** (256-d HRR), **Diamond Lattice Entorhinal Neuropil** (multi-scale 3D tetrahedral / FCC geodesic grid cells), **METAMORPH** developmental control, **MOLT** life-stage morphogenesis, **NexusFlow** causal flux, **Chronos** cyclic beacon, **AURA** biomimetic Central Complex, **Tessera** macro-commons, **Mnemorph** memory assays, **Odysseus** empirical navigator, and complete evaluation receipts with weightless replay verification.
 
 The release target is [Kai9987kai/Supermix-Poseidon](https://huggingface.co/Kai9987kai/Supermix-Poseidon).
 Its `manifest.json` binds a clean Git source commit to every packaged file's size
 and SHA-256. `SHA256SUMS.txt` provides an additional file integrity inventory.
 Publishing these artifacts improves the experimental instrument without changing
-the selected core, language weights or default DAgger policy. CHIMERA, METAMORPH, AURA, Tessera, Mnemorph, Odysseus and Helm remain opt-in.
+the selected core, language weights or default DAgger policy. HYPERION, CHIMERA, METAMORPH, AURA, Tessera, Mnemorph, Odysseus and Helm remain opt-in.
 
 ## Download and run
 
 ```powershell
 # Install the Hub CLI in a Python environment with compatible CPU PyTorch.
 python -m pip install huggingface-hub
-hf download Kai9987kai/Supermix-Poseidon --revision v1.0.0 --local-dir Poseidon-release
+hf download Kai9987kai/Supermix-Poseidon --revision v1.1.0 --local-dir Poseidon-release
 cd Poseidon-release
 python -m pip install -e .
 python tools/verify_huggingface_release.py . --smoke
@@ -21,7 +21,7 @@ python -m poseidon serve --port 8787
 ```
 
 Open http://127.0.0.1:8787. For a reproducible download, add `--revision` with the
-release's Hub commit SHA or `v1.0.0` tag. Python 3.10+ and PyTorch 2.6+ are required;
+release's Hub commit SHA or `v1.1.0` tag. Python 3.10+ and PyTorch 2.6+ are required;
 the native custom core is loaded with `torch.load(..., weights_only=True)`.
 Transformers remote code is disabled. This is a custom PyTorch application, so
 `AutoModel.from_pretrained` on the Hub repository root is not supported.
@@ -37,6 +37,7 @@ are preserved in `SOURCE_GITIGNORE`.
 ```powershell
 python -m poseidon chat "Explain why seasons change."
 python -m poseidon world --planner policy --seed 42
+python -m poseidon world --planner hyperion --seed 42
 python -m poseidon world --planner chimera --seed 42
 python -m poseidon world --planner metamorph --seed 42
 python -m poseidon world --planner aura --seed 42
@@ -46,6 +47,7 @@ python -m poseidon world --planner odyssey --seed 42
 python -m poseidon world --planner horizon --seed 42
 python -m poseidon world --planner contrast --seed 42
 python -m poseidon world --planner atlas --seed 42
+python -m poseidon hyperion-experiment
 python -m poseidon chimera-experiment
 python -m poseidon metamorph-experiment
 python -m poseidon aura-experiment
@@ -57,7 +59,7 @@ python -m poseidon chat "Explain why seasons change." --adapter runs/language/ad
 ```
 
 The LoRA command is an explicit candidate test. Default conversation uses the
-unchanged, pinned SmolLM2 base. CHIMERA, METAMORPH, AURA, Odysseus Atlas, Helm Critic, Odyssey Atlas, Horizon Atlas, Contrast and Atlas are also opt-in. User carrier memory, raw
+unchanged, pinned SmolLM2 base. HYPERION, CHIMERA, METAMORPH, AURA, Odysseus Atlas, Helm Critic, Odyssey Atlas, Horizon Atlas, Contrast and Atlas are also opt-in. User carrier memory, raw
 language datasets, caches, generated media and optimizer continuation artifacts
 are excluded. The supervised baseline checkpoint retains its original embedded
 training state; the selected DAgger checkpoint has no optimizer state. No claim of
@@ -67,9 +69,9 @@ a complete resumable language-training package is made.
 
 ```powershell
 # Commit all intended source changes first; packaging rejects a dirty checkout.
-python tools/package_huggingface.py --output outputs/releases/poseidon-v1.0.0
-python tools/verify_huggingface_release.py outputs/releases/poseidon-v1.0.0 --smoke
-hf upload Kai9987kai/Supermix-Poseidon outputs/releases/poseidon-v1.0.0 . --commit-message "Release Poseidon v1.0.0 CHIMERA, Causeway, Hologram & Lattice"
+python tools/package_huggingface.py --output outputs/releases/poseidon-v1.1.0
+python tools/verify_huggingface_release.py outputs/releases/poseidon-v1.1.0 --smoke
+hf upload Kai9987kai/Supermix-Poseidon outputs/releases/poseidon-v1.1.0 . --commit-message "Release Poseidon v1.1.0 HYPERION, Morpheus, Prometheus & Intermittent NTAG"
 ```
 
 Packaging checks upstream language hashes, the actual active core hash, Atlas/Odyssey/Helm/Odysseus

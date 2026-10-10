@@ -22,6 +22,11 @@ class CausewaySuperpositionEngine:
         self.imag = [0.0] * num_actions
         self._normalize()
 
+    @property
+    def phases(self) -> List[float]:
+        """Complex phase angles theta_a = atan2(imag, real) for each action."""
+        return [math.atan2(i, r) for r, i in zip(self.real, self.imag)]
+
     def _normalize(self) -> None:
         norm_sq = sum(r * r + i * i for r, i in zip(self.real, self.imag))
         if norm_sq < 1e-12:

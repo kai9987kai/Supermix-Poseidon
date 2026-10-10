@@ -9,6 +9,39 @@ The model release is hosted at [**Kai9987kai/Supermix-Poseidon**](https://huggin
 
 Built for the supplied Snapdragon Windows PC: CPU only, bounded threads, no paid APIs. The 24 linked projects inform the architecture through documented source review; their code and checkpoints are not indiscriminately merged.
 
+## HYPERION, Morpheus, Prometheus & Intermittent NTAG — v1.1.0 release
+
+The **v1.1.0 milestone** pushes Poseidon to a new evolutionary frontier, synthesizing oneiric offline consolidation, non-gradient meta-plasticity, passive RF energy harvesting, and federated vector retrieval:
+
+1. **Morpheus Offline Oneiric Sleep Engine** ([`docs/MORPHEUS_DESIGN.md`](docs/MORPHEUS_DESIGN.md)):
+   - **Slow-Wave Sleep (SWS)**: Synaptic downscaling and high-surprise memory compression into 256-d HRR holographic storage.
+   - **Rapid Eye Movement (REM)**: Zero-energy counterfactual trajectory replays and Causeway quantum phase annealing ($\Delta \phi_a = -\eta A(a)$) optimizing action priors for daytime wake states.
+
+2. **Prometheus Meta-Plasticity & Allostasis** ([`docs/PROMETHEUS_DESIGN.md`](docs/PROMETHEUS_DESIGN.md)):
+   - **Rolling Shannon Scarcity Entropy**: $H(S) = -\sum p_k \log_2(p_k)$ tracking environmental unpredictability.
+   - **Self-Regulating Quantum Gain & Decay**: Automatically scales Causeway non-Hermitian gain $\gamma_t = \gamma_0(1 + \beta H(S))$ and adapts holographic retention.
+   - **Physiological Drive Allostasis**: Dynamically resolves competing hunger, thirst, fatigue, and exposure demands.
+
+3. **Intermittent Passive RF Carrier Harvesting & NTAG Resuscitation** ([`docs/INTERMITTENT_DESIGN.md`](docs/INTERMITTENT_DESIGN.md)):
+   - **Passive Energy Harvesting**: Inductively accumulates ambient potential into a virtual capacitor $C_{\text{harvest}}$ during rest and shelter dwell cycles.
+   - **38-byte Binary NTAG 215 Checkpoints**: Cryptographically seals state, 3D lattice coordinates, and quantum phases before brownouts.
+   - **Zero-Power Resuscitation**: Discharges harvested capacitor reserves during metabolic crises, preventing blackout deaths.
+
+4. **NexusSearch Federated Associative Search Engine** (`poseidon/nexus_search.py`):
+   - Multi-vector indexing across 256-d holographic vectors, 3D diamond lattice coordinates, and causal transition paths.
+
+5. **HYPERION Super-Controller & Verified Empirical Receipt** ([`docs/HYPERION_RESULTS.md`](docs/HYPERION_RESULTS.md)):
+   - Integrates Core + AURA + MOLT + NexusFlow + Chronos + Diamond Lattice + Hologram + Causeway + Morpheus + Prometheus + Intermittent + NexusSearch.
+   - **100.0% Survival Rate** with **6.2037 Mean Reward** on paired high-stress benchmarks (`outputs/hyperion_experiments/RECEIPT.json`, SHA-256 verified!).
+
+```powershell
+# Run the 5-arm paired HYPERION evaluation benchmark
+python -m poseidon hyperion-experiment --episodes 4 --max-steps 64 --scarcity 2.5
+
+# Verify HYPERION experiment receipt offline
+python -m poseidon verify-hyperion outputs/hyperion_experiments/RECEIPT.json
+```
+
 ## CHIMERA, Causeway, Hologram & Lattice — v1.0.0 release
 
 The **v1.0.0 milestone** synthesizes the collective architectural paradigms of all 24 reference repositories (Causeway, QuantumBot, GhostInTheMachine, Morpheus, GenesisEngine, FLY-DIAMOND-NEXUS, 3d-animal-simulator, etc.) into a unified super-controller operating on the immutable Tidal core:

@@ -91,16 +91,17 @@ tags:
 - synthetic-simulation
 ---
 
-# Supermix Poseidon v{version}: CHIMERA Quantum Superposition, Holographic Concept Memory & Diamond Lattice Neuropil
+# Supermix Poseidon v{version}: HYPERION & MORPHEUS Frontier Architecture
 
-Version 1.0.0 synthesizes the architectural paradigms of all 24 reference projects into a unified super-controller operating on the immutable Tidal core:
-1. **Causeway Quantum Superposition Decision Engine**: 6-dimensional complex state vector |psi> evolving under non-Hermitian gain potential evolution and unitary phase rotations exp(gamma * (V_a - mean(V))) * exp(-i * (V_a + phi_a) * dt), real-time pairwise wave interference I(a, b) = 2 * Re(alpha_a^* * alpha_b) mitigating cognitive conflicts, von Neumann entropy decoherence tracking S(rho) = -sum(p_a * ln(p_a)), and peak Born-rule eigenstate collapse.
-2. **Holographic Reduced Representation (HRR) Associative Concept Memory**: Constant 256-dimensional Vector Symbolic Architecture using discrete circular convolution binding z = x (*) y, circular correlation unbinding, trace bundling with decay, and cosine clean-up resonance.
-3. **Diamond Lattice Entorhinal Neuropil**: Multi-scale 3D tetrahedral / Face-Centered Cubic (FCC) geodesic grid cells (lambda_1 = 3.0, lambda_2 = 8.0, lambda_3 = 20.0) with continuous toroidal velocity phase integration and lattice coherence tracking C_lattice in [0, 1].
-4. **Unified CHIMERA Super-Controller**: Integrated super-controller combining Tidal core, AURA ring compass, MOLT developmental instars, NexusFlow causal flux, Chronos cyclic beaconing, Diamond Lattice, Holographic Memory, and Causeway superposition into an integrated agentic controller achieving 100% survival and 4.6478 mean reward.
+Version 1.1.0 unifies all 24 experimental technologies into an empirical frontier super-controller operating on the immutable Tidal core:
+1. **HYPERION Frontier Super-Controller**: Deep synthesis uniting Tidal core, AURA ring compass, MOLT developmental instars, NexusFlow causal flux, Chronos cyclic sync, Diamond Lattice neuropil, HRR Holographic Memory, Causeway quantum phase engine, Morpheus oneiric sleep consolidation, Prometheus rolling Shannon meta-plasticity and allostasis, Intermittent zero-power RF harvesting, and NexusSearch federated associative index.
+2. **Morpheus Offline Dream Consolidation & Replay**: Slow-Wave Sleep (SWS) episodic trace circular convolution compression into 256-d HRR memory and Rapid Eye Movement (REM) counterfactual trajectory replay with Causeway quantum phase annealing \Delta\phi_a = -\eta A(a).
+3. **Prometheus Meta-Plasticity & Allostasis**: Online non-gradient meta-plasticity computing rolling Shannon scarcity entropy H(S) = -\sum p_k \log_2(p_k) to modulate Causeway non-Hermitian gain \gamma_t = \gamma_0(1 + \beta H(S)) and holographic decay, combined with 4-drive homeostatic allostasis (hunger, thirst, fatigue, exposure).
+4. **Intermittent Passive RF Harvesting & NTAG 215 Frame**: Ambient RF carrier harvesting accumulating virtual capacitor charge C_{{harvest}}, zero-power emergency resuscitation, and 38-byte packed binary NTAG 215 state checkpoints.
+5. **NexusSearch Federated Associative Index**: Federated multi-modal search combining 256-d HRR holographic cosine resonance and 3D diamond lattice spatial proximity.
 
 [Source commit](https://github.com/kai9987kai/Supermix-Poseidon/tree/{revision}) ·
-[Causeway design](docs/CAUSEWAY_DESIGN.md) · [Holographic design](docs/HOLOGRAPHIC_DESIGN.md) · [Lattice design](docs/LATTICE_DESIGN.md) · [CHIMERA results](docs/CHIMERA_RESULTS.md) · [MOLT design](docs/MOLT_DESIGN.md) · [NexusFlow design](docs/NEXUSFLOW_DESIGN.md) · [Chronos design](docs/CHRONOS_DESIGN.md) · [Release guide](docs/HUGGINGFACE_RELEASE.md)
+[HYPERION results](docs/HYPERION_RESULTS.md) · [Morpheus design](docs/MORPHEUS_DESIGN.md) · [Prometheus design](docs/PROMETHEUS_DESIGN.md) · [Intermittent design](docs/INTERMITTENT_DESIGN.md) · [CHIMERA results](docs/CHIMERA_RESULTS.md) · [Causeway design](docs/CAUSEWAY_DESIGN.md) · [Release guide](docs/HUGGINGFACE_RELEASE.md)
 
 ## Components and activation
 
@@ -110,6 +111,12 @@ Version 1.0.0 synthesizes the architectural paradigms of all 24 reference projec
 | Supervised baseline | `runs/tidal/core.pt` | Comparison checkpoint, original embedded training state |
 | SmolLM2: 134,515,008 stored parameters | `models/language/model.safetensors` | Separate unchanged pretrained conversation backend |
 | LoRA: 61,440 parameters | `runs/language/adapter/` | Experimental candidate, inactive by default |
+| HYPERION Super-Controller | `poseidon/hyperion.py` | Unified frontier super-controller synthesizing all 24 projects, opt-in |
+| Morpheus Consolidation & Replay | `poseidon/morpheus.py` | Offline SWS holographic compression & REM quantum annealing replay |
+| Prometheus Meta-Plasticity | `poseidon/prometheus.py` | Rolling Shannon entropy meta-plasticity & 4-drive homeostatic allostasis |
+| Intermittent RF Harvesting | `poseidon/intermittent.py` | Passive RF energy harvesting, zero-power resuscitation & 38-byte NTAG frames |
+| NexusSearch Federated Index | `poseidon/nexus_search.py` | Dual HRR associative vector & 3D diamond lattice spatial search |
+| HYPERION Receipt | `outputs/hyperion_experiments/RECEIPT.json` | Paired multi-arm evaluation benchmark receipt |
 | CHIMERA Super-Controller | `poseidon/chimera.py` | Unified quantum superposition, holographic memory & diamond lattice, opt-in |
 | Causeway Decision Engine | `poseidon/causeway.py` | 6D complex superposition, non-Hermitian gain & Born collapse |
 | Holographic Concept Memory | `poseidon/hologram.py` | 256-d HRR circular convolution binding & associative clean-up |
@@ -262,7 +269,7 @@ to avoid relicensing upstream artifacts as MIT.
 def package(output: Path, repo_id: str = REPO_ID) -> dict:
     sys.path.insert(0, str(ROOT))
     from poseidon import __version__
-    if __version__ != "1.0.0":
+    if __version__ != "1.1.0":
         raise ValueError(f"unsupported version {__version__}")
     if repo_id != REPO_ID:
         raise ValueError("this release card is bound to Kai9987kai/Supermix-Poseidon")
@@ -332,6 +339,7 @@ def package(output: Path, repo_id: str = REPO_ID) -> dict:
     from poseidon.mnemorph import verify_mnemorph_receipt
     from poseidon.metamorph_experiment import verify_metamorph_receipt
     from poseidon.chimera_experiment import verify_chimera_receipt
+    from poseidon.hyperion_experiment import verify_hyperion_receipt
     aura_experiment_verification = {
         name: verify_aura_receipt(json.loads((ROOT / "outputs/aura_experiments" / name).read_text(encoding="utf-8")))
         for name in AURA_EXPERIMENTS
@@ -347,6 +355,9 @@ def package(output: Path, repo_id: str = REPO_ID) -> dict:
     }
     chimera_experiment_verification = {
         "RECEIPT.json": verify_chimera_receipt(json.loads((ROOT / "outputs/chimera_experiments/RECEIPT.json").read_text(encoding="utf-8")))
+    }
+    hyperion_experiment_verification = {
+        "RECEIPT.json": verify_hyperion_receipt(json.loads((ROOT / "outputs/hyperion_experiments/RECEIPT.json").read_text(encoding="utf-8")))
     }
 
     experiment_verification = {name: load_and_verify(ROOT / "outputs/experiments" / name) for name in EXPERIMENTS}
@@ -415,6 +426,7 @@ def package(output: Path, repo_id: str = REPO_ID) -> dict:
         "outputs/mnemorph/RECEIPT.json",
         "outputs/metamorph_experiments/RECEIPT.json",
         "outputs/chimera_experiments/RECEIPT.json",
+        "outputs/hyperion_experiments/RECEIPT.json",
         "models/language/manifest.json", "data/language/manifest.json",
         "data/language/SOURCE_CARD.md",
     ] + [f"models/language/{name}" for name in upstream["files"]]
@@ -533,6 +545,7 @@ See runs/language/report.json, data/language/SOURCE_CARD.md and the root model c
         "mnemorph_experiment_verification": mnemorph_experiment_verification,
         "metamorph_experiment_verification": metamorph_experiment_verification,
         "chimera_experiment_verification": chimera_experiment_verification,
+        "hyperion_experiment_verification": hyperion_experiment_verification,
         "build_environment": {name: importlib.metadata.version(name) for name in
                               ("torch", "transformers", "peft", "safetensors", "numpy", "huggingface-hub")},
         "activation": {"core": "existing-dagger-selection", "language": "unchanged-upstream-base",
@@ -547,6 +560,11 @@ See runs/language/report.json, data/language/SOURCE_CARD.md and the root model c
                        "mnemorph": "archaeological-memory-assays",
                        "metamorph": "opt-in-metamorphic-controller",
                        "chimera": "opt-in-quantum-holographic-super-controller",
+                       "hyperion": "opt-in-frontier-super-controller",
+                       "morpheus": "offline-oneiric-trace-consolidation",
+                       "prometheus": "rolling-entropy-meta-plasticity-allostasis",
+                       "intermittent": "ambient-rf-carrier-harvesting-ntag",
+                       "nexus_search": "federated-associative-vector-lattice-indexing",
                        "legacy_ensemble": "historical-unvalidated-not-loaded"},
     }
     write_json(output / "manifest.json", manifest)
