@@ -268,6 +268,7 @@ if manifest["version"] == "0.6.0":
     helm_world = runtime.respond("Survive", mode="world", planner="helm", seed=99000001, max_steps=32, scarcity=2.5)
     assert len(helm_world["episode"]["trajectory"]) == helm_world["episode"]["steps"]
 core, atlas = runtime.core(), runtime.atlas()
+titan_core_path = core.path
 def digest(path):
     h = hashlib.sha256()
     with path.open("rb") as f:
@@ -531,7 +532,7 @@ if manifest["version"] == "1.2.0":
         relative = "outputs/titan_experiments/" + name
         receipt_file = evidence_path(relative, "outputs/titan_experiments")
         assert digest(receipt_file) == manifest["titan_receipt_sha256"], "TITAN receipt file digest differs from manifest"
-        actual = verify_titan_receipt(json.loads(receipt_file.read_text(encoding="utf-8")), core_path=core.path)
+        actual = verify_titan_receipt(json.loads(receipt_file.read_text(encoding="utf-8")), core_path=titan_core_path)
         check_recorded(actual, recorded)
         titan_replays.append({"path": relative, **actual})
     assert len(titan_replays) >= 1, "Complete TITAN action and world replay evidence missing"
