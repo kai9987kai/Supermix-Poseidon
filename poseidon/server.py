@@ -92,6 +92,8 @@ def make_handler(runtime, port):
                         kind = payload.get("kind")
                         if kind == "hyperion-experiment":
                             self.send_json(202, runtime.submit_hyperion_experiment(payload))
+                        elif kind == "titan-experiment":
+                            self.send_json(202, runtime.submit_titan_experiment(payload))
                         elif kind == "chimera-experiment":
                             self.send_json(202, runtime.submit_chimera_experiment(payload))
                         elif kind == "metamorph-experiment":
@@ -123,7 +125,7 @@ def make_handler(runtime, port):
                 except RuntimeError as error:
                     self.send_json(409, {"error": str(error)})
                 return
-            if self.path not in ("/api/respond", "/api/remember", "/api/experiment", "/api/contrast-experiment", "/api/horizon-experiment", "/api/odyssey-experiment", "/api/helm-experiment", "/api/odysseus-experiment", "/api/mco-experiment", "/api/aura-experiment", "/api/tessera-experiment", "/api/mnemorph-experiment", "/api/metamorph-experiment", "/api/chimera-experiment", "/api/hyperion-experiment"):
+            if self.path not in ("/api/respond", "/api/remember", "/api/experiment", "/api/contrast-experiment", "/api/horizon-experiment", "/api/odyssey-experiment", "/api/helm-experiment", "/api/odysseus-experiment", "/api/mco-experiment", "/api/aura-experiment", "/api/tessera-experiment", "/api/mnemorph-experiment", "/api/metamorph-experiment", "/api/chimera-experiment", "/api/hyperion-experiment", "/api/titan-experiment"):
                 self.send_json(404, {"error": "Not found"}); return
             if not busy.acquire(blocking=False):
                 self.send_json(409, {"error": "Poseidon is processing another request. Try again shortly."}); return
@@ -137,7 +139,7 @@ def make_handler(runtime, port):
                 elif self.path == "/api/mnemorph-experiment":
                     assert_source_current()
                     result = runtime.mnemorph_experiment()
-                elif self.path in ("/api/experiment", "/api/contrast-experiment", "/api/horizon-experiment", "/api/odyssey-experiment", "/api/helm-experiment", "/api/odysseus-experiment", "/api/aura-experiment", "/api/metamorph-experiment", "/api/chimera-experiment", "/api/hyperion-experiment"):
+                elif self.path in ("/api/experiment", "/api/contrast-experiment", "/api/horizon-experiment", "/api/odyssey-experiment", "/api/helm-experiment", "/api/odysseus-experiment", "/api/aura-experiment", "/api/metamorph-experiment", "/api/chimera-experiment", "/api/hyperion-experiment", "/api/titan-experiment"):
                     if set(payload) - {"kind", "seed", "episodes", "max_steps", "scarcity"}:
                         raise ValueError("Unknown experiment setting.")
                     episodes, max_steps = payload.get("episodes", 4), payload.get("max_steps", 64)
@@ -146,6 +148,8 @@ def make_handler(runtime, port):
                     assert_source_current()
                     if self.path == "/api/hyperion-experiment":
                         result = runtime.hyperion_experiment(payload.get("seed", 303000001), episodes, max_steps, payload.get("scarcity", 2.5))
+                    elif self.path == "/api/titan-experiment":
+                        result = runtime.titan_experiment(payload.get("seed", 99000000), episodes, max_steps, payload.get("scarcity", 2.5))
                     elif self.path == "/api/chimera-experiment":
                         result = runtime.chimera_experiment(payload.get("seed", 202000001), episodes, max_steps, payload.get("scarcity", 2.5))
                     elif self.path == "/api/metamorph-experiment":

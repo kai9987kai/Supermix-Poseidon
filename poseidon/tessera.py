@@ -27,6 +27,12 @@ class TesseraMacroCommons:
         # Ratified public opcodes: opcode_id -> {sequence, ratifiers, delta_r_mean, usage_count, last_epoch}
         self.ratified: Dict[str, Dict[str, Any]] = {}
 
+    def reset(self) -> None:
+        """Clear episode-learned candidates so paired runs start from the same state."""
+        self.current_epoch = 1
+        self.quarantine.clear()
+        self.ratified.clear()
+
     @staticmethod
     def seq_key(actions: List[int]) -> str:
         return "-".join(str(a) for a in actions)

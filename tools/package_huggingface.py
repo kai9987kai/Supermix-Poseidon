@@ -57,7 +57,7 @@ def git(*args: str) -> str:
     return subprocess.check_output(["git", *args], cwd=ROOT, text=True, encoding="utf-8").strip()
 
 
-def model_card(revision: str, core_hash: str, atlas_hash: str, horizon_hash: str, contrast_hash: str, odyssey_hash: str, version: str, helm_hash: str = "", odysseus_hash: str = "") -> str:
+def model_card(revision: str, core_hash: str, atlas_hash: str, horizon_hash: str, contrast_hash: str, odyssey_hash: str, version: str, helm_hash: str = "", odysseus_hash: str = "", titan_hash: str = "") -> str:
     return fr"""---
 language:
 - en
@@ -91,16 +91,16 @@ tags:
 - synthetic-simulation
 ---
 
-# Supermix Poseidon v{version}: HYPERION & MORPHEUS Frontier Architecture
+# Supermix Poseidon v{version}: TITAN Experimental Composite
 
-Version 1.1.0 unifies all 24 experimental technologies into an empirical frontier super-controller operating on the immutable Tidal core:
-1. **HYPERION Frontier Super-Controller**: Deep synthesis uniting Tidal core, AURA ring compass, MOLT developmental instars, NexusFlow causal flux, Chronos cyclic sync, Diamond Lattice neuropil, HRR Holographic Memory, Causeway quantum phase engine, Morpheus oneiric sleep consolidation, Prometheus rolling Shannon meta-plasticity and allostasis, Intermittent zero-power RF harvesting, and NexusSearch federated associative index.
-2. **Morpheus Offline Dream Consolidation & Replay**: Slow-Wave Sleep (SWS) episodic trace circular convolution compression into 256-d HRR memory and Rapid Eye Movement (REM) counterfactual trajectory replay with Causeway quantum phase annealing \Delta\phi_a = -\eta A(a).
-3. **Prometheus Meta-Plasticity & Allostasis**: Online non-gradient meta-plasticity computing rolling Shannon scarcity entropy H(S) = -\sum p_k \log_2(p_k) to modulate Causeway non-Hermitian gain \gamma_t = \gamma_0(1 + \beta H(S)) and holographic decay, combined with 4-drive homeostatic allostasis (hunger, thirst, fatigue, exposure).
-4. **Intermittent Passive RF Harvesting & NTAG 215 Frame**: Ambient RF carrier harvesting accumulating virtual capacitor charge C_{{harvest}}, zero-power emergency resuscitation, and 38-byte packed binary NTAG 215 state checkpoints.
-5. **NexusSearch Federated Associative Index**: Federated multi-modal search combining 256-d HRR holographic cosine resonance and 3D diamond lattice spatial proximity.
+Version 1.2.0 adds **TITAN**, an opt-in controller around the unchanged Tidal checkpoint. It composes selected mechanisms from the reviewed project portfolio and records real environment feedback before storing a transition. TITAN is an experimental controller for the synthetic TidePool world, not a newly trained foundation model.
+
+The six-arm profile pairs TITAN, the frozen Tidal core, AURA, METAMORPH, CHIMERA and HYPERION on identical seeds. The receipt stores actions and transitions and independently replays both controller decisions and world outcomes. Reward, survival and telemetry remain descriptive measurements; they do not activate or promote a model.
+
+Additional modules are software simulations or heuristics: Archimedes computes synthetic fluid telemetry; Genesis runs an auxiliary toy ecology; S-Video encodes telemetry; Universal Modder applies static Python hooks; QuantumBot uses a classical state-vector simulator. They do not provide physical RF harvesting, NTAG hardware, analog video, hot-patching, quantum hardware, biological evidence or real-world survival capability. Causeway uses deterministic maximum-probability selection in this controller.
 
 [Source commit](https://github.com/kai9987kai/Supermix-Poseidon/tree/{revision}) ·
+[TITAN design](docs/TITAN_DESIGN.md) · [TITAN results](docs/TITAN_RESULTS.md) ·
 [HYPERION results](docs/HYPERION_RESULTS.md) · [Morpheus design](docs/MORPHEUS_DESIGN.md) · [Prometheus design](docs/PROMETHEUS_DESIGN.md) · [Intermittent design](docs/INTERMITTENT_DESIGN.md) · [CHIMERA results](docs/CHIMERA_RESULTS.md) · [Causeway design](docs/CAUSEWAY_DESIGN.md) · [Release guide](docs/HUGGINGFACE_RELEASE.md)
 
 ## Components and activation
@@ -111,10 +111,12 @@ Version 1.1.0 unifies all 24 experimental technologies into an empirical frontie
 | Supervised baseline | `runs/tidal/core.pt` | Comparison checkpoint, original embedded training state |
 | SmolLM2: 134,515,008 stored parameters | `models/language/model.safetensors` | Separate unchanged pretrained conversation backend |
 | LoRA: 61,440 parameters | `runs/language/adapter/` | Experimental candidate, inactive by default |
-| HYPERION Super-Controller | `poseidon/hyperion.py` | Unified frontier super-controller synthesizing all 24 projects, opt-in |
-| Morpheus Consolidation & Replay | `poseidon/morpheus.py` | Offline SWS holographic compression & REM quantum annealing replay |
+| TITAN Composite Controller | `poseidon/titan.py` | Selected project mechanisms around the frozen Tidal core; opt-in |
+| TITAN Paired Replay Receipt | `outputs/titan_experiments/RECEIPT.json` | Six-arm matched-seed controller and world replay; no promotion |
+| HYPERION Super-Controller | `poseidon/hyperion.py` | Separate opt-in experimental controller |
+| Morpheus Consolidation & Replay | `poseidon/morpheus.py` | Simulated trace compression and replay summaries |
 | Prometheus Meta-Plasticity | `poseidon/prometheus.py` | Rolling Shannon entropy meta-plasticity & 4-drive homeostatic allostasis |
-| Intermittent RF Harvesting | `poseidon/intermittent.py` | Passive RF energy harvesting, zero-power resuscitation & 38-byte NTAG frames |
+| Intermittent Computing | `poseidon/intermittent.py` | Software model of harvested-energy state and compact frames |
 | NexusSearch Federated Index | `poseidon/nexus_search.py` | Dual HRR associative vector & 3D diamond lattice spatial search |
 | HYPERION Receipt | `outputs/hyperion_experiments/RECEIPT.json` | Paired multi-arm evaluation benchmark receipt |
 | CHIMERA Super-Controller | `poseidon/chimera.py` | Unified quantum superposition, holographic memory & diamond lattice, opt-in |
@@ -125,7 +127,7 @@ Version 1.1.0 unifies all 24 experimental technologies into an empirical frontie
 | METAMORPH Controller | `poseidon/metamorph.py` | Unified developmental ecdysis, causal flux & cyclic sync controller, opt-in |
 | MOLT Morphogenesis | `poseidon/molt.py` | Larval/pupa/imago developmental instars & exuvia hashing |
 | NexusFlow Causal Flux | `poseidon/nexusflow.py` | Hydraulic replenishment gradients & superposition interference checking |
-| Chronos & Ghost Auditor | `poseidon/chronos.py` | Hardware cyclic sync pulses & Ghost counterfactual SDI tracking |
+| Chronos & Ghost Auditor | `poseidon/chronos.py` | Simulated periodic ticks and counterfactual SDI tracking |
 | METAMORPH Receipt | `outputs/metamorph_experiments/RECEIPT.json` | Paired multi-arm evaluation benchmark receipt |
 | AURA Biomimetic Controller | `poseidon/aura.py` | 16-wedge CX-ring attractor & 128-KC sparse neuropil arbiter, opt-in controller |
 | Tessera Macro-Commons | `outputs/tessera_experiments/RECEIPT.json` | Independent dual-lineage ratified macro-actions, opt-in commons |
@@ -233,6 +235,7 @@ Contrast canonical payload SHA-256: `{contrast_hash}`.
 Horizon canonical payload SHA-256: `{horizon_hash}`.
 Odyssey canonical payload SHA-256: `{odyssey_hash}`.
 Helm canonical payload SHA-256: `{helm_hash}`.
+TITAN receipt SHA-256: `{titan_hash}`.
 `manifest.json` and `SHA256SUMS.txt` inventory the staged files. The manifest binds
 source, weights, upstream provenance and the exact experiment receipts.
 Checksums diagnose integrity; they do not prove scientific validity or authorship.
@@ -269,7 +272,7 @@ to avoid relicensing upstream artifacts as MIT.
 def package(output: Path, repo_id: str = REPO_ID) -> dict:
     sys.path.insert(0, str(ROOT))
     from poseidon import __version__
-    if __version__ != "1.1.0":
+    if __version__ != "1.2.0":
         raise ValueError(f"unsupported version {__version__}")
     if repo_id != REPO_ID:
         raise ValueError("this release card is bound to Kai9987kai/Supermix-Poseidon")
@@ -340,6 +343,7 @@ def package(output: Path, repo_id: str = REPO_ID) -> dict:
     from poseidon.metamorph_experiment import verify_metamorph_receipt
     from poseidon.chimera_experiment import verify_chimera_receipt
     from poseidon.hyperion_experiment import verify_hyperion_receipt
+    from poseidon.titan_experiment import verify_titan_receipt
     aura_experiment_verification = {
         name: verify_aura_receipt(json.loads((ROOT / "outputs/aura_experiments" / name).read_text(encoding="utf-8")))
         for name in AURA_EXPERIMENTS
@@ -359,6 +363,12 @@ def package(output: Path, repo_id: str = REPO_ID) -> dict:
     hyperion_experiment_verification = {
         "RECEIPT.json": verify_hyperion_receipt(json.loads((ROOT / "outputs/hyperion_experiments/RECEIPT.json").read_text(encoding="utf-8")))
     }
+    titan_receipt_path = ROOT / "outputs/titan_experiments/RECEIPT.json"
+    titan_receipt = json.loads(titan_receipt_path.read_text(encoding="utf-8"))
+    titan_experiment_verification = {
+        "RECEIPT.json": verify_titan_receipt(titan_receipt, core_path=core_path)
+    }
+    titan_receipt_hash = sha256(titan_receipt_path)
 
     experiment_verification = {name: load_and_verify(ROOT / "outputs/experiments" / name) for name in EXPERIMENTS}
     evidence_artifacts = load_artifacts(ROOT)
@@ -427,6 +437,7 @@ def package(output: Path, repo_id: str = REPO_ID) -> dict:
         "outputs/metamorph_experiments/RECEIPT.json",
         "outputs/chimera_experiments/RECEIPT.json",
         "outputs/hyperion_experiments/RECEIPT.json",
+        "outputs/titan_experiments/RECEIPT.json",
         "models/language/manifest.json", "data/language/manifest.json",
         "data/language/SOURCE_CARD.md",
     ] + [f"models/language/{name}" for name in upstream["files"]]
@@ -497,7 +508,7 @@ See runs/language/report.json, data/language/SOURCE_CARD.md and the root model c
         copy("runs/language/adapter/adapter_model.safetensors", directory + "/adapter_model.safetensors")
         write_json(output / directory / "adapter_config.json", adapter_config)
         (output / directory / "README.md").write_text(adapter_card, encoding="utf-8")
-    (output / "README.md").write_text(model_card(revision, core_hash, atlas_hash, horizon_hash, contrast_hash, odyssey_hash, __version__, helm_hash, odysseus_hash), encoding="utf-8")
+    (output / "README.md").write_text(model_card(revision, core_hash, atlas_hash, horizon_hash, contrast_hash, odyssey_hash, __version__, helm_hash, odysseus_hash, titan_receipt_hash), encoding="utf-8")
 
     if git("status", "--porcelain") or git("rev-parse", "HEAD") != revision:
         raise ValueError("source checkout changed while packaging")
@@ -546,6 +557,8 @@ See runs/language/report.json, data/language/SOURCE_CARD.md and the root model c
         "metamorph_experiment_verification": metamorph_experiment_verification,
         "chimera_experiment_verification": chimera_experiment_verification,
         "hyperion_experiment_verification": hyperion_experiment_verification,
+        "titan_receipt_sha256": titan_receipt_hash,
+        "titan_experiment_verification": titan_experiment_verification,
         "build_environment": {name: importlib.metadata.version(name) for name in
                               ("torch", "transformers", "peft", "safetensors", "numpy", "huggingface-hub")},
         "activation": {"core": "existing-dagger-selection", "language": "unchanged-upstream-base",
@@ -559,11 +572,12 @@ See runs/language/report.json, data/language/SOURCE_CARD.md and the root model c
                        "tessera": "ratified-macro-commons",
                        "mnemorph": "archaeological-memory-assays",
                        "metamorph": "opt-in-metamorphic-controller",
-                       "chimera": "opt-in-quantum-holographic-super-controller",
-                       "hyperion": "opt-in-frontier-super-controller",
-                       "morpheus": "offline-oneiric-trace-consolidation",
-                       "prometheus": "rolling-entropy-meta-plasticity-allostasis",
-                       "intermittent": "ambient-rf-carrier-harvesting-ntag",
+                       "chimera": "opt-in-classical-composite-controller",
+                       "hyperion": "opt-in-composite-controller",
+                       "titan": "opt-in-experimental-composite-controller-no-promotion",
+                       "morpheus": "simulated-transition-trace-and-replay",
+                       "prometheus": "synthetic-entropy-and-drive-heuristics",
+                       "intermittent": "simulated-energy-state-and-compact-frame",
                        "nexus_search": "federated-associative-vector-lattice-indexing",
                        "legacy_ensemble": "historical-unvalidated-not-loaded"},
     }
@@ -575,7 +589,8 @@ See runs/language/report.json, data/language/SOURCE_CARD.md and the root model c
             "core_sha256": core_hash, "atlas_artifact_sha256": atlas_hash,
             "contrast_artifact_sha256": contrast_hash, "horizon_artifact_sha256": horizon_hash,
             "odyssey_artifact_sha256": odyssey_hash, "helm_artifact_sha256": helm_hash,
-            "odysseus_artifact_sha256": odysseus_hash}
+            "odysseus_artifact_sha256": odysseus_hash,
+            "titan_receipt_sha256": titan_receipt_hash}
 
 
 def main() -> None:

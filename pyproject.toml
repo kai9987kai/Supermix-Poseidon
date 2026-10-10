@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "supermix-poseidon"
-version = "1.1.0"
+version = "1.2.0"
 description = "A local experimental language, scene and survival research system"
 requires-python = ">=3.10"
 dependencies = ["torch>=2.6", "transformers>=4.46,<6", "peft>=0.13", "safetensors>=0.4", "numpy>=1.26", "Pillow>=10", "huggingface-hub>=0.26", "pyarrow>=15"]

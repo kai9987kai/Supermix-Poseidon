@@ -20,6 +20,7 @@ def main():
         "metamorph-experiment", "verify-metamorph",
         "chimera-experiment", "verify-chimera",
         "hyperion-experiment", "verify-hyperion",
+        "titan-experiment", "verify-titan",
     ])
     p.add_argument("prompt", nargs="?", default="")
     p.add_argument("--root", default=".")
@@ -28,7 +29,7 @@ def main():
     p.add_argument("--episodes", type=int, default=None)
     p.add_argument("--scarcity", type=float, default=None)
     p.add_argument("--adapter")
-    p.add_argument("--planner", choices=["policy", "mpc", "hybrid", "risk_aware", "uncertainty", "atlas", "contrast", "horizon", "odyssey", "helm", "odysseus", "aura", "metamorph", "chimera", "hyperion"], default="policy", help="world simulation planner")
+    p.add_argument("--planner", choices=["policy", "mpc", "hybrid", "risk_aware", "uncertainty", "atlas", "contrast", "horizon", "odyssey", "helm", "odysseus", "aura", "metamorph", "chimera", "hyperion", "titan"], default="policy", help="world simulation planner")
     p.add_argument("--max-steps", type=int, default=None)
     p.add_argument("--anchors", type=int, default=24)
     p.add_argument("--train-episodes", type=int, default=12)
@@ -48,9 +49,9 @@ def main():
                      "mco-experiment": 140000001, "aura-experiment": 144000001,
                      "tessera-experiment": 155000001, "mnemorph-experiment": 160000001,
                      "metamorph-experiment": 199000001, "chimera-experiment": 202000001,
-                     "hyperion-experiment": 303000001}
+                     "hyperion-experiment": 303000001, "titan-experiment": 99000000}
     args.seed = args.seed if args.seed is not None else default_seeds.get(args.command, 42)
-    args.episodes = args.episodes if args.episodes is not None else (4 if args.command in ("experiment", "contrast-experiment", "horizon-experiment", "odyssey-experiment", "helm-experiment", "odysseus-experiment", "aura-experiment", "metamorph-experiment", "chimera-experiment", "hyperion-experiment") else 100)
+    args.episodes = args.episodes if args.episodes is not None else (4 if args.command in ("experiment", "contrast-experiment", "horizon-experiment", "odyssey-experiment", "helm-experiment", "odysseus-experiment", "aura-experiment", "metamorph-experiment", "chimera-experiment", "hyperion-experiment", "titan-experiment") else 100)
     args.scarcity = args.scarcity if args.scarcity is not None else (1.0 if args.command == "world" else 2.5)
     args.calibration_episodes = args.calibration_episodes if args.calibration_episodes is not None else (8 if args.command in ("contrast-fit", "horizon-fit", "odyssey-fit", "fit-helm", "fit-odysseus") else 6)
 
@@ -381,10 +382,22 @@ def main():
         print(json.dumps(verify_hyperion_receipt(data), indent=2))
         return
 
-    if args.command in ("experiment", "contrast-experiment", "horizon-experiment", "odyssey-experiment", "helm-experiment", "odysseus-experiment", "aura-experiment", "metamorph-experiment", "chimera-experiment", "hyperion-experiment"):
+    if args.command == "verify-titan":
+        from pathlib import Path
+        from .titan_experiment import verify_titan_receipt
+        target = Path(args.prompt) if args.prompt else (Path(args.root) / "outputs/titan_experiments/RECEIPT.json")
+        if not target.is_absolute():
+            target = Path(args.root) / target
+        data = json.loads(target.read_text(encoding="utf-8"))
+        print(json.dumps(verify_titan_receipt(data), indent=2))
+        return
+
+    if args.command in ("experiment", "contrast-experiment", "horizon-experiment", "odyssey-experiment", "helm-experiment", "odysseus-experiment", "aura-experiment", "metamorph-experiment", "chimera-experiment", "hyperion-experiment", "titan-experiment"):
         runtime = Poseidon(args.root)
         if args.command == "hyperion-experiment":
             experiment = runtime.hyperion_experiment
+        elif args.command == "titan-experiment":
+            experiment = runtime.titan_experiment
         elif args.command == "chimera-experiment":
             experiment = runtime.chimera_experiment
         elif args.command == "metamorph-experiment":

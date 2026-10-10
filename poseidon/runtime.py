@@ -204,6 +204,37 @@ class Poseidon:
         except Exception:
             return {"ready": True, "type": "unified_frontier_morpheus_prometheus_intermittent_super_controller", "receipt_ready": False}
 
+    def titan(self):
+        from .titan import TitanController
+        return TitanController(core=self.core(), tessera=self.tessera())
+
+    def titan_status(self):
+        relative = "outputs/titan_experiments/RECEIPT.json"
+        path = self.root / relative
+        if not path.is_file():
+            return {"ready": True, "type": "experimental_composite_controller", "receipt_ready": False,
+                    "scope": "synthetic TidePool simulation", "promotion": False}
+        try:
+            receipt = json.loads(path.read_text(encoding="utf-8"))
+            if receipt.get("schema") not in ("poseidon-titan-experiment-v1", "poseidon-titan-experiment-v2"):
+                raise ValueError("Unsupported or incomplete TITAN receipt")
+            return {
+                "ready": True,
+                "type": "experimental_composite_controller",
+                "receipt_ready": True,
+                "scope": "synthetic TidePool simulation",
+                "promotion": False,
+                "path": relative,
+                "receipt_sha256": receipt.get("receipt_sha256") or receipt.get("sha256"),
+                "mean_bell_fidelity": receipt.get("titan_telemetry", {}).get("mean_bell_fidelity"),
+                "mean_buoyancy_force": receipt.get("titan_telemetry", {}).get("mean_buoyancy_force"),
+                "mean_trophic_richness": receipt.get("titan_telemetry", {}).get("mean_trophic_richness"),
+                "total_teleportations": receipt.get("titan_telemetry", {}).get("total_teleportations"),
+            }
+        except Exception:
+            return {"ready": True, "type": "experimental_composite_controller", "receipt_ready": False,
+                    "path": relative, "error": "TITAN receipt is malformed or from an unsupported schema."}
+
     def mnemorph_status(self):
         relative = "outputs/mnemorph/RECEIPT.json"
         path = self.root / relative
@@ -691,6 +722,89 @@ class Poseidon:
         finally:
             self.lock.release()
 
+    def submit_titan_experiment(self, settings):
+        from .provenance import assert_source_current
+        from .world import _integer, _number
+        if not isinstance(settings, dict) or set(settings) - {"kind", "seed", "episodes", "max_steps", "scarcity"}:
+            raise ValueError("Unknown job setting.")
+        if settings.get("kind") != "titan-experiment":
+            raise ValueError("Unknown experiment job kind.")
+        seed = _integer(settings.get("seed", 99000000), "seed", 0, 2**63 - 9)
+        episodes = _integer(settings.get("episodes", 4), "episodes", 1, 8)
+        max_steps = _integer(settings.get("max_steps", 64), "max_steps", 16, 256)
+        scarcity = _number(settings.get("scarcity", 2.5), "scarcity", .5, 4)
+        assert_source_current()
+        if not self.lock.acquire(blocking=False):
+            raise RuntimeError("Poseidon is processing another model operation. Try again shortly.")
+        try:
+            self.core()
+        finally:
+            self.lock.release()
+        normalized = {"seed": seed, "episodes": episodes, "max_steps": max_steps, "scarcity": scarcity}
+        return self.jobs().submit("titan-experiment", normalized,
+            lambda progress: self.titan_experiment(**normalized, progress=progress), timeout_seconds=1800)
+
+    def titan_experiment(self, seed=99000000, episodes=4, max_steps=64, scarcity=2.5, progress=None):
+        import json
+        import os
+        from .titan_experiment import run_titan_benchmark, verify_titan_receipt
+        from .provenance import assert_source_current
+        from .world import _integer, _number
+        seed = _integer(seed, "seed", 0, 2**63 - 9)
+        episodes = _integer(episodes, "episodes", 1, 32)
+        if seed > 2**63 - episodes:
+            raise ValueError("seed cannot form the requested nonnegative seed range")
+        max_steps = _integer(max_steps, "max_steps", 1, 512)
+        scarcity = _number(scarcity, "scarcity", .5, 4)
+        def check(event):
+            assert_source_current()
+            if progress:
+                progress(event)
+        while not self.lock.acquire(timeout=.2):
+            check({"phase": "waiting-for-model"})
+        try:
+            check({"phase": "starting"})
+            core = self.core()
+            result = run_titan_benchmark(core_path=core.path, seed_base=seed,
+                                         episodes=episodes, max_steps=max_steps,
+                                         scarcity=scarcity, progress=check)
+            check({"phase": "verifying"})
+            verification = verify_titan_receipt(result, core_path=core.path)
+            check({"phase": "publishing"})
+            receipt_dir = self.root / "outputs/titan_experiments"
+            receipt_dir.mkdir(parents=True, exist_ok=True)
+            path = receipt_dir / "RECEIPT.json"
+            temporary = path.with_suffix(".json.tmp")
+            temporary.write_text(json.dumps(result, indent=2, sort_keys=True, allow_nan=False), encoding="utf-8")
+            os.replace(temporary, path)
+            return {
+                "schema": result["schema"],
+                "experiment_id": result.get("experiment_id", result.get("sha256", "")[:32]),
+                "arms": {arm: {key: value for key, value in data.items() if key != "episodes_data"}
+                         for arm, data in result["arms"].items()},
+                "summary": {arm: {key: data[key] for key in
+                                   ("episodes", "survival_rate", "mean_steps", "mean_reward", "std_reward")}
+                            for arm, data in result["arms"].items()},
+                "titan_telemetry": result.get("titan_telemetry"),
+                "paired_vs_titan": result.get("paired_vs_titan"),
+                "paired": {
+                    "titan_vs_" + arm: {
+                        "mean_reward_delta": sum(row[arm + "_reward_delta"] for row in result["paired_vs_titan"]) / episodes,
+                        "per_seed": [{"reward_delta": row[arm + "_reward_delta"]} for row in result["paired_vs_titan"]],
+                        "wins": sum(row[arm + "_reward_delta"] > 1e-10 for row in result["paired_vs_titan"]),
+                        "ties": sum(abs(row[arm + "_reward_delta"]) <= 1e-10 for row in result["paired_vs_titan"]),
+                        "losses": sum(row[arm + "_reward_delta"] < -1e-10 for row in result["paired_vs_titan"]),
+                    } for arm in ("core", "aura", "metamorph", "chimera", "hyperion")
+                },
+                "artifact_url": "/artifacts/" + path.relative_to(self.root / "outputs").as_posix(),
+                "receipt_sha256": result.get("receipt_sha256", result.get("sha256")),
+                "verification": verification,
+                "replay": result["arms"]["titan"]["episodes_data"][0],
+                "titan": self.titan_status(),
+            }
+        finally:
+            self.lock.release()
+
     def _candidate_status(self, name):
         """Readiness may be cached while a world or experiment owns the model."""
         relative = f"outputs/{name}/atlas.json"
@@ -824,7 +938,7 @@ class Poseidon:
             core_ready = active_core_path(self.root).is_file()
         except (ValueError, TypeError, OSError) as error:
             core_ready, core_error = False, str(error)
-        result = {"version": __version__, "name": "Supermix Poseidon", "language_ready": (self.root/"models/language/model.safetensors").exists(), "core_ready": core_ready, "atlas": self.atlas_status(), "contrast": self.contrast_status(), "horizon": self.horizon_status(), "odyssey": self.odyssey_status(), "helm": self.helm_status(), "odysseus": self.odysseus_status(), "mco": self.mco_status(), "aura": self.aura_status(), "tessera": self.tessera_status(), "mnemorph": self.mnemorph_status(), "metamorph": self.metamorph_status(), "chimera": self.chimera_status(), "hyperion": self.hyperion_status(), "reports": reports, "limits": "Experimental composite system. Controlled geometric media. Tool-assisted maths. Synthetic survival."} | source_status()
+        result = {"version": __version__, "name": "Supermix Poseidon", "language_ready": (self.root/"models/language/model.safetensors").exists(), "core_ready": core_ready, "atlas": self.atlas_status(), "contrast": self.contrast_status(), "horizon": self.horizon_status(), "odyssey": self.odyssey_status(), "helm": self.helm_status(), "odysseus": self.odysseus_status(), "mco": self.mco_status(), "aura": self.aura_status(), "tessera": self.tessera_status(), "mnemorph": self.mnemorph_status(), "metamorph": self.metamorph_status(), "chimera": self.chimera_status(), "hyperion": self.hyperion_status(), "titan": self.titan_status(), "reports": reports, "limits": "Experimental composite system. Controlled geometric media. Tool-assisted maths. Synthetic survival."} | source_status()
         if core_error:
             result["core_error"] = core_error
         return result
@@ -863,10 +977,14 @@ class Poseidon:
                 from .world_controls import rollout_with_decisions
                 _integer(max_steps, "max_steps", 1, 10000)
                 scarcity = _number(scarcity, "scarcity", .5, 4)
-                if planner not in ("policy", "mpc", "hybrid", "risk_aware", "uncertainty", "atlas", "contrast", "horizon", "odyssey", "helm", "odysseus", "aura", "metamorph", "chimera", "hyperion"):
+                if planner not in ("policy", "mpc", "hybrid", "risk_aware", "uncertainty", "atlas", "contrast", "horizon", "odyssey", "helm", "odysseus", "aura", "metamorph", "chimera", "hyperion", "titan"):
                     raise ValueError("Unknown survival planner.")
                 core = self.core()
-                if planner == "hyperion":
+                if planner == "titan":
+                    controller = self.titan()
+                    controller.reset(scarcity, seed=seed)
+                    backend_desc = "TITAN experimental composite controller (selected portfolio mechanisms) in synthetic TidePool; software-only sidecar simulations"
+                elif planner == "hyperion":
                     controller = self.hyperion()
                     controller.reset(scarcity)
                     backend_desc = "HYPERION frontier super-controller (Morpheus dream consolidation + Prometheus meta-plasticity + NTAG intermittent harvest) in TidePool"
@@ -918,7 +1036,11 @@ class Poseidon:
                 else:
                     controller = core
                     backend_desc = "learned Tidal policy in TidePool"
-                episode = rollout_with_decisions(controller, seed=seed, max_steps=max_steps, scarcity=scarcity)
+                if planner == "titan":
+                    from .world_controls import rollout_with_observed_transitions
+                    episode = rollout_with_observed_transitions(controller, seed=seed, max_steps=max_steps, scarcity=scarcity)
+                else:
+                    episode = rollout_with_decisions(controller, seed=seed, max_steps=max_steps, scarcity=scarcity)
                 episode["controller"] = planner
                 episode["backend"] = backend_desc
                 return {"text": f"Episode ended after {episode['steps']} steps. " + (f"The agent reached the {max_steps}-step horizon alive." if episode["survived"] else f"The agent died: {episode['death_reason']}."), "backend": backend_desc, "episode": episode, "verified": True}
