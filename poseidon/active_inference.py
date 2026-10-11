@@ -57,6 +57,7 @@ class ActiveInferenceConfig:
     min_epistemic_weight: float = 0.05
     pragmatic_temperature: float = 1.0
     stamina_depletion_cost: float = 0.05
+    active_inference_blend: float = 0.05
 
 
 class ActiveInferenceEvaluator:

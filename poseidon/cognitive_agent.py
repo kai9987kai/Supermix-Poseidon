@@ -116,6 +116,7 @@ class CognitiveAgent:
         horizon_config: HorizonXConfig | None = None,
         adapt_config: AdaptConfig | None = None,
         neuro_config: NeuroConfig | None = None,
+        active_inference_config: ActiveInferenceConfig | None = None,
     ):
         self.core = core or CoreRuntime(active_core_path())
         self.mode = mode
@@ -130,7 +131,7 @@ class CognitiveAgent:
         self.planner = HorizonXPlanner(core=self.core, oracle=self.oracle, config=horizon_config)
         self.adapter = ContinualAdapter(core=self.core, config=adapt_config)
         self.router = NeuromodulatedRouter(neuro_config or NeuroConfig(dim=self.core.model.config.hidden_size))
-        self.active_inference = ActiveInferenceEvaluator()
+        self.active_inference = ActiveInferenceEvaluator(active_inference_config)
         self.metacognition = MetacognitiveMonitor()
         self.dream = DreamConsolidator(
             core=self.core,
@@ -191,9 +192,10 @@ class CognitiveAgent:
         # 4. Multi-Horizon Risk-Sensitive Planning
         plan_out = self.planner.plan(obs_list)
 
-        # 5. World Model Preview across all candidate actions
+        # 5. World Model Preview & Active Inference across all candidate actions
         predicted_outcomes = []
         predicted_healths = {}
+        candidate_efes = []
         with torch.no_grad():
             for act_idx in range(N_ACTIONS):
                 a_tens = torch.tensor([act_idx], dtype=torch.long)
@@ -202,22 +204,46 @@ class CognitiveAgent:
                 pred_s = torch.clamp(obs_t.squeeze(0) + d, 0.0, 1.0).tolist()
                 predicted_outcomes.append(pred_s)
                 predicted_healths[act_idx] = pred_s[0]
+                unc_a = float(wm_res["calibrated_uncertainty"].item())
+                candidate_efes.append((pred_s, unc_a))
 
-        # 6. Empowerment & Active Inference Evaluation
         empowerment = self.active_inference.compute_empowerment(predicted_outcomes)
-        chosen_action = plan_out["selected_action"]
-        chosen_pred_obs = predicted_outcomes[chosen_action]
-        act_tensor = torch.tensor([chosen_action], dtype=torch.long)
-        with torch.no_grad():
-            wm_preview = self.oracle(latent_state, obs_t, act_tensor)
-            unc_preview = float(wm_preview["calibrated_uncertainty"].item())
 
-        efe = self.active_inference.evaluate_expected_free_energy(
-            current_obs=obs_list,
-            predicted_obs=chosen_pred_obs,
-            calibrated_uncertainty=unc_preview,
-            empowerment_value=empowerment,
-        )
+        efe_evals = []
+        for act_idx, (pred_s, unc_a) in enumerate(candidate_efes):
+            efe_eval = self.active_inference.evaluate_expected_free_energy(
+                current_obs=obs_list,
+                predicted_obs=pred_s,
+                calibrated_uncertainty=unc_a,
+                empowerment_value=empowerment,
+            )
+            efe_evals.append(efe_eval)
+
+        # 6. Candidate Integration & Dynamic Reserve-Scaled Override
+        alpha = self.active_inference.config.active_inference_blend
+        if alpha > 0.0:
+            for act_idx, c_eval in enumerate(plan_out["candidate_evaluations"]):
+                efe_obj = efe_evals[act_idx]["free_energy_objective"]
+                c_eval["composite_score"] += alpha * efe_obj
+
+            base_action = plan_out["base_action"]
+            best_cand = max(plan_out["candidate_evaluations"], key=lambda x: x["composite_score"])
+            base_eval = next((e for e in plan_out["candidate_evaluations"] if e["action"] == base_action), plan_out["candidate_evaluations"][0])
+            margin = best_cand["composite_score"] - base_eval["composite_score"]
+
+            rho_t = plan_out["reserve_index"]
+            effective_threshold = self.planner.config.override_threshold * max(self.planner.config.min_risk_scale, rho_t)
+            override = (best_cand["action"] != base_action) and (margin > effective_threshold)
+
+            chosen_action = best_cand["action"] if override else base_action
+            plan_out["selected_action"] = chosen_action
+            plan_out["selected_action_name"] = ACTIONS[chosen_action]
+            plan_out["override"] = override
+            plan_out["margin"] = margin
+        else:
+            chosen_action = plan_out["selected_action"]
+
+        efe = efe_evals[chosen_action]
 
         # 7. Formal Safety Guardrails (TESSERA ratified invariants)
         guard_audit = self.guardrails.audit_and_constrain(

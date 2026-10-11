@@ -106,6 +106,12 @@ SEARCH_SPACE = [
         "pattern": r"(stamina_depletion_cost:\s*float\s*=\s*)([0-9\.]+)",
         "min": 0.01, "max": 0.10, "type": "float", "fmt": "{:.3f}",
     },
+    {
+        "file": "poseidon/active_inference.py",
+        "name": "active_inference_blend",
+        "pattern": r"(active_inference_blend:\s*float\s*=\s*)([0-9\.]+)",
+        "min": 0.01, "max": 0.25, "type": "float", "fmt": "{:.3f}",
+    },
     # Horizon-X Planner
     {
         "file": "poseidon/horizon_x.py",
@@ -123,13 +129,20 @@ SEARCH_SPACE = [
         "file": "poseidon/horizon_x.py",
         "name": "override_threshold",
         "pattern": r"(override_threshold:\s*float\s*=\s*)([0-9\.]+)",
-        "min": 0.005, "max": 0.050, "type": "float", "fmt": "{:.3f}",
+        "min": 0.015, "max": 0.045, "type": "float", "fmt": "{:.3f}",
     },
     {
         "file": "poseidon/horizon_x.py",
         "name": "horizon_decay",
         "pattern": r"(horizon_decay:\s*float\s*=\s*)([0-9\.]+)",
         "min": 0.65, "max": 0.95, "type": "float", "fmt": "{:.2f}",
+    },
+    # Continual Adapter
+    {
+        "file": "poseidon/adapt.py",
+        "name": "anchor_weight",
+        "pattern": r"(anchor_weight:\s*float\s*=\s*)([0-9\.]+)",
+        "min": 0.20, "max": 3.00, "type": "float", "fmt": "{:.2f}",
     },
     # Formal Safety Guardrails
     {
