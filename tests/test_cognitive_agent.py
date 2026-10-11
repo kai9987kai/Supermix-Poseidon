@@ -1,4 +1,5 @@
 import pytest
+import torch
 
 from poseidon.cognitive_agent import CognitiveAgent, CognitiveDecision
 from poseidon.core import CoreRuntime, active_core_path
@@ -70,3 +71,67 @@ def test_cognitive_agent_matched_lesion_modes(core):
         res = agent.rollout(env, max_steps=4, mode=mode)
         assert res["mode"] == mode
         assert res["steps"] > 0
+
+
+def test_prediction_matches_current_transition_not_previous(core):
+    agent = CognitiveAgent(core=core, mode="memory_free")
+    agent.reset()
+    # observe_transition remains valid for callers that do not call act first.
+    for action, value in ((2, 0.4), (4, 0.7)):
+        obs = [value] * OBS_SIZE
+        obs_t = torch.tensor([obs])
+        with torch.no_grad():
+            latent = core.model(["Survive"], obs_t)["memory"]
+            out = agent.oracle(latent, obs_t, torch.tensor([action]))
+            successor = (obs_t + out["mean_delta"]).clamp(0, 1)[0].tolist()
+        agent.observe_transition(obs, action, 0.0, successor)
+        assert len(agent.metacognition.surprise_history) == agent.step_count
+        assert agent.metacognition.surprise_history[-1] == 0.0
+
+
+def test_episode_reset_clears_planner_replay_and_dream_state(core):
+    agent = CognitiveAgent(core=core)
+    agent.act([0.5] * OBS_SIZE)
+    agent.observe_transition([0.5] * OBS_SIZE, 0, 0.0, [0.5] * OBS_SIZE)
+    assert len(agent.adapter.replay) > 0
+    agent.reset()
+    assert agent.planner.step_counter == 0
+    assert agent.planner.override_history == []
+    assert len(agent.adapter.replay) == 0
+    assert agent.dream.consolidated_count == 0
+    assert agent.dream.dream_history == []
+
+
+def test_rollout_snapshot_is_after_reset_and_final_health_is_current(core):
+    agent = CognitiveAgent(core=core)
+    env = TidePool(seed=42, max_steps=2)
+    env.step(4)
+    result = agent.rollout(env, max_steps=2)
+    assert result["initial_snapshot"]["tick"] == 0
+    assert result["final_health"] == env.health
+    assert result["truncated"] is True
+    assert result["death"] is False
+
+
+@pytest.mark.parametrize("dead, noisy_health", [(True, 0.7), (False, 0.0)])
+def test_rollout_uses_true_terminal_status_not_noisy_health(core, dead, noisy_health):
+    from poseidon.worldlab import StepResult
+
+    class MisleadingSensor(POMDPTidePool):
+        def step(self, action):
+            result = super().step(action)
+            self.underlying.health = 0.0 if dead else 0.4
+            self.underlying.death_reason = "test-death" if dead else None
+            self.underlying.done = True
+            result.observation[0] = noisy_health
+            return StepResult(result.observation, result.reward, True, not dead,
+                              {**result.info, "alive": not dead, "death": dead,
+                               "death_reason": self.death_reason, "truncated": not dead,
+                               "terminal_reason": "death" if dead else "horizon"})
+
+    env = MisleadingSensor(max_steps=1)
+    result = CognitiveAgent(core=core).rollout(env, max_steps=1)
+    assert result["survived"] is (not dead)
+    assert result["death"] is dead
+    assert result["truncated"] is (not dead)
+    assert result["final_health"] == env.health

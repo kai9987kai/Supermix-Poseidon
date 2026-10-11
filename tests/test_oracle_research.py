@@ -1,10 +1,78 @@
+import copy
+import hashlib
+import json
+
 import pytest
 import torch
 
 from poseidon.research.candidate_evaluation import evaluate_oracle, verify_evaluation_receipt
 from poseidon.research.contracts import EpisodeSplit, assert_disjoint_splits, tidepool_contract
 from poseidon.research.oracle_training import (collect_episode, conformal_order_statistic,
-                                                fit_oracle, verify_fit_receipt)
+                                                fit_oracle, verify_fit_receipt,
+                                                load_oracle_artifact, model_state_sha256)
+from poseidon.research.contracts import canonical_bytes
+
+
+@pytest.fixture(scope="module")
+def fitted_candidate(tmp_path_factory):
+    return fit_oracle(tmp_path_factory.mktemp("research-contracts"), base_seed=556_000_000,
+                      train_episodes=4, selection_episodes=2, calibration_episodes=4,
+                      max_steps=10, training_updates=2, batch_size=8,
+                      hidden_size=16, ensemble_size=2, coverage=0.8)
+
+
+def _save_receipt(path, receipt):
+    receipt = copy.deepcopy(receipt)
+    receipt.pop("receipt_sha256", None)
+    receipt["receipt_sha256"] = hashlib.sha256(canonical_bytes(receipt)).hexdigest()
+    path.write_text(json.dumps(receipt), encoding="utf-8")
+
+
+@pytest.mark.parametrize("field", ["calibration", "config", "training", "training_manifest", "activated", "world_version", "status"])
+def test_fit_rejects_resealed_contradictory_claims(fitted_candidate, tmp_path, field):
+    receipt = copy.deepcopy(fitted_candidate)
+    if field == "calibration":
+        receipt[field]["state_standardized_error_quantile"] += 0.25
+    elif field == "config":
+        receipt[field]["hidden_size"] += 1
+    elif field == "training":
+        receipt[field]["training_positive_death_labels"] += 1
+    elif field == "training_manifest":
+        receipt[field]["data_policy"] = "a different policy"
+    elif field == "activated":
+        receipt[field] = True
+    else:
+        receipt[field] = "contradictory"
+    receipt_path = tmp_path / "forged.json"
+    _save_receipt(receipt_path, receipt)
+    with pytest.raises(ValueError):
+        verify_fit_receipt(receipt_path, replay_data=True)
+
+
+@pytest.mark.parametrize("mutation", ["nonfinite", "missing_split", "overlap", "protocol", "calibration", "shape", "bool_config"])
+def test_artifact_rejects_semantically_invalid_payload(fitted_candidate, tmp_path, mutation):
+    payload = torch.load(fitted_candidate["artifact_path"], weights_only=True)
+    if mutation == "nonfinite":
+        next(iter(payload["model_state_dict"].values())).reshape(-1)[0] = float("nan")
+        payload["model_sha256"] = model_state_sha256(payload["model_state_dict"])
+    elif mutation == "missing_split":
+        del payload["training_manifest"]["seed_sets"]["selection"]
+    elif mutation == "overlap":
+        payload["training_manifest"]["seed_sets"]["selection"][0] = payload["training_manifest"]["seed_sets"]["train"][0]
+    elif mutation == "protocol":
+        payload["training_manifest"]["data_protocol"] = "unsupported-policy-v999"
+    elif mutation == "calibration":
+        payload["calibration"]["state_standardized_error_quantile"] += 0.25
+    elif mutation == "shape":
+        key = next(iter(payload["model_state_dict"]))
+        payload["model_state_dict"][key] = torch.zeros(1)
+        payload["model_sha256"] = model_state_sha256(payload["model_state_dict"])
+    else:
+        payload["config"]["action_count"] = 6.0
+    target = tmp_path / "invalid.pt"
+    torch.save(payload, target)
+    with pytest.raises(ValueError):
+        load_oracle_artifact(target)
 
 
 def test_tidepool_contract_and_episode_collection_are_exact():

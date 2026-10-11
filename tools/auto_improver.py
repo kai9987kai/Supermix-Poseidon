@@ -1,59 +1,41 @@
-"""Supermix Poseidon Autonomous Overnight Experimentation & Continuous Improvement Loop.
+"""Bounded parameter search in copied workspaces; all candidates remain inactive.
 
-Runs continuous matched-seed empirical experiments until the target hour (06:00 AM),
-evaluating hypothesis mutations across Active Inference, Horizon-X planning,
-Metacognitive monitoring, Memory geometry, and Formal Safety contracts.
-
-Decision Gating:
-1. Syntax & Unit Test Integrity (pytest verification).
-2. Paired Matched-Seed POMDP Benchmark (4 difficult seeds).
-3. Improvement Criterion:
-   - Survival rate must not regress (candidate_survival >= champion_survival).
-   - Paired reward gain must be strictly positive (delta_reward >= +0.005) OR
-     survival must strictly increase with delta_reward >= -0.05.
-4. If Accepted: Commits cleanly to git and updates champion baseline.
-5. If Rejected: Automatically restores working tree via git revert.
+Repeated fixed-seed results are selection evidence, not an unbiased estimate of
+improvement. Only the final selected candidate is compared with the original
+baseline on disjoint audit seeds, and audit results never feed proposal selection.
+No command restores, stages, commits, or promotes files in the shared checkout.
 """
 from __future__ import annotations
 
 import argparse
 from datetime import datetime, timedelta
-import functools
+import hashlib
 import json
 import math
 import os
 from pathlib import Path
 import random
 import re
+import shutil
 import subprocess
 import sys
+import tempfile
 import time
 
-if hasattr(sys.stdout, "reconfigure"):
-    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
-if hasattr(sys.stderr, "reconfigure"):
-    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
-
-print = functools.partial(print, flush=True)
-
-# Ensure CPU safety
-os.environ["OMP_NUM_THREADS"] = "2"
-os.environ["MKL_NUM_THREADS"] = "2"
-os.environ["TORCH_NUM_THREADS"] = "2"
-os.environ["PYTHONIOENCODING"] = "utf-8"
-
 ROOT = Path(__file__).resolve().parent.parent
-
-# Output logs
 OUT_DIR = ROOT / "outputs" / "auto_improvements"
-HISTORY_FILE = OUT_DIR / "history.jsonl"
-SUMMARY_FILE = OUT_DIR / "OVERNIGHT_REPORT.md"
-RECEIPTS_DIR = OUT_DIR / "receipts"
-
-# Target evaluation seeds
-EVAL_SEEDS = [90500000, 90500001, 90500002, 90500003]
+SELECTION_SEEDS = [90500000, 90500001, 90500002, 90500003]
+AUDIT_SEEDS = [90600000, 90600001, 90600002, 90600003]
 EVAL_MAX_STEPS = 32
 EVAL_SCARCITY = 2.8
+TEST_FILES = [
+    "tests/test_cognitive_agent.py", "tests/test_active_inference.py",
+    "tests/test_horizon_x.py", "tests/test_guardrails.py",
+    "tests/test_metacognition.py",
+]
+SOURCE_DIRS = ("poseidon", "tests", "configs")
+SOURCE_FILES = ("pyproject.toml", "pytest.ini", "setup.cfg", "requirements.txt")
+CORE_RELATIVE_PATH = "runs/search_core.pt"
 
 # Search Space Definitions: (filepath, regex_pattern, min_val, max_val, format_str)
 SEARCH_SPACE = [
@@ -204,290 +186,396 @@ SEARCH_SPACE = [
 ]
 
 
-def git_revert() -> None:
-    """Restores working tree to last clean git commit."""
-    subprocess.run(["git", "restore", "."], cwd=ROOT, check=False)
+def remaining_seconds(deadline: float) -> float:
+    remaining = deadline - time.monotonic()
+    if remaining <= 0:
+        raise TimeoutError("search deadline reached")
+    return remaining
 
 
-def run_tests() -> bool:
-    """Verifies that unit tests and integrity invariants pass."""
-    cmd = [
-        sys.executable, "-m", "pytest",
-        "tests/test_cognitive_agent.py",
-        "tests/test_active_inference.py",
-        "tests/test_horizon_x.py",
-        "tests/test_guardrails.py",
-        "tests/test_metacognition.py",
-        "-q",
-    ]
-    res = subprocess.run(cmd, cwd=ROOT, capture_output=True, text=True)
-    return res.returncode == 0
+def file_hash(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for block in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(block)
+    return digest.hexdigest()
 
 
-def run_benchmark() -> dict:
-    """Runs matched-seed evaluation across EVAL_SEEDS."""
+def source_files(root: Path) -> list[Path]:
+    paths = []
+    for name in SOURCE_DIRS:
+        base = root / name
+        if not base.exists():
+            continue
+        for path in [base, *sorted(base.rglob("*"))]:
+            if path.is_symlink() or getattr(path, "is_junction", lambda: False)():
+                raise ValueError(f"source snapshots cannot contain links: {path}")
+            if path.is_file() and not any(part in {"__pycache__", ".pytest_cache"}
+                                          for part in path.relative_to(base).parts):
+                paths.append(path)
+    for name in SOURCE_FILES:
+        path = root / name
+        if path.is_symlink():
+            raise ValueError(f"source snapshots cannot contain links: {path}")
+        if path.is_file():
+            paths.append(path)
+    return sorted(paths)
+
+
+def source_binding(workspace: Path) -> dict:
+    manifest = {path.relative_to(workspace).as_posix(): file_hash(path)
+                for path in source_files(workspace)}
+    digest = hashlib.sha256(json.dumps(manifest, sort_keys=True).encode()).hexdigest()
+    return {"source_sha256": digest, "source_files": manifest,
+            "core_sha256": file_hash(workspace / CORE_RELATIVE_PATH)}
+
+
+def resolve_core(source_root: Path, core_path: Path | None) -> Path:
+    if core_path is not None:
+        path = Path(core_path)
+        path = path if path.is_absolute() else source_root / path
+    else:
+        pointer = source_root / "runs/active_core.json"
+        relative = "runs/tidal/core.pt"
+        if pointer.exists():
+            relative = json.loads(pointer.read_text(encoding="utf-8"))["checkpoint"]
+        path = (source_root / relative).resolve()
+        if not path.is_relative_to(source_root):
+            raise ValueError("active core pointer must stay within the source tree")
+    path = path.resolve()
+    if not path.is_file():
+        raise ValueError(f"trained core checkpoint does not exist: {path}")
+    return path
+
+
+def copy_workspace(source: Path, destination: Path, core: Path, deadline: float) -> dict:
+    """Copy bytes, never links; refuse a moving source rather than mix revisions."""
+    remaining_seconds(deadline)
+    files = source_files(source)
+    before = {path.relative_to(source).as_posix(): file_hash(path) for path in files}
+    core_before = file_hash(core)
+    destination.mkdir(parents=True)
+    for path in files:
+        remaining_seconds(deadline)
+        target = destination / path.relative_to(source)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(path, target)
+    target_core = destination / CORE_RELATIVE_PATH
+    target_core.parent.mkdir(parents=True, exist_ok=True)
+    remaining_seconds(deadline)
+    shutil.copyfile(core, target_core)
+    (destination / "runs/active_core.json").write_text(
+        json.dumps({"checkpoint": CORE_RELATIVE_PATH, "sha256": core_before,
+                    "reason": "isolated search snapshot; never active in shared checkout"}, indent=2),
+        encoding="utf-8")
+    binding = source_binding(destination)
+    after = {path.relative_to(source).as_posix(): file_hash(path) for path in source_files(source)}
+    if before != after or binding["source_files"] != before or file_hash(core) != core_before:
+        raise RuntimeError("source or core changed while copying; snapshot is unusable")
+    if binding["core_sha256"] != core_before:
+        raise RuntimeError("copied core does not match its source")
+    return binding
+
+
+def run_command(command: list[str], *, workspace: Path, deadline: float,
+                log_name: str = "command") -> subprocess.CompletedProcess:
+    """Run one owned child with a hard remaining-time limit and local temp files."""
+    timeout = remaining_seconds(deadline)
+    temporary = workspace / ".tmp"
+    temporary.mkdir(exist_ok=True)
+    env = os.environ.copy()
+    env.update({"OMP_NUM_THREADS": "2", "MKL_NUM_THREADS": "2", "TORCH_NUM_THREADS": "2",
+                "PYTHONIOENCODING": "utf-8", "PYTHONHASHSEED": "0",
+                "PYTHONPATH": str(workspace), "PYTHONDONTWRITEBYTECODE": "1",
+                "TEMP": str(temporary), "TMP": str(temporary), "TMPDIR": str(temporary)})
+    process = subprocess.Popen(command, cwd=workspace, env=env, stdout=subprocess.PIPE,
+                               stderr=subprocess.PIPE, text=True, encoding="utf-8", errors="replace")
+    stdout, stderr = "", ""
+    try:
+        stdout, stderr = process.communicate(timeout=timeout)
+    except (subprocess.TimeoutExpired, KeyboardInterrupt):
+        # Only the child created above is stopped; unrelated user jobs are never touched.
+        process.kill()
+        stdout, stderr = process.communicate()
+        raise
+    finally:
+        logs = workspace / "logs"
+        logs.mkdir(exist_ok=True)
+        (logs / f"{log_name}.stdout.log").write_text(stdout, encoding="utf-8")
+        (logs / f"{log_name}.stderr.log").write_text(stderr, encoding="utf-8")
+    return subprocess.CompletedProcess(command, process.returncode, stdout, stderr)
+
+
+def run_tests(workspace: Path, *, deadline: float) -> bool:
+    result = run_command([sys.executable, "-m", "pytest", *TEST_FILES, "-q",
+                          "--basetemp", str(workspace / ".test-temp"),
+                          "-o", "cache_dir=.pytest_cache"],
+                         workspace=workspace, deadline=deadline, log_name="tests")
+    return result.returncode == 0
+
+
+def run_benchmark(workspace: Path, *, seeds: list[int], deadline: float,
+                  label: str = "selection") -> dict:
+    """Fresh agent/core per episode; retain raw outcomes for every specified seed."""
     script = f"""
-import torch, json
+import json, random, torch
 from poseidon.cognitive_agent import CognitiveAgent
+from poseidon.core import CoreRuntime
 from poseidon.worldlab import POMDPTidePool, POMDPConfig
 
 torch.set_num_threads(2)
-agent = CognitiveAgent()
-rewards = []
-survivals = []
-overrides = 0
-total_steps = 0
-
-for s in {EVAL_SEEDS}:
-    env = POMDPTidePool(POMDPConfig(seed=s, scarcity={EVAL_SCARCITY}, sensor_noise_std=0.02, fog_threshold=0.65), max_steps={EVAL_MAX_STEPS})
-    res = agent.rollout(env, max_steps={EVAL_MAX_STEPS})
-    rewards.append(res['total_reward'])
-    survivals.append(1.0 if res['survived'] else 0.0)
-    overrides += res['overrides']
-    total_steps += res['steps']
-
-out = {{
-    'mean_reward': sum(rewards) / len(rewards),
-    'survival_rate': sum(survivals) / len(survivals),
-    'overrides': overrides,
-    'total_steps': total_steps,
-    'rewards': rewards,
-}}
-print('__RESULT__' + json.dumps(out))
+rows = []
+for seed in {seeds!r}:
+    random.seed(seed)
+    torch.manual_seed(seed)
+    agent = CognitiveAgent(core=CoreRuntime({CORE_RELATIVE_PATH!r}))
+    env = POMDPTidePool(POMDPConfig(seed=seed, scarcity={EVAL_SCARCITY}, sensor_noise_std=0.02,
+                                  fog_threshold=0.65), max_steps={EVAL_MAX_STEPS})
+    outcome = agent.rollout(env, max_steps={EVAL_MAX_STEPS})
+    rows.append({{'seed': seed, 'total_reward': outcome['total_reward'], 'survived': outcome['survived'],
+                 'steps': outcome['steps'], 'overrides': outcome['overrides'], 'trajectory': outcome}})
+print('__RESULT__' + json.dumps({{'per_seed': rows}}, allow_nan=False))
 """
-    cmd = [sys.executable, "-c", script]
-    res = subprocess.run(cmd, cwd=ROOT, capture_output=True, text=True)
-    if res.returncode != 0:
-        raise RuntimeError(f"Benchmark failed: {res.stderr}")
-    for line in res.stdout.splitlines():
-        if line.startswith("__RESULT__"):
-            return json.loads(line[len("__RESULT__"):])
-    raise RuntimeError(f"Could not parse benchmark output: {res.stdout}")
+    result = run_command([sys.executable, "-c", script], workspace=workspace,
+                         deadline=deadline, log_name=label)
+    if result.returncode:
+        raise RuntimeError(f"benchmark failed in {workspace}; see logs/{label}.stderr.log")
+    outputs = [line[len("__RESULT__"):] for line in result.stdout.splitlines()
+               if line.startswith("__RESULT__")]
+    if len(outputs) != 1:
+        raise ValueError("benchmark did not produce exactly one result")
+    rows = json.loads(outputs[0])["per_seed"]
+    if [row["seed"] for row in rows] != seeds or not seeds:
+        raise ValueError("benchmark results do not match requested seeds")
+    for row in rows:
+        if (not math.isfinite(row["total_reward"]) or type(row["survived"]) is not bool
+                or type(row["steps"]) is not int or type(row["overrides"]) is not int
+                or not 0 <= row["overrides"] <= row["steps"] <= EVAL_MAX_STEPS):
+            raise ValueError("benchmark contains invalid or nonfinite outcomes")
+    rewards = [row["total_reward"] for row in rows]
+    return {"per_seed": rows, "rewards": rewards, "mean_reward": sum(rewards) / len(rows),
+            "survival_rate": sum(row["survived"] for row in rows) / len(rows),
+            "overrides": sum(row["overrides"] for row in rows),
+            "total_steps": sum(row["steps"] for row in rows)}
 
 
-def read_param_value(spec: dict) -> float:
-    path = ROOT / spec["file"]
+def read_param_value(spec: dict, workspace: Path) -> float:
+    content = (workspace / spec["file"]).read_text(encoding="utf-8")
+    matches = list(re.finditer(spec["pattern"], content))
+    if len(matches) != 1:
+        raise ValueError(f"expected exactly one parameter {spec['name']} in {spec['file']}")
+    return float(matches[0].group(2))
+
+
+def write_param_value(spec: dict, val: float, workspace: Path) -> None:
+    read_param_value(spec, workspace)
+    path = workspace / spec["file"]
     content = path.read_text(encoding="utf-8")
-    m = re.search(spec["pattern"], content)
-    if not m:
-        raise ValueError(f"Pattern {spec['pattern']} not found in {spec['file']}")
-    return float(m.group(2))
+    path.write_text(re.sub(spec["pattern"], lambda m: m.group(1) + spec["fmt"].format(val),
+                           content, count=1), encoding="utf-8")
 
 
-def write_param_value(spec: dict, val: float) -> None:
-    path = ROOT / spec["file"]
-    content = path.read_text(encoding="utf-8")
-    formatted = spec["fmt"].format(val)
-    new_content, count = re.subn(spec["pattern"], r"\g<1>" + formatted, content, count=1)
-    if count == 0:
-        raise ValueError(f"Could not replace {spec['name']} in {spec['file']}")
-    path.write_text(new_content, encoding="utf-8")
+def propose_mutation(workspace: Path, rng: random.Random) -> dict:
+    spec = rng.choice(SEARCH_SPACE)
+    current = read_param_value(spec, workspace)
+    if rng.random() < 0.70:
+        scale = rng.uniform(0.10, 0.25)
+        direction = 1.0 if rng.random() < 0.5 else -1.0
+        value = current + direction * scale * (spec["max"] - spec["min"])
+    else:
+        value = rng.uniform(spec["min"], spec["max"])
+    value = float(spec["fmt"].format(max(spec["min"], min(spec["max"], value))))
+    return {"name": spec["name"], "file": spec["file"], "old": current, "new": value}
+
+
+def comparison(baseline: dict, candidate: dict) -> dict:
+    left, right = baseline["per_seed"], candidate["per_seed"]
+    if [row["seed"] for row in left] != [row["seed"] for row in right]:
+        raise ValueError("paired comparison requires identical ordered seeds")
+    deltas = [{"seed": a["seed"], "reward": b["total_reward"] - a["total_reward"],
+               "survival": int(b["survived"]) - int(a["survived"])} for a, b in zip(left, right)]
+    reward = sum(row["reward"] for row in deltas) / len(deltas)
+    survival = sum(row["survival"] for row in deltas) / len(deltas)
+    improved = (survival > 0 and reward >= -0.05) or (survival >= 0 and reward > 0.005)
+    return {"delta_reward": reward, "delta_survival": survival, "per_seed_deltas": deltas,
+            "improvement_supported": improved}
 
 
 def parse_target_end_time(until_str: str | None, hours: float | None) -> datetime:
     now = datetime.now()
     if hours is not None:
-        return now + timedelta(hours=hours)
-    target_hour, target_min = 6, 0
-    if until_str:
-        parts = until_str.split(":")
-        target_hour = int(parts[0])
-        target_min = int(parts[1]) if len(parts) > 1 else 0
-    target = now.replace(hour=target_hour, minute=target_min, second=0, microsecond=0)
-    if target <= now:
-        target += timedelta(days=1)
-    return target
-
-
-def main():
-    parser = argparse.ArgumentParser(description="Autonomous Overnight Poseidon Improver")
-    parser.add_argument("--until", type=str, default="06:00", help="Stop time HH:MM (default 06:00)")
-    parser.add_argument("--duration-hours", type=float, default=None, help="Optional duration in hours")
-    args = parser.parse_args()
-
-    OUT_DIR.mkdir(parents=True, exist_ok=True)
-    RECEIPTS_DIR.mkdir(parents=True, exist_ok=True)
-
-    end_time = parse_target_end_time(args.until, args.duration_hours)
-    print(f"================================================================")
-    print(f" SUPERMIX POSEIDON AUTONOMOUS IMPROVEMENT DAEMON")
-    print(f" Target End Time: {end_time.strftime('%Y-%m-%d %H:%M:%S')}")
-    print(f" Root Directory:  {ROOT}")
-    print(f" Log File:        {HISTORY_FILE}")
-    print(f"================================================================")
-
-    # 1. Establish Initial Baseline
-    print("\n[Step 1] Establishing initial champion baseline...")
-    base_res = run_benchmark()
-    champ_reward = base_res["mean_reward"]
-    champ_survival = base_res["survival_rate"]
-    print(f"Initial Champion: Mean Reward = {champ_reward:.4f}, Survival = {champ_survival:.1%}")
-
-    iteration = 0
-    accepted_count = 0
-    rejected_count = 0
-    start_time = datetime.now()
-
-    while True:
-        now = datetime.now()
-        if now >= end_time:
-            print(f"\n[Terminating] Reached scheduled stop time {end_time.strftime('%H:%M:%S')}.")
-            break
-
-        iteration += 1
-        spec = random.choice(SEARCH_SPACE)
-        curr_val = read_param_value(spec)
-
-        # Perturbation: +/- 10% to 25% Gaussian noise or random range exploration
-        if random.random() < 0.70:
-            scale = random.uniform(0.10, 0.25)
-            direction = 1.0 if random.random() < 0.5 else -1.0
-            new_val = curr_val + direction * scale * (spec["max"] - spec["min"])
-        else:
-            new_val = random.uniform(spec["min"], spec["max"])
-
-        new_val = max(spec["min"], min(spec["max"], new_val))
-        if abs(new_val - curr_val) < 1e-4:
-            continue
-
-        print(f"\n--- [Iteration {iteration}] Testing Hypothesis on {spec['name']} ---")
-        print(f"    Target: {spec['file']}")
-        print(f"    Mutation: {curr_val} -> {spec['fmt'].format(new_val)}")
-
+        if not math.isfinite(hours) or hours <= 0:
+            raise ValueError("duration-hours must be finite and positive")
         try:
-            # Apply mutation to disk
-            write_param_value(spec, new_val)
+            return now + timedelta(hours=hours)
+        except OverflowError as error:
+            raise ValueError("duration-hours is too large") from error
+    parts = (until_str or "06:00").split(":")
+    if len(parts) > 2:
+        raise ValueError("until must use HH:MM")
+    target = now.replace(hour=int(parts[0]), minute=int(parts[1]) if len(parts) == 2 else 0,
+                         second=0, microsecond=0)
+    return target if target > now else target + timedelta(days=1)
 
-            # Test verification gate
-            test_passed = run_tests()
-            if not test_passed:
-                print("    [Gating 1 FAILED] Unit tests failed. Reverting...")
-                git_revert()
-                rejected_count += 1
-                record = {
-                    "iteration": iteration,
-                    "timestamp": datetime.now().isoformat(),
-                    "name": spec["name"],
-                    "file": spec["file"],
-                    "old": curr_val,
-                    "new": new_val,
-                    "status": "REJECTED_TESTS_FAILED",
-                    "delta_reward": 0.0,
-                }
-                with open(HISTORY_FILE, "a", encoding="utf-8") as f:
-                    f.write(json.dumps(record) + "\n")
+
+def write_json(path: Path, payload: dict) -> None:
+    temporary = path.with_suffix(path.suffix + ".tmp")
+    temporary.write_text(json.dumps(payload, indent=2, allow_nan=False), encoding="utf-8")
+    temporary.replace(path)
+
+
+def run_search(*, source_root: Path = ROOT, output_root: Path = OUT_DIR,
+               end_time: datetime, seed: int = 1729, max_iterations: int | None = None,
+               core_path: Path | None = None) -> dict:
+    """Search frozen copies with 20% of the time reserved for the final audit.
+
+    The source tree may already be dirty. It is never an execution workspace or
+    an incumbent destination. Selection can overfit its four reused seeds; audit
+    is one descriptive four-seed check, not a generalization or significance claim.
+    """
+    source_root, output_root = Path(source_root).resolve(), Path(output_root).resolve()
+    if max_iterations is not None and (type(max_iterations) is not int or max_iterations < 1):
+        raise ValueError("max_iterations must be a positive integer")
+    if set(SELECTION_SEEDS) & set(AUDIT_SEEDS):
+        raise ValueError("selection and audit seeds must be disjoint")
+    for name in (*SOURCE_DIRS, "runs", ".git"):
+        if output_root.is_relative_to(source_root / name):
+            raise ValueError("output directory must not be inside source, tests, runs, or git metadata")
+    now = time.monotonic()
+    budget = max(0.0, (end_time - datetime.now()).total_seconds())
+    deadline, selection_deadline = now + budget, now + budget * 0.8
+    output_root.mkdir(parents=True, exist_ok=True)
+    run_dir = Path(tempfile.mkdtemp(prefix="search-" + datetime.now().strftime("%Y%m%d-%H%M%S-"),
+                                    dir=output_root))
+    baseline = run_dir / "baseline"
+    result = {"schema": "poseidon-isolated-parameter-search-v1", "status": "running", "seed": seed,
+              "started_at": datetime.now().isoformat(), "deadline": end_time.isoformat(),
+              "selection_budget_fraction": 0.8, "source_root": str(source_root),
+              "baseline_workspace": str(baseline), "selection_seeds": list(SELECTION_SEEDS),
+              "audit_seeds": list(AUDIT_SEEDS), "selected_candidate": None, "candidates": [],
+              "audit": {"status": "not_run", "reason": "no selected candidate"},
+              "report_path": str(run_dir / "report.json"), "active": False,
+              "interpretation": "Selection reuses fixed seeds and may overfit. Disjoint audit seeds are used "
+                                "once after selection; they are a small descriptive check, not statistical "
+                                "proof of general improvement. All candidates remain inactive."}
+    current = None
+    rng = random.Random(seed)
+    try:
+        remaining_seconds(selection_deadline)
+        source_core = resolve_core(source_root, core_path)
+        binding = copy_workspace(source_root, baseline, source_core, selection_deadline)
+        result["baseline_binding"] = binding
+        result["core_origin"] = str(source_core)
+        incumbent, incumbent_binding = baseline, binding
+        base = run_benchmark(baseline, seeds=SELECTION_SEEDS, deadline=selection_deadline)
+        result["baseline_selection"] = base
+        incumbent_result = base
+        iteration = 0
+        while time.monotonic() < selection_deadline and (max_iterations is None or iteration < max_iterations):
+            iteration += 1
+            proposal = propose_mutation(incumbent, rng)
+            current = {"iteration": iteration, "mutation": proposal, "status": "PREPARING", "active": False,
+                       "parent_workspace": str(incumbent), "baseline_binding": incumbent_binding}
+            result["candidates"].append(current)
+            candidate = run_dir / f"candidate_{iteration:04d}"
+            current["workspace"] = str(candidate)
+            if proposal["old"] == proposal["new"]:
+                current["status"] = "SKIPPED_UNCHANGED"
+                current = None
                 continue
-
-            # Benchmark gate
-            try:
-                cand_res = run_benchmark()
-            except Exception as e:
-                print(f"    [Gating 2 FAILED] Benchmark crashed: {e}. Reverting...")
-                git_revert()
-                rejected_count += 1
-                continue
-
-            cand_reward = cand_res["mean_reward"]
-            cand_survival = cand_res["survival_rate"]
-            delta_rew = cand_reward - champ_reward
-            delta_surv = cand_survival - champ_survival
-
-            print(f"    Candidate: Reward={cand_reward:.4f} (delta={delta_rew:+.4f}), Survival={cand_survival:.1%} (delta={delta_surv:+.1%})")
-
-            # Acceptance Criteria
-            is_improved = False
-            if cand_survival > champ_survival and delta_rew >= -0.05:
-                is_improved = True
-                reason = "Higher survival rate with non-catastrophic reward"
-            elif cand_survival >= champ_survival and delta_rew > 0.005:
-                is_improved = True
-                reason = f"Positive paired reward gain (+{delta_rew:.4f})"
-
-            if is_improved:
-                print(f"    *** [ACCEPTED IMPROVEMENT] {reason} ***")
-                champ_reward = cand_reward
-                champ_survival = cand_survival
-                accepted_count += 1
-
-                # Commit improvement to git
-                commit_msg = (
-                    f"auto-improve: [ACCEPTED #{accepted_count}] {spec['name']} "
-                    f"({curr_val} -> {spec['fmt'].format(new_val)}) dR={delta_rew:+.4f}"
-                )
-                subprocess.run(["git", "add", spec["file"]], cwd=ROOT, check=True)
-                subprocess.run(["git", "commit", "-m", commit_msg], cwd=ROOT, check=True)
-
-                # Record receipt
-                receipt_path = RECEIPTS_DIR / f"receipt_iter_{iteration:04d}.json"
-                receipt_data = {
-                    "iteration": iteration,
-                    "timestamp": datetime.now().isoformat(),
-                    "mutation": {"name": spec["name"], "file": spec["file"], "old": curr_val, "new": new_val},
-                    "champion": {"reward": champ_reward, "survival": champ_survival},
-                    "delta_reward": delta_rew,
-                }
-                receipt_path.write_text(json.dumps(receipt_data, indent=2), encoding="utf-8")
-
-                record = {
-                    "iteration": iteration,
-                    "timestamp": datetime.now().isoformat(),
-                    "name": spec["name"],
-                    "file": spec["file"],
-                    "old": curr_val,
-                    "new": new_val,
-                    "status": "ACCEPTED",
-                    "delta_reward": delta_rew,
-                    "champ_reward": champ_reward,
-                    "champ_survival": champ_survival,
-                }
+            copy_workspace(incumbent, candidate, incumbent / CORE_RELATIVE_PATH, selection_deadline)
+            spec = next(item for item in SEARCH_SPACE if item["name"] == proposal["name"])
+            write_param_value(spec, proposal["new"], candidate)
+            candidate_binding = source_binding(candidate)
+            current["candidate_binding"] = candidate_binding
+            if not run_tests(candidate, deadline=selection_deadline):
+                current["status"] = "REJECTED_TESTS_FAILED"
             else:
-                print("    [REJECTED] Performance did not exceed champion baseline. Reverting...")
-                git_revert()
-                rejected_count += 1
-                record = {
-                    "iteration": iteration,
-                    "timestamp": datetime.now().isoformat(),
-                    "name": spec["name"],
-                    "file": spec["file"],
-                    "old": curr_val,
-                    "new": new_val,
-                    "status": "REJECTED_NO_IMPROVEMENT",
-                    "delta_reward": delta_rew,
-                    "cand_reward": cand_reward,
-                    "cand_survival": cand_survival,
-                }
+                candidate_result = run_benchmark(candidate, seeds=SELECTION_SEEDS, deadline=selection_deadline)
+                if source_binding(candidate) != candidate_binding:
+                    raise RuntimeError("candidate source or frozen core changed during evaluation")
+                paired = comparison(incumbent_result, candidate_result)
+                current["selection"] = {"incumbent": incumbent_result, "candidate": candidate_result, **paired}
+                current["status"] = "SELECTED_INACTIVE" if paired["improvement_supported"] else "REJECTED_NO_IMPROVEMENT"
+                if paired["improvement_supported"]:
+                    incumbent, incumbent_binding, incumbent_result = candidate, candidate_binding, candidate_result
+                    result["selected_candidate"] = {"workspace": str(candidate), "binding": candidate_binding,
+                                                    "iteration": iteration, "active": False}
+            write_json(run_dir / f"receipt_{iteration:04d}.json", current)
+            write_json(Path(result["report_path"]), result)
+            current = None
+        result["status"] = "completed"
+    except KeyboardInterrupt:
+        result["status"] = "cancelled"
+        if current is not None:
+            current["status"] = "CANCELLED"
+    except (TimeoutError, subprocess.TimeoutExpired):
+        result["status"] = "timed_out"
+        if current is not None:
+            current["status"] = "TIMED_OUT"
+    except Exception as error:
+        result["status"] = "failed"
+        result["error"] = f"{type(error).__name__}: {error}"
+        if current is not None:
+            current["status"] = "FAILED"
+            current["error"] = result["error"]
+    if current is not None:
+        write_json(run_dir / f"receipt_{current['iteration']:04d}.json", current)
 
-            with open(HISTORY_FILE, "a", encoding="utf-8") as f:
-                f.write(json.dumps(record) + "\n")
+    # Audit never resumes search, changes the selected candidate, or triggers promotion.
+    if result["selected_candidate"] is not None and result["status"] != "cancelled":
+        audit = result["audit"] = {"status": "running", "seeds": list(AUDIT_SEEDS),
+                                    "baseline_binding": result["baseline_binding"],
+                                    "candidate_binding": result["selected_candidate"]["binding"]}
+        try:
+            remaining_seconds(deadline)
+            audit["baseline"] = run_benchmark(baseline, seeds=AUDIT_SEEDS, deadline=deadline, label="audit")
+            selected = Path(result["selected_candidate"]["workspace"])
+            audit["candidate"] = run_benchmark(selected, seeds=AUDIT_SEEDS, deadline=deadline, label="audit")
+            if source_binding(baseline) != result["baseline_binding"] or source_binding(selected) != audit["candidate_binding"]:
+                raise RuntimeError("source or core changed during audit")
+            audit.update(comparison(audit["baseline"], audit["candidate"]))
+            audit["status"] = "completed"
+        except KeyboardInterrupt:
+            audit["status"], result["status"] = "cancelled", "cancelled"
+        except (TimeoutError, subprocess.TimeoutExpired):
+            audit["status"] = "timed_out"
+        except Exception as error:
+            audit["status"], audit["error"] = "failed", f"{type(error).__name__}: {error}"
+    elif result["selected_candidate"] is not None:
+        result["audit"] = {"status": "not_run", "reason": "search cancelled; selected artifact remains inactive"}
+    result["finished_at"] = datetime.now().isoformat()
+    write_json(Path(result["report_path"]), result)
+    report = (f"# Poseidon isolated parameter search\n\nStatus: {result['status']}\n\n"
+              f"Proposals: {len(result['candidates'])}. Audit: {result['audit']['status']}.\n\n"
+              f"{result['interpretation']}\n\n"
+              "The source checkout, Git HEAD and active core pointer were not promoted or restored.\n\n"
+              "Full source/core bindings, raw per-seed results and candidate paths are in report.json.\n")
+    (run_dir / "OVERNIGHT_REPORT.md").write_text(report, encoding="utf-8")
+    return result
 
-        except Exception as iteration_err:
-            print(f"    [ERROR] Unexpected error in iteration {iteration}: {iteration_err}. Reverting...")
-            git_revert()
-            rejected_count += 1
 
-        time.sleep(1)
-
-    # Final Morning Summary Generation
-    elapsed = (datetime.now() - start_time).total_seconds() / 3600
-    report_md = f"""# Supermix Poseidon Overnight Auto-Improvement Report
-- **Run Period:** {start_time.strftime('%Y-%m-%d %H:%M:%S')} to {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} ({elapsed:.2f} hours)
-- **Total Hypotheses Tested:** {iteration}
-- **Accepted Improvements Committed:** {accepted_count}
-- **Rejected Mutations (Clean Reverts):** {rejected_count}
-- **Initial Champion Reward:** {base_res['mean_reward']:.4f} (Survival: {base_res['survival_rate']:.1%})
-- **Final Champion Reward:** {champ_reward:.4f} (Survival: {champ_survival:.1%})
-- **Net Reward Delta:** {champ_reward - base_res['mean_reward']:+.4f}
-
-## Verification Receipts
-Receipts stored in `outputs/auto_improvements/receipts/`.
-History log recorded in `outputs/auto_improvements/history.jsonl`.
-"""
-    SUMMARY_FILE.write_text(report_md, encoding="utf-8")
-    print(f"\n================================================================")
-    print(f" OVERNIGHT RUN COMPLETED!")
-    print(f" Report written to: {SUMMARY_FILE}")
-    print(f"================================================================")
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description="Bounded isolated Poseidon parameter search; no automatic promotion")
+    parser.add_argument("--until", default="06:00", help="Local stop time HH:MM (default 06:00)")
+    parser.add_argument("--duration-hours", type=float, help="Optional duration in hours")
+    parser.add_argument("--seed", type=int, default=1729, help="Deterministic proposal RNG seed")
+    parser.add_argument("--max-iterations", type=int, help="Additional finite proposal limit")
+    parser.add_argument("--core", type=Path, help="Explicit trained core; defaults to the active checkpoint")
+    parser.add_argument("--output-dir", type=Path, default=OUT_DIR)
+    args = parser.parse_args(argv)
+    try:
+        end_time = parse_target_end_time(args.until, args.duration_hours)
+        if args.max_iterations is not None and args.max_iterations < 1:
+            raise ValueError("max-iterations must be positive")
+    except ValueError as error:
+        parser.error(str(error))
+    print(f"Isolated search ending at {end_time.isoformat()}; selected candidates stay inactive.", flush=True)
+    result = run_search(source_root=ROOT, output_root=args.output_dir, end_time=end_time,
+                        seed=args.seed, max_iterations=args.max_iterations, core_path=args.core)
+    print(f"Search {result['status']}; report: {result['report_path']}", flush=True)
+    return 1 if result["status"] == "failed" else (130 if result["status"] == "cancelled" else 0)
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

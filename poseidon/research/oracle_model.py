@@ -23,7 +23,8 @@ class OracleConfig:
             raise ValueError("hidden_size must be an integer in [16, 1024]")
         if type(self.ensemble_size) is not int or not 2 <= self.ensemble_size <= 16:
             raise ValueError("ensemble_size must be an integer in [2, 16]")
-        if self.observation_size != OBS_SIZE or self.action_count != N_ACTIONS:
+        if (type(self.observation_size) is not int or type(self.action_count) is not int
+                or self.observation_size != OBS_SIZE or self.action_count != N_ACTIONS):
             raise ValueError("ORACLE config does not match the registered TidePool contract")
 
     def to_dict(self) -> dict:
@@ -81,6 +82,8 @@ class OracleEnsemble(nn.Module):
     def forward(self, observation: torch.Tensor, action: torch.Tensor) -> dict[str, torch.Tensor]:
         if observation.ndim != 2 or observation.shape[1] != self.config.observation_size:
             raise ValueError("observation must have shape [batch, observation_size]")
+        if not observation.is_floating_point() or not bool(torch.isfinite(observation).all()):
+            raise ValueError("observation must contain finite floating point values")
         if action.ndim != 1 or action.shape[0] != observation.shape[0]:
             raise ValueError("action must have shape [batch]")
         if action.dtype != torch.long or bool(((action < 0) | (action >= self.config.action_count)).any()):

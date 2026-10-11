@@ -3,24 +3,24 @@
 [![Hugging Face](https://img.shields.io/badge/Hugging%20Face-Supermix--Poseidon-yellow)](https://huggingface.co/Kai9987kai/Supermix-Poseidon)
 [![GitHub](https://img.shields.io/badge/GitHub-Supermix--Poseidon-blue)](https://github.com/kai9987kai/Supermix-Poseidon)
 
-Poseidon v2.0 evolves the workbench into an experimental **cognitive AI platform** that predicts, remembers, plans, and adapts through experience while scientifically evaluating its own decisions across matched lesion assays and partially observable environments (POMDP).
+Poseidon is an experimental **cognitive AI workbench** combining a trained Tidal core with optional prediction, memory, planning and adaptation modules. Subsystem availability and passing unit tests do not establish improved learning or transfer. The [11 October architecture audit](docs/research/architecture-audit-2026-10-11.md) records current wiring, verification and evaluation limits.
 
 ## v2.0 Cognitive Platform Architecture
 
-Poseidon v2.0 unifies six cognitive subsystems around the immutable, frozen Tidal core checkpoint:
+The v2.0 coordinator instantiates six experimental subsystems around the frozen Tidal core checkpoint:
 
-1. **ORACLE (`poseidon/oracle.py`)**: Bootstrapped predictive world-model ensemble ($K$-head) with empirical quantile-calibrated uncertainty $U_{\text{cal}}(s, a)$ and multi-step recursive trajectory imagination.
+1. **ORACLE**: `poseidon/oracle.py` provides independently initialized heads, a fitted disagreement/error curve and trajectory imagination. CognitiveAgent and HyperAgent currently construct fresh, uncalibrated heads. The separately trained, episode-bootstrap predictor in `poseidon/research/` has replayable fit/evaluation receipts and remains inactive; it is not yet wired into those agents.
 2. **MNEMOSYNE (`poseidon/mnemosyne.py`)**: Biologically inspired 3-tier memory hierarchy:
    - **Tier 1 (Working Memory)**: Recurrent GRU context cell dynamically updated by prediction surprise ($e_{t-1} = \|o_t - \hat{o}_t\|_2$).
    - **Tier 2 (Episodic Store)**: Value-gated experiential memory weighted by reward, surprise, and recency.
    - **Tier 3 (Spatial Map)**: Online Bayesian replenishment estimation with conservative lower-confidence bounds (LCB).
-   - **Matched Lesion Assays**: Validated across `intact`, `erased`, `shifted`, `random_retrieval`, and `memory_free` modes.
-3. **HORIZON-X (`poseidon/horizon_x.py`)**: Multi-horizon ($H \in \{1, 4, 8, 16, 32\}$) risk-sensitive planner with dynamic metabolic reserve modulation ($\lambda_t = \lambda_0 \cdot \max(\mu_{\min}, \text{health} \cdot \min(\text{energy}, \text{hydration}))$) to avoid the "pessimism trap" under starvation.
-4. **ADAPT (`poseidon/adapt.py`)**: Evidence-gated continual learning pipeline with prioritized transition replay, anti-forgetting anchor datasets ($D_{\text{KL}}$ regularization), and audited promotion gates ($\le 2\%$ anchor regression).
-5. **NEURO (`poseidon/neuro.py`)**: Neuromodulated sparse connectome routing implementing small-world Watts-Strogatz graph masks and metabolic gain scaling.
-6. **WORLDLAB (`poseidon/worldlab.py`)**: High-fidelity partially observable Markov decision processes (`POMDPTidePool`) with fog-of-war scent occlusion, sensor noise, dynamic tidal oscillations, and a standardized simulation bridge (`WorldBridgeProtocol`).
+   - **Matched Lesion Modes**: `intact`, `erased`, `shifted`, `random_retrieval`, and `memory_free` are implemented. Memory outputs currently feed v2 telemetry; causal decision benefit has not been established.
+3. **HORIZON-X (`poseidon/horizon_x.py`)**: Planner with default horizons `{1,4,8,16}` and reserve-dependent risk penalties. It currently uses the fresh runtime ORACLE; reserve modulation is a heuristic requiring outcome validation.
+4. **ADAPT (`poseidon/adapt.py`)**: Experimental residual adaptation, replay and anchor checks. Useful adaptation and retention require separate held-out evidence.
+5. **NEURO (`poseidon/neuro.py`)**: Sparse routing with graph masks and gain scaling. The v2 coordinator reports its outputs as telemetry; they do not currently alter the planner input.
+6. **WORLDLAB (`poseidon/worldlab.py`)**: Synthetic partially observed TidePool with fog, sensor noise, tidal effects and an external simulation bridge contract. It is not a validated physical or biological model.
 
-See the complete research documentation in [docs/POSEIDON_V2_RESEARCH.md](docs/POSEIDON_V2_RESEARCH.md).
+See the [subsystem documentation](docs/POSEIDON_V2_RESEARCH.md), [24-project source review](docs/research/portfolio-refresh-2026-10-11.md) and [proposed learning and transfer operation](docs/superpowers/specs/2026-10-11-learning-transfer-design.md). The new v3/OmniPlane modules are additional experiments; their presence does not resolve the predictor integration or evidence gaps.
 
 ## Run locally
 

@@ -79,3 +79,22 @@ def test_world_bridge_protocol():
     assert decoded_step.reward == 0.75
     assert decoded_step.done is True
     assert decoded_step.info["alive"] is False
+
+
+def test_pomdp_snapshot_replays_sensor_rng_and_reset():
+    env = POMDPTidePool(POMDPConfig(seed=19, sensor_noise_std=0.2), max_steps=8)
+    first = env.reset()
+    env.step(4)
+    env.observe()  # Snapshot must preserve arbitrary sensor draws, not just tick.
+    snapshot = json.loads(json.dumps(env.snapshot()))
+    restored = POMDPTidePool.from_snapshot(snapshot)
+    assert restored.observe() == env.observe()
+    assert restored.step(2).to_dict() == env.step(2).to_dict()
+    assert restored.snapshot() == env.snapshot()
+    assert env.reset() == first
+
+
+def test_pomdp_legacy_snapshot_cannot_claim_exact_sensor_replay():
+    env = POMDPTidePool()
+    with pytest.raises(ValueError, match="sensor"):
+        POMDPTidePool.from_snapshot(env.underlying.snapshot())

@@ -1,31 +1,33 @@
-# Supermix Poseidon v2.0: Calibrated Predictive World Models, Tripartite Memory, and Dynamic Risk-Modulated Planning
+# Supermix Poseidon v2.0: Experimental Prediction, Memory and Planning Modules
 
-**Authors:** Google DeepMind Advanced Agentic Coding & Research Team  
+**Project:** kai9987kai/Supermix-Poseidon; engineering documentation with no external institutional authorship claimed.
 **System Version:** `2.0.0`  
-**Repository Branch:** `codex/poseidon-v2-cognitive-platform`  
+**Audited Revision:** `97eebc637865a815b458c50fb7ef8200ef1c61df` (11 October 2026)
 **Schema Identifier:** `poseidon-cognitive-experiment-v2`  
-**Core Baseline Weights:** Frozen Tidal Core (`runs/tidal_dagger/core.pt` — MD5 verified, immutable)
+**Core Baseline Weights:** Frozen Tidal Core (`runs/tidal_dagger/core.pt`), SHA-256 `a053104ae63dc7f86baa15b4b34e46730e1ccb92117f221801fb21f90d2d6c27`.
+
+**Evidence status:** This document describes experimental implementations and intended mechanisms. The runtime ORACLE is initialized without trained weights or fitted calibration; the separate trained research ORACLE is not yet connected to the cognitive agents. Memory/router outputs currently contribute v2 telemetry rather than planner inputs. The cognitive receipt verifier checks a JSON digest without replay. The [current audit](research/architecture-audit-2026-10-11.md) takes precedence over capability claims below; the [operation design](superpowers/specs/2026-10-11-learning-transfer-design.md) specifies the required integration and validation work.
 
 ---
 
 ## 1. Abstract
 
-Supermix Poseidon v2.0 transitions the Poseidon architecture from static heuristic controllers into a **complete, scientifically validated cognitive AI platform**. Previous iterations (v1.0.0 through v1.3.0 TRIDENT) relied on frozen neural embeddings augmented by local transition gating, but remained limited by:
+Supermix Poseidon v2.0 adds experimental modules to the trained Tidal core and existing controllers. Their usefulness as a combined learning system remains to be established. The development questions include:
 1. Saturated synthetic test environments obscuring statistical significance.
 2. Uncalibrated heuristic variance metrics masquerading as epistemic uncertainty.
 3. Rigid risk penalties that provoked the **"pessimism trap"**—causing agents facing critical starvation or dehydration to freeze or default to doomed actions because all high-reward harvesting attempts carried uncertainty penalties.
 4. Absence of genuine temporal context integration and value-gated episodic memory.
 5. Vulnerability to catastrophic forgetting during continual policy adaptation.
 
-Poseidon v2.0 resolves these limitations through six cohesive cognitive innovations:
-- **ORACLE**: Bootstrapped $K$-head world-model ensemble providing empirical quantile-calibrated uncertainty $U_{\text{cal}}(s, a)$ and recursive multi-step trajectory imagination.
-- **MNEMOSYNE**: Biologically grounded 3-tier memory hierarchy combining fast recurrent context (GRU working memory updated via prediction surprise), value-gated episodic retrieval, and topological Bayesian replenishment mapping, verified against 5 matched lesion assays.
-- **HORIZON-X**: Multi-horizon ($H \in \{1, 4, 8, 16, 32\}$) risk-sensitive planner featuring dynamic reserve-dependent risk modulation: $\lambda_t = \lambda_0 \cdot \max(\mu_{\min}, \text{health} \cdot \min(\text{energy}, \text{hydration}))$, systematically eliminating the pessimism trap.
+Poseidon v2.0 includes six experimental mechanisms:
+- **ORACLE**: Independently initialized runtime heads, a disagreement/error curve and recursive trajectory imagination. The separate research trainer implements whole-episode bootstrap and held-out calibration; its pilot is inactive.
+- **MNEMOSYNE**: A 3-tier memory hierarchy with a GRU, priority-weighted episodic retrieval and spatial resource estimates. Five intervention modes exist; a causal control-benefit assay is pending.
+- **HORIZON-X**: Multi-horizon planning (default $H \in \{1,4,8,16\}$) with reserve-dependent risk penalties. The intended response to depletion needs measured comparison against alternatives.
 - **ADAPT**: Evidence-gated continual learning pipeline utilizing residual policy perturbation networks, anti-forgetting anchor datasets ($\le 2\%$ allowable regression), and audited promotion gates.
 - **NEURO**: Neuromodulated sparse connectome routing with small-world topological graph masks and metabolic gain scaling.
-- **WORLDLAB**: High-fidelity partially observable Markov decision processes (POMDP) incorporating fog-of-war scent occlusion, sensor noise, dynamic tidal oscillations, and a standardized simulation bridge for external 3D engines.
+- **WORLDLAB**: Synthetic partially observed TidePool variants with fog, sensor noise, tidal effects and a simulation bridge contract.
 
-All evaluations are executed under strict reproducibility standards, paired-seed comparisons, and cryptographic receipt verification.
+Some existing controller and research experiments support replay and source binding. The v2 cognitive receipt verifier currently establishes checksum consistency only; it does not establish reproducibility, complete pairing or improved performance.
 
 ---
 
@@ -33,7 +35,7 @@ All evaluations are executed under strict reproducibility standards, paired-seed
 
 ### 2.1 POSEIDON ORACLE: Calibrated Predictive World Model Ensemble
 
-The ORACLE world model maintains an ensemble of $K$ independently initialized and trained dynamics heads $\theta_1, \dots, \theta_K$:
+The runtime ORACLE contains $K$ independently initialized dynamics heads $\theta_1, \dots, \theta_K$. The cognitive coordinator does not load trained heads; the formula describes their prediction interface:
 
 $$\hat{s}_{t+1}^{(k)} = s_t + \Delta_{\theta_k}(s_t, a_t)$$
 
@@ -44,7 +46,7 @@ Each head features dedicated prediction branches:
 - Catastrophic failure probability: $\hat{p}_{\text{fail}} \in [0, 1]$
 
 #### Epistemic Uncertainty Estimation
-Raw predictive disagreement across ensemble members measures epistemic model uncertainty:
+Raw predictive disagreement is an ensemble diagnostic; whether it tracks epistemic error must be tested:
 
 $$U_{\text{raw}}(s_t, a_t) = \frac{1}{K} \sum_{k=1}^K \|\Delta_{\theta_k}(s_t, a_t) - \bar{\Delta}\|^2$$
 
@@ -53,7 +55,7 @@ To prevent ungrounded variance assumptions, ORACLE fits an empirical power-law c
 
 $$U_{\text{cal}}(s, a) = a \cdot U_{\text{raw}}^b + c$$
 
-where parameters $(a, b, c)$ are fitted via log-space quantile regression against held-out validation trajectories.
+The implemented fitting routine uses log-space regression and an offset, not quantile regression. Default buffers are present even when `is_calibrated=false`. Its `ece` output is mean absolute mismatch between fitted error estimates and observed errors, not a probability calibration statistic. The raw runtime output name `calibrated_uncertainty` does not itself establish calibration.
 
 #### Trajectory Imagination
 ORACLE recursively projects hypothetical action sequences $[a_0, a_1, \dots, a_{H-1}]$ forward in time:
@@ -65,7 +67,7 @@ $$\hat{R}_{\text{tot}} = \sum_{t=0}^{H-1} \hat{r}_t, \quad P_{\text{surv}} = \pr
 
 ### 2.2 POSEIDON MNEMOSYNE: 3-Tier Cognitive Memory
 
-MNEMOSYNE structures memory across three distinct biological timescales:
+MNEMOSYNE structures synthetic memory into three software components:
 
 ```
 [Observation o_t] ---> [Prediction Error e_t]
@@ -96,7 +98,7 @@ MNEMOSYNE structures memory across three distinct biological timescales:
    $$\text{LCB}_{\text{food}}(t) = \min\left(C_{\text{food}}, o_{\text{obs}} + \Delta t \cdot \max(0, \mu_{\text{food}} - z \cdot \sigma_{\text{food}})\right)$$
 
 #### Matched Lesion Assay Protocol
-To prove causal memory utility rather than correlation, MNEMOSYNE implements 5 matched assay modes:
+MNEMOSYNE implements five intervention modes intended for a future causal memory assay. Their presence and unit tests do not prove memory utility:
 - `intact`: All three tiers fully functioning.
 - `erased`: Memory reset to zero at every tick (context wiped).
 - `shifted`: Circular roll of memory embeddings (preserves vector norm and variance while severing semantic alignment).
@@ -153,12 +155,12 @@ To allow post-deployment policy improvement without destabilizing the core:
 
 ### 2.5 POSEIDON WORLDLAB: POMDP Benchmark & External Bridge
 
-WorldLab addresses benchmark saturation through environmental realism:
+WorldLab adds synthetic challenges intended to probe benchmark saturation:
 - **Fog of War**: When weather severity $> 0.65$, scent gradients from adjacent patches are masked.
 - **Sensor Noise**: Gaussian noise $\mathcal{N}(0, \sigma^2)$ injected into vital and sensory channels.
 - **Tidal Oscillations**: Patch water tables oscillate sinusoidally:
   $$W_{\text{eff}}(t) = W_{\text{base}} \cdot \left(1.0 + A_{\text{tide}} \sin\left(\frac{2\pi t}{T_{\text{tide}}}\right)\right)$$
-- **WorldBridgeProtocol**: Clean JSON/TCP socket specification for driving external 3D animal simulations and game engines with zero interface mismatch.
+- **WorldBridgeProtocol**: JSON/TCP contract for external simulation adapters. Actual compatibility requires unit, action, episode/tick and lifecycle validation for each adapter.
 
 ---
 
@@ -172,7 +174,7 @@ The benchmark evaluates six matched arms over identical pseudo-random seeds:
 5. `memory_free`: Pure reactive baseline (ablated memory)
 6. `frozen_tidal`: Frozen unaugmented Tidal baseline
 
-All runs generate an auditable cryptographic receipt in `outputs/cognitive_experiments/RECEIPT.json`.
+The benchmark produces a JSON receipt. Its current verifier validates only the recomputable digest; replay, semantic identity and outcome acceptance are pending.
 
 ---
 
@@ -180,11 +182,11 @@ All runs generate an auditable cryptographic receipt in `outputs/cognitive_exper
 
 | Subsystem | Module | Key Innovation |
 | :--- | :--- | :--- |
-| **ORACLE** | `poseidon/oracle.py` | Bootstrapped $K$-head world model, quantile calibration, recursive imagination |
+| **ORACLE** | `poseidon/oracle.py` | Initialized runtime heads, fitted error curve, recursive imagination; trained research artifact is separate |
 | **MNEMOSYNE** | `poseidon/mnemosyne.py` | 3-tier memory (working GRU, episodic store, spatial map), 5 matched lesion assays |
 | **HORIZON-X** | `poseidon/horizon_x.py` | Multi-horizon risk planner, dynamic metabolic reserve modulation ($\lambda_t$) |
 | **ADAPT** | `poseidon/adapt.py` | Residual adapter, anti-forgetting anchor dataset ($D_{\text{KL}}$), promotion gate |
 | **NEURO** | `poseidon/neuro.py` | Watts-Strogatz small-world connectome mask, neuromodulated gain routing |
 | **WORLDLAB** | `poseidon/worldlab.py` | POMDP TidePool (fog-of-war, tides, sensor noise), WorldBridge TCP/JSON protocol |
 | **AGENT** | `poseidon/cognitive_agent.py`| Master coordinator unifying all subsystems around frozen Tidal core |
-| **EXPERIMENT**| `poseidon/cognitive_experiment.py`| 6-arm matched lesion assay benchmark, cryptographic receipt verification |
+| **EXPERIMENT**| `poseidon/cognitive_experiment.py`| 6-arm benchmark and checksum verifier; replay and causal memory evidence pending |

@@ -133,6 +133,8 @@ class EpisodeSplit:
 
 
 def assert_disjoint_splits(splits: Mapping[str, EpisodeSplit]) -> dict[str, list[int]]:
+    if not splits:
+        raise ValueError("episode partitions cannot be empty")
     seen: dict[int, str] = {}
     manifest: dict[str, list[int]] = {}
     for name, split in splits.items():
@@ -161,10 +163,10 @@ def split_fingerprint(split: EpisodeSplit) -> str:
     return digest.hexdigest()
 
 
-def split_summary(split: EpisodeSplit) -> dict:
+def split_summary(split: EpisodeSplit, *, include_exposure: bool = False) -> dict:
     split.validate()
     rows = [row for episode in split.episodes for row in episode.transitions]
-    return {
+    result = {
         "name": split.name,
         "episode_seeds": [episode.seed for episode in split.episodes],
         "episodes": len(split.episodes),
@@ -173,3 +175,16 @@ def split_summary(split: EpisodeSplit) -> dict:
         "scarcity_values": sorted({float(episode.scarcity) for episode in split.episodes}),
         "sha256": split_fingerprint(split),
     }
+    # Legacy fingerprints and summaries remain byte-for-byte interpretable.
+    if include_exposure:
+        result.update({
+            "action_counts": [sum(row.action == action for row in rows) for action in range(len(ACTIONS))],
+            "death_count_by_action": [sum(row.death and row.action == action for row in rows) for action in range(len(ACTIONS))],
+            "truncations": sum(row.truncated for row in rows),
+            "per_episode": [{"seed": episode.seed, "steps": len(episode.transitions),
+                             "death": episode.transitions[-1].death,
+                             "action_counts": [sum(row.action == action for row in episode.transitions)
+                                               for action in range(len(ACTIONS))]}
+                            for episode in split.episodes],
+        })
+    return result
