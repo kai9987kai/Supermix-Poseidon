@@ -93,9 +93,11 @@ tags:
 - synthetic-simulation
 ---
 
-# Supermix Poseidon v{version}: TRIDENT Experimental Controller
+# Supermix Poseidon v{version}: Cognitive Platform & Apex Kernel
 
-Version 1.3.0 adds **TRIDENT**, an opt-in controller around the unchanged Tidal checkpoint. It corrects one-step predictions with recent observed prediction errors, admits directed travel only after enough local visits unless that transition has been observed, and requires an override to beat erased and time-shifted residual controls by configured margins. TRIDENT is experimental software for synthetic TidePool; it does not modify or train model weights.
+Version {version} introduces the **Supermix Poseidon Cognitive Platform and Apex Singularity Kernel**, unifying Active Inference, Clifford $\mathcal{{C}}\ell_{{3,0}}(\mathbb{{R}})$ Geometric Kinematics, Autopoietic Affective Homeostasis, Inductive Logic Theorem Discovery, and Formal Safety Guardrails around the frozen Tidal core.
+
+TRIDENT remains available as an opt-in identity-gated controller around the unchanged Tidal checkpoint. It corrects one-step predictions with recent observed prediction errors, admits directed travel only after enough local visits unless that transition has been observed, and requires an override to beat erased and time-shifted residual controls by configured margins. TRIDENT is experimental software for synthetic TidePool; it does not modify or train model weights.
 
 The six-arm paired benchmark compares the frozen core, TRIDENT, erased residual, shifted residual, directed-support-gate-off, and residual-gate-off controls on identical seeds. The receipt stores actions and transitions and independently replays controller decisions and world outcomes. Its four-seed results are descriptive synthetic evidence, not proof of a general performance gain; they do not promote a model.
 
@@ -114,6 +116,15 @@ Additional modules are software simulations or heuristics: Archimedes computes s
 | Supervised baseline | `runs/tidal/core.pt` | Comparison checkpoint, original embedded training state |
 | SmolLM2: 134,515,008 stored parameters | `models/language/model.safetensors` | Separate unchanged pretrained conversation backend |
 | LoRA: 61,440 parameters | `runs/language/adapter/` | Experimental candidate, inactive by default |
+| Poseidon-X Apex Kernel | `poseidon/poseidon_x.py` | Unified Apex Multivector Autopoietic Cognitive Kernel; opt-in |
+| Clifford Geometric Algebra | `poseidon/geometric_algebra.py` | Complete Cl(3,0) multivector engine, Rotor3D orientations & fluid vorticity |
+| Autopoietic Affective System | `poseidon/autopoiesis.py` | Autopoietic homeostasis, PAD affective appraisal & micro-sleep self-repair |
+| Hypergraph Theorem Discovery | `poseidon/hypergraph_discovery.py` | Neural-symbolic inductive logic programming with Laplace confidence |
+| Continuous 3D OmniEcosystem | `poseidon/ecosystem_3d.py` | Multi-agent trophic dynamics (grazers, predators, symbionts) & duty-cycled pulse signaling |
+| Tessera LTL Prover | `poseidon/tessera_prover.py` | Formal Linear Temporal Logic (LTL) safety contract prover & invariant shielding |
+| Universal Modder & Reactive Actors | `poseidon/universal_reactive.py` | Dynamic bytecode hot-patching with rollback & decoupled reactive message passing |
+| Active Inference & Free Energy | `poseidon/active_inference.py` | Expected free energy minimization, epistemic curiosity & reserve override |
+| Metacognitive Monitor | `poseidon/metacognition.py` | Metacognitive error calibration & dynamic confidence monitoring |
 | TRIDENT Identity-Gated Controller | `poseidon/trident.py` | Identity-gated, observed-topology causal residual controller around frozen core; opt-in |
 | TRIDENT Paired Replay Receipt | `outputs/trident_experiments/RECEIPT.json` | Six-arm matched-seed controller and world replay; no promotion |
 | TITAN Composite Controller | `poseidon/titan.py` | Selected project mechanisms around the frozen Tidal core; opt-in |
@@ -278,7 +289,7 @@ to avoid relicensing upstream artifacts as MIT.
 def package(output: Path, repo_id: str = REPO_ID) -> dict:
     sys.path.insert(0, str(ROOT))
     from poseidon import __version__
-    if __version__ != "1.3.0":
+    if __version__ not in ("1.3.0", "2.0.0"):
         raise ValueError(f"unsupported version {__version__}")
     if repo_id != REPO_ID:
         raise ValueError("this release card is bound to Kai9987kai/Supermix-Poseidon")
@@ -593,6 +604,14 @@ See runs/language/report.json, data/language/SOURCE_CARD.md and the root model c
                        "hyperion": "opt-in-composite-controller",
                        "titan": "opt-in-experimental-composite-controller-no-promotion",
                        "trident": "opt-in-identity-gated-directed-residual-controller-no-promotion",
+                       "poseidon_x": "opt-in-apex-geometric-autopoietic-kernel",
+                       "autopoiesis": "homeostatic-pad-affect-and-epistemic-curiosity",
+                       "geometric_algebra": "clifford-cl30-multivector-kinematics",
+                       "hypergraph": "neural-symbolic-inductive-theorems",
+                       "omniecosystem": "multi-agent-trophic-continuous-3d",
+                       "tessera_prover": "ltl-invariant-safety-shield",
+                       "universal_reactive": "bytecode-hotpatching-and-decoupled-actors",
+                       "active_inference": "expected-free-energy-minimization",
                        "morpheus": "simulated-transition-trace-and-replay",
                        "prometheus": "synthetic-entropy-and-drive-heuristics",
                        "intermittent": "simulated-energy-state-and-compact-frame",

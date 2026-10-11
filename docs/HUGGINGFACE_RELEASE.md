@@ -1,12 +1,12 @@
 # Hugging Face release procedure
 
-Poseidon is a custom PyTorch runtime package hosted at [Kai9987kai/Supermix-Poseidon](https://huggingface.co/Kai9987kai/Supermix-Poseidon). The repository root is not a Transformers `AutoModel` checkpoint. The v1.3.0 release adds the opt-in TRIDENT controller with identity-gated directed residual control and a replayable six-arm TidePool experiment; it does not replace or retrain the selected Tidal core.
+Poseidon is a custom PyTorch runtime package hosted at [Kai9987kai/Supermix-Poseidon](https://huggingface.co/Kai9987kai/Supermix-Poseidon). The repository root is not a Transformers `AutoModel` checkpoint. The v2.0.0 release adds the Supermix Poseidon Cognitive Platform and Apex Singularity Kernel, integrating Active Inference, Clifford Cl(3,0) Geometric Kinematics, Autopoietic Affective Homeostasis, Inductive Logic Theorem Discovery, and Formal Safety Guardrails around the unchanged selected Tidal core.
 
 ## Download and run
 
 ```powershell
 python -m pip install huggingface-hub
-hf download Kai9987kai/Supermix-Poseidon --revision v1.3.0 --local-dir Poseidon-release
+hf download Kai9987kai/Supermix-Poseidon --revision v2.0.0 --local-dir Poseidon-release
 Set-Location Poseidon-release
 python -m pip install -e .
 python tools/verify_huggingface_release.py . --smoke
@@ -30,12 +30,12 @@ The receipt is bound to the active Tidal checkpoint and TidePool source bytes. I
 Start with a clean Git checkout and a completed `outputs/trident_experiments/RECEIPT.json`. The packager checks the active checkpoints, pinned upstream language files, existing experiment evidence, and the TRIDENT receipt. It rejects dirty source so the manifest can bind a commit.
 
 ```powershell
-python tools/package_huggingface.py --output outputs/releases/poseidon-v1.3.0
-python tools/verify_huggingface_release.py outputs/releases/poseidon-v1.3.0 --smoke
-hf upload Kai9987kai/Supermix-Poseidon outputs/releases/poseidon-v1.3.0 . --commit-message "Release Poseidon v1.3.0 with replayable TRIDENT evaluation"
+python tools/package_huggingface.py --output outputs/releases/poseidon-v2.0.0
+python tools/verify_huggingface_release.py outputs/releases/poseidon-v2.0.0 --smoke
+hf upload Kai9987kai/Supermix-Poseidon outputs/releases/poseidon-v2.0.0 . --commit-message "Release Poseidon v2.0.0 Cognitive Platform & Apex Singularity Kernel"
 ```
 
-After upload, verify the Hub's new commit SHA, `v1.3.0` tag, model card, manifest, file inventory, and remote file hashes against the local release package. A local package or successful CLI upload alone is not proof that publication completed. Preserve the existing Hub history and release assets; do not force-push.
+After upload, verify the Hub's new commit SHA, `v2.0.0` tag, model card, manifest, file inventory, and remote file hashes against the local release package. A local package or successful CLI upload alone is not proof that publication completed. Preserve the existing Hub history and release assets; do not force-push.
 
 ## Scope and licensing
 
