@@ -23,7 +23,10 @@ from .active_inference import ActiveInferenceConfig, ActiveInferenceEvaluator
 from .causal_scm import CausalAttribution, StructuralCausalModel
 from .core import CoreRuntime, active_core_path
 from .genesis_3d import ContinuousTidePool3D
+from .ghost_monologue import GhostIntrospectionEngine, IntrospectiveAudit, LatentDrives
 from .guardrails import FormalSafetyGuard, GuardrailAudit
+from .morpheus_replay import MorpheusSleepEngine, OneiricSleepReport
+from .phase_plane import PhasePlaneEngine, PhaseStateAudit
 from .horizon_x import HorizonXConfig, HorizonXPlanner
 from .metacognition import MetacognitiveMonitor, MetacognitiveState
 from .mnemosyne import MnemosyneConfig, MnemosyneMemory
@@ -54,6 +57,12 @@ class HyperDecision:
     alert_level: str
     guardrail_veto: bool
     candidates: list[dict[str, Any]]
+    phase_regime: str = "transient_orbit"
+    lyapunov_drift: float = 0.0
+    separatrix_distance: float = 1.0
+    dominant_drive: str = "nominal"
+    monologue: str = ""
+    sleep_cycles: int = 0
 
     def __int__(self) -> int:
         return self.action
@@ -78,6 +87,12 @@ class HyperDecision:
             "morphogenesis_state": self.morphogenesis_state,
             "alert_level": self.alert_level,
             "guardrail_veto": self.guardrail_veto,
+            "phase_regime": self.phase_regime,
+            "lyapunov_drift": round(self.lyapunov_drift, 5),
+            "separatrix_distance": round(self.separatrix_distance, 4),
+            "dominant_drive": self.dominant_drive,
+            "monologue": self.monologue,
+            "sleep_cycles": self.sleep_cycles,
             "candidates": self.candidates,
         }
 
@@ -107,6 +122,9 @@ class HyperAgent:
         self.causeway = StructuralCausalModel()
         self.quantum = QuantumSuperpositionPlanner()
         self.molt = MorphogeneticAdapter(in_dim=OBS_SIZE, out_dim=N_ACTIONS, initial_hidden=64)
+        self.phase_plane = PhasePlaneEngine()
+        self.ghost = GhostIntrospectionEngine()
+        self.morpheus = MorpheusSleepEngine()
 
         # Runtime transition cache
         self.last_observation: list[float] | None = None
@@ -118,6 +136,9 @@ class HyperAgent:
         """Resets the agent's internal episodic state."""
         self.mnemosyne.reset()
         self.metacognition = MetacognitiveMonitor()
+        self.phase_plane.reset()
+        self.ghost.reset()
+        self.morpheus.reset()
         self.last_observation = None
         self.predicted_next_obs = None
         self.last_causal_attribution = None
@@ -129,9 +150,10 @@ class HyperAgent:
         obs_t = torch.tensor(obs_list, dtype=torch.float32).reshape(1, -1)
         self.step_counter += 1
 
-        # 1. Memory and Metacognitive State
+        # 1. Memory, Metacognitive State & Phase-Plane Analysis
         mem_info = self.mnemosyne.step_observation(obs_list, self.predicted_next_obs)
         meta_state = self.metacognition.evaluate_state(obs_list)
+        phase_audit = self.phase_plane.analyze_phase_space(obs_list)
 
         # 2. MOLT Morphogenesis Trigger
         morph_state = self.molt.step_metacognitive_trigger(
@@ -188,18 +210,20 @@ class HyperAgent:
             )
             efe_evals.append(efe_val)
 
-        # 9. Unified Candidate Scoring Synthesis
-        # S(a) = S_horizon(a) + alpha_efe * EFE(a) + gamma_quantum * Gain_quantum(a)
+        # 9. Unified Multi-Plane Candidate Scoring Synthesis
+        # S(a) = S_horizon(a) + alpha_efe * EFE(a) + gamma_quantum * Gain_quantum(a) - beta_phase * dL/dt(a)
         alpha_efe = self.active_inference.config.active_inference_blend
         gamma_quantum = 0.15
+        beta_phase = 0.08
 
         synthesized_candidates = []
         for act_idx in range(N_ACTIONS):
             hx_score = plan_out["candidate_evaluations"][act_idx]["composite_score"]
             efe_score = efe_evals[act_idx]["free_energy_objective"]
             q_gain = quantum_res["branches"][act_idx]["interference_gain"]
+            phase_drift = phase_audit.action_phase_drifts[act_idx]
 
-            total_score = hx_score + (alpha_efe * efe_score) + (gamma_quantum * q_gain)
+            total_score = hx_score + (alpha_efe * efe_score) + (gamma_quantum * q_gain) - (beta_phase * phase_drift)
             synthesized_candidates.append({
                 "action": act_idx,
                 "action_name": ACTIONS[act_idx],
@@ -207,6 +231,7 @@ class HyperAgent:
                 "hx_score": hx_score,
                 "efe_score": efe_score,
                 "quantum_gain": q_gain,
+                "phase_drift": phase_drift,
                 "predicted_health": predicted_healths[act_idx],
             })
 
@@ -230,6 +255,22 @@ class HyperAgent:
         final_action = guard_audit.action
         final_override = override or guard_audit.vetoed
 
+        # 11. Ghost in the Machine Introspective Monologue Synthesis
+        ghost_audit = self.ghost.synthesize_monologue(
+            obs=obs_list,
+            phase_audit=phase_audit,
+            quantum_coherence=quantum_res["branches"][final_action]["coherence"],
+            quantum_gain=quantum_res["branches"][final_action]["interference_gain"],
+            causal_effect=float(causeway_predictions[final_action][0] - causeway_predictions[0][0]),
+            active_neurons=self.molt.current_hidden,
+            morph_state=morph_state,
+            chosen_action=final_action,
+            base_action=base_action,
+            override=final_override,
+            guardrail_veto=guard_audit.vetoed,
+            surprise=mem_info["surprise"],
+        )
+
         # Construct decision
         decision = HyperDecision(
             action=final_action,
@@ -247,6 +288,12 @@ class HyperAgent:
             morphogenesis_state=morph_state,
             alert_level=meta_state.alert_level,
             guardrail_veto=guard_audit.vetoed,
+            phase_regime=phase_audit.stability_regime,
+            lyapunov_drift=phase_audit.lyapunov_drift,
+            separatrix_distance=phase_audit.separatrix_distance,
+            dominant_drive=ghost_audit.drives.dominant_drive,
+            monologue=ghost_audit.monologue,
+            sleep_cycles=self.morpheus.sleep_cycle_counter,
             candidates=synthesized_candidates,
         )
 
@@ -275,6 +322,15 @@ class HyperAgent:
             wm_res = self.oracle(torch.zeros(1, self.oracle.config.latent_size), obs_t, a_t)
             d = wm_res["mean_delta"].squeeze(0)
             self.predicted_next_obs = torch.clamp(obs_t.squeeze(0) + d, 0.0, 1.0).tolist()
+
+        # Check for sleep onset & offline counterfactual dream consolidation
+        stamina_val = obs[3] if len(obs) > 3 else 0.5
+        if self.morpheus.is_sleep_indicated(action, stamina_val):
+            self.morpheus.execute_sleep_cycle(
+                episodic_records=self.mnemosyne.episodic.records,
+                causeway_scm=self.causeway,
+                morph_adapter=self.molt,
+            )
 
     def rollout_3d(self, env: ContinuousTidePool3D, max_steps: int = 64) -> dict[str, Any]:
         """Rolls out the HyperAgent inside the Continuous 3D Genesis environment."""
