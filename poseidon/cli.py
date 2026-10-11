@@ -24,6 +24,7 @@ def main():
         "trident-experiment", "verify-trident",
         "cognitive-experiment", "verify-cognitive",
         "oracle-fit", "oracle-evaluate", "verify-oracle-fit", "verify-oracle-evaluation",
+        "hyper-experiment", "world-3d",
     ])
     p.add_argument("prompt", nargs="?", default="")
     p.add_argument("--root", default=".")
@@ -32,7 +33,7 @@ def main():
     p.add_argument("--episodes", type=int, default=None)
     p.add_argument("--scarcity", type=float, default=None)
     p.add_argument("--adapter")
-    p.add_argument("--planner", choices=["policy", "mpc", "hybrid", "risk_aware", "uncertainty", "atlas", "contrast", "horizon", "odyssey", "helm", "odysseus", "aura", "metamorph", "chimera", "hyperion", "titan", "trident", "cognitive"], default="policy", help="world simulation planner")
+    p.add_argument("--planner", choices=["policy", "mpc", "hybrid", "risk_aware", "uncertainty", "atlas", "contrast", "horizon", "odyssey", "helm", "odysseus", "aura", "metamorph", "chimera", "hyperion", "titan", "trident", "cognitive", "hyper"], default="policy", help="world simulation planner")
     p.add_argument("--use-pomdp", action="store_true", help="use partially observable POMDP TidePool environment")
     p.add_argument("--max-steps", type=int, default=None)
     p.add_argument("--anchors", type=int, default=24)
@@ -67,9 +68,10 @@ def main():
                      "metamorph-experiment": 199000001, "chimera-experiment": 202000001,
                      "hyperion-experiment": 303000001, "titan-experiment": 99000000,
                      "trident-experiment": 88000000, "cognitive-experiment": 90000000,
-                     "oracle-fit": 442000000, "oracle-evaluate": 442000000}
+                     "oracle-fit": 442000000, "oracle-evaluate": 442000000,
+                     "hyper-experiment": 90000001, "world-3d": 42}
     args.seed = args.seed if args.seed is not None else default_seeds.get(args.command, 42)
-    args.episodes = args.episodes if args.episodes is not None else (4 if args.command in ("experiment", "contrast-experiment", "horizon-experiment", "odyssey-experiment", "helm-experiment", "odysseus-experiment", "aura-experiment", "metamorph-experiment", "chimera-experiment", "hyperion-experiment", "titan-experiment", "trident-experiment", "cognitive-experiment") else 100)
+    args.episodes = args.episodes if args.episodes is not None else (4 if args.command in ("experiment", "contrast-experiment", "horizon-experiment", "odyssey-experiment", "helm-experiment", "odysseus-experiment", "aura-experiment", "metamorph-experiment", "chimera-experiment", "hyperion-experiment", "titan-experiment", "trident-experiment", "cognitive-experiment", "hyper-experiment") else 100)
     args.scarcity = args.scarcity if args.scarcity is not None else (1.0 if args.command == "world" else 2.5)
     args.calibration_episodes = args.calibration_episodes if args.calibration_episodes is not None else (8 if args.command in ("contrast-fit", "horizon-fit", "odyssey-fit", "fit-helm", "fit-odysseus") else 6)
 
@@ -497,9 +499,22 @@ def main():
         print(json.dumps({"verified": verify_cognitive_receipt(data), "sha256": data.get("sha256")}, indent=2))
         return
 
-    if args.command in ("experiment", "contrast-experiment", "horizon-experiment", "odyssey-experiment", "helm-experiment", "odysseus-experiment", "aura-experiment", "metamorph-experiment", "chimera-experiment", "hyperion-experiment", "titan-experiment", "trident-experiment", "cognitive-experiment"):
+    if args.command == "world-3d":
+        from .genesis_3d import ContinuousTidePool3D
         runtime = Poseidon(args.root)
-        if args.command == "cognitive-experiment":
+        agent = runtime.hyper_agent()
+        env = ContinuousTidePool3D(seed=args.seed)
+        result = agent.rollout_3d(env, max_steps=args.max_steps if args.max_steps is not None else 64)
+        print(json.dumps({k: v for k, v in result.items() if k != "decisions"}, indent=2))
+        return
+
+    if args.command in ("experiment", "contrast-experiment", "horizon-experiment", "odyssey-experiment", "helm-experiment", "odysseus-experiment", "aura-experiment", "metamorph-experiment", "chimera-experiment", "hyperion-experiment", "titan-experiment", "trident-experiment", "cognitive-experiment", "hyper-experiment"):
+        runtime = Poseidon(args.root)
+        if args.command == "hyper-experiment":
+            result = runtime.hyper_experiment(args.seed, args.episodes, args.max_steps if args.max_steps is not None else 64, args.scarcity)
+            print(json.dumps(result, indent=2))
+            return
+        elif args.command == "cognitive-experiment":
             result = runtime.cognitive_experiment(args.seed, args.episodes, args.max_steps if args.max_steps is not None else 32, args.scarcity, use_pomdp=args.use_pomdp)
             print(json.dumps(result, indent=2))
             return

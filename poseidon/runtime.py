@@ -306,6 +306,23 @@ class Poseidon:
                 "error": "Cognitive experiment receipt is malformed.",
             }
 
+    def hyper_agent(self):
+        from .hyper_agent import HyperAgent
+        return HyperAgent(core=self.core())
+
+    def hyper_agent_status(self):
+        return {
+            "ready": True,
+            "version": "3.0.0",
+            "type": "hyper_causal_quantum_morphogenetic_agent",
+            "subsystems": [
+                "causal_scm", "quantum_planner", "morphogenesis", "molt",
+                "active_inference_fep", "horizon_x", "metacognition",
+                "mnemosyne_3tier", "tessera_guardrails", "genesis_3d"
+            ],
+            "core_frozen": True,
+        }
+
     def mnemorph_status(self):
         relative = "outputs/mnemorph/RECEIPT.json"
         path = self.root / relative
@@ -1054,6 +1071,22 @@ class Poseidon:
         finally:
             self.lock.release()
 
+    def hyper_experiment(self, seed=90000001, episodes=4, max_steps=64, scarcity=2.5):
+        from .hyper_experiment import run_hyper_experiment
+        from .world import _integer, _number
+        seed = _integer(seed, "seed", 0, 2**63 - 9)
+        episodes = _integer(episodes, "episodes", 1, 32)
+        max_steps = _integer(max_steps, "max_steps", 1, 512)
+        scarcity = _number(scarcity, "scarcity", .5, 4)
+        with self.lock:
+            return run_hyper_experiment(
+                seed=seed,
+                episodes=episodes,
+                max_steps=max_steps,
+                scarcity=scarcity,
+                core=self.core(),
+            )
+
     def _candidate_status(self, name):
         """Readiness may be cached while a world or experiment owns the model."""
         relative = f"outputs/{name}/atlas.json"
@@ -1226,10 +1259,14 @@ class Poseidon:
                 from .world_controls import rollout_with_decisions
                 _integer(max_steps, "max_steps", 1, 10000)
                 scarcity = _number(scarcity, "scarcity", .5, 4)
-                if planner not in ("policy", "mpc", "hybrid", "risk_aware", "uncertainty", "atlas", "contrast", "horizon", "odyssey", "helm", "odysseus", "aura", "metamorph", "chimera", "hyperion", "titan", "trident", "cognitive"):
+                if planner not in ("policy", "mpc", "hybrid", "risk_aware", "uncertainty", "atlas", "contrast", "horizon", "odyssey", "helm", "odysseus", "aura", "metamorph", "chimera", "hyperion", "titan", "trident", "cognitive", "hyper"):
                     raise ValueError("Unknown survival planner.")
                 core = self.core()
-                if planner == "cognitive":
+                if planner == "hyper":
+                    controller = self.hyper_agent()
+                    controller.reset()
+                    backend_desc = "Supermix Poseidon v3.0 Apex Causal-Quantum Morphogenetic Agent in TidePool"
+                elif planner == "cognitive":
                     controller = self.cognitive_agent()
                     controller.reset()
                     backend_desc = "Supermix Poseidon v2.0 Cognitive Agent (Oracle + Mnemosyne + Horizon-X + Neuro) in TidePool"
@@ -1293,7 +1330,7 @@ class Poseidon:
                 else:
                     controller = core
                     backend_desc = "learned Tidal policy in TidePool"
-                if planner in ("titan", "trident", "cognitive"):
+                if planner in ("titan", "trident", "cognitive", "hyper"):
                     from .world_controls import rollout_with_observed_transitions
                     episode = rollout_with_observed_transitions(controller, seed=seed, max_steps=max_steps, scarcity=scarcity)
                 else:
