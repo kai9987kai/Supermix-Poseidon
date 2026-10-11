@@ -69,6 +69,30 @@ def make_handler(runtime, port):
                 except Exception as error:
                     self.send_json(500, {"error": str(error), "type": type(error).__name__})
                 return
+            if path == "/api/autopoiesis/affect":
+                try:
+                    from .autopoiesis import AutopoieticEngine
+                    engine = AutopoieticEngine()
+                    audit = engine.update([1.0, 0.85, 0.85, 0.9])
+                    self.send_json(200, {
+                        "affect": audit.affect.to_dict(),
+                        "negentropy_flux": audit.negentropy_flux,
+                        "curiosity_drive": audit.curiosity_drive,
+                        "hypotheses": audit.hypotheses_generated,
+                    })
+                except Exception as error:
+                    self.send_json(500, {"error": str(error), "type": type(error).__name__})
+                return
+            if path == "/api/hypergraph/theorems":
+                try:
+                    from .hypergraph_discovery import InductiveHypergraphEngine
+                    engine = InductiveHypergraphEngine()
+                    engine.ingest_trajectory([{"action": 0, "stamina": 0.5, "next_stamina": 0.55}])
+                    kg = engine.export_jsonld_knowledge_graph()
+                    self.send_json(200, kg)
+                except Exception as error:
+                    self.send_json(500, {"error": str(error), "type": type(error).__name__})
+                return
             if path in ("/", "/index.html", "/style.css", "/app.js"):
                 file = WEB/("index.html" if path in ("/", "/index.html") else path[1:])
             elif path.startswith("/artifacts/"):
@@ -149,12 +173,17 @@ def make_handler(runtime, port):
                 except RuntimeError as error:
                     self.send_json(409, {"error": str(error)})
                 return
-            if self.path not in ("/api/respond", "/api/remember", "/api/experiment", "/api/contrast-experiment", "/api/horizon-experiment", "/api/odyssey-experiment", "/api/helm-experiment", "/api/odysseus-experiment", "/api/mco-experiment", "/api/aura-experiment", "/api/tessera-experiment", "/api/mnemorph-experiment", "/api/metamorph-experiment", "/api/chimera-experiment", "/api/hyperion-experiment", "/api/titan-experiment", "/api/trident-experiment", "/api/cognitive-experiment", "/api/ecosystem-experiment", "/api/tessera/shield"):
+            if self.path not in ("/api/respond", "/api/remember", "/api/experiment", "/api/contrast-experiment", "/api/horizon-experiment", "/api/odyssey-experiment", "/api/helm-experiment", "/api/odysseus-experiment", "/api/mco-experiment", "/api/aura-experiment", "/api/tessera-experiment", "/api/mnemorph-experiment", "/api/metamorph-experiment", "/api/chimera-experiment", "/api/hyperion-experiment", "/api/titan-experiment", "/api/trident-experiment", "/api/cognitive-experiment", "/api/ecosystem-experiment", "/api/tessera/shield", "/api/poseidon-x-experiment"):
                 self.send_json(404, {"error": "Not found"}); return
             if not busy.acquire(blocking=False):
                 self.send_json(409, {"error": "Poseidon is processing another request. Try again shortly."}); return
             try:
-                if self.path == "/api/ecosystem-experiment":
+                if self.path == "/api/poseidon-x-experiment":
+                    assert_source_current()
+                    episodes = payload.get("episodes", 2)
+                    max_steps = payload.get("max_steps", 32)
+                    result = runtime.poseidon_x_experiment(seed=payload.get("seed", 101), episodes=episodes, max_steps=max_steps)
+                elif self.path == "/api/ecosystem-experiment":
                     assert_source_current()
                     episodes = payload.get("episodes", 2)
                     max_steps = payload.get("max_steps", 32)

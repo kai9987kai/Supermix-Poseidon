@@ -344,6 +344,34 @@ class Poseidon:
             seeds = list(range(seed, seed + episodes))
             return run_ecosystem_experiment(seeds=seeds, steps_per_episode=max_steps)
 
+    def poseidon_x(self):
+        from .poseidon_x import PoseidonXKernel
+        return PoseidonXKernel(core=self.core())
+
+    def poseidon_x_status(self):
+        return {
+            "ready": True,
+            "version": "5.0.0",
+            "type": "apex_multivector_autopoietic_neural_symbolic_kernel",
+            "lineages": [
+                "clifford_geometric_algebra_cl30",
+                "autopoietic_pad_affect_homeostasis",
+                "intrinsic_epistemic_curiosity",
+                "neural_symbolic_hypergraph_theorems",
+                "tessera_ltl_invariant_shield",
+                "quantum_grover_tree_superposition",
+                "causal_scm_pearl_do_calculus",
+                "topological_betti_memory_observatory",
+            ],
+            "core_frozen": True,
+        }
+
+    def poseidon_x_experiment(self, seed: int = 101, episodes: int = 2, max_steps: int = 32):
+        from .poseidon_x_experiment import run_poseidon_x_experiment
+        with self.lock:
+            seeds = list(range(seed, seed + episodes))
+            return run_poseidon_x_experiment(seeds=seeds, max_steps=max_steps)
+
     def mnemorph_status(self):
         relative = "outputs/mnemorph/RECEIPT.json"
         path = self.root / relative
@@ -1241,7 +1269,7 @@ class Poseidon:
             core_ready = active_core_path(self.root).is_file()
         except (ValueError, TypeError, OSError) as error:
             core_ready, core_error = False, str(error)
-        result = {"version": __version__, "name": "Supermix Poseidon", "language_ready": (self.root/"models/language/model.safetensors").exists(), "core_ready": core_ready, "atlas": self.atlas_status(), "contrast": self.contrast_status(), "horizon": self.horizon_status(), "odyssey": self.odyssey_status(), "helm": self.helm_status(), "odysseus": self.odysseus_status(), "mco": self.mco_status(), "aura": self.aura_status(), "tessera": self.tessera_status(), "mnemorph": self.mnemorph_status(), "metamorph": self.metamorph_status(), "chimera": self.chimera_status(), "hyperion": self.hyperion_status(), "titan": self.titan_status(), "trident": self.trident_status(), "hyper_agent": self.hyper_agent_status(), "ecosystem": self.ecosystem_status(), "reports": reports, "limits": "Experimental composite system. Controlled geometric media. Tool-assisted maths. Synthetic survival."} | source_status()
+        result = {"version": __version__, "name": "Supermix Poseidon", "language_ready": (self.root/"models/language/model.safetensors").exists(), "core_ready": core_ready, "atlas": self.atlas_status(), "contrast": self.contrast_status(), "horizon": self.horizon_status(), "odyssey": self.odyssey_status(), "helm": self.helm_status(), "odysseus": self.odysseus_status(), "mco": self.mco_status(), "aura": self.aura_status(), "tessera": self.tessera_status(), "mnemorph": self.mnemorph_status(), "metamorph": self.metamorph_status(), "chimera": self.chimera_status(), "hyperion": self.hyperion_status(), "titan": self.titan_status(), "trident": self.trident_status(), "hyper_agent": self.hyper_agent_status(), "ecosystem": self.ecosystem_status(), "poseidon_x": self.poseidon_x_status(), "reports": reports, "limits": "Experimental composite system. Controlled geometric media. Tool-assisted maths. Synthetic survival."} | source_status()
         if core_error:
             result["core_error"] = core_error
         return result
@@ -1280,10 +1308,14 @@ class Poseidon:
                 from .world_controls import rollout_with_decisions
                 _integer(max_steps, "max_steps", 1, 10000)
                 scarcity = _number(scarcity, "scarcity", .5, 4)
-                if planner not in ("policy", "mpc", "hybrid", "risk_aware", "uncertainty", "atlas", "contrast", "horizon", "odyssey", "helm", "odysseus", "aura", "metamorph", "chimera", "hyperion", "titan", "trident", "cognitive", "hyper"):
+                if planner not in ("policy", "mpc", "hybrid", "risk_aware", "uncertainty", "atlas", "contrast", "horizon", "odyssey", "helm", "odysseus", "aura", "metamorph", "chimera", "hyperion", "titan", "trident", "cognitive", "hyper", "poseidon_x"):
                     raise ValueError("Unknown survival planner.")
                 core = self.core()
-                if planner == "hyper":
+                if planner == "poseidon_x":
+                    controller = self.poseidon_x()
+                    controller.reset()
+                    backend_desc = "Supermix Poseidon v5.0 Apex Multivector Autopoietic Cognitive Kernel in TidePool"
+                elif planner == "hyper":
                     controller = self.hyper_agent()
                     controller.reset()
                     backend_desc = "Supermix Poseidon v3.0 Apex Causal-Quantum Morphogenetic Agent in TidePool"
@@ -1351,7 +1383,7 @@ class Poseidon:
                 else:
                     controller = core
                     backend_desc = "learned Tidal policy in TidePool"
-                if planner in ("titan", "trident", "cognitive", "hyper"):
+                if planner in ("titan", "trident", "cognitive", "hyper", "poseidon_x"):
                     from .world_controls import rollout_with_observed_transitions
                     episode = rollout_with_observed_transitions(controller, seed=seed, max_steps=max_steps, scarcity=scarcity)
                 else:

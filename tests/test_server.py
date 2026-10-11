@@ -131,4 +131,14 @@ def test_ecosystem_and_memory_endpoints(server):
     assert shield_res["certified_action"] == 1
     assert len(shield_res["certificate_sha256"]) == 64
 
+    # Test GET /api/autopoiesis/affect
+    aff_res = json.load(urlopen(url+"/api/autopoiesis/affect"))
+    assert "affect" in aff_res
+    assert "curiosity_drive" in aff_res
+
+    # Test GET /api/hypergraph/theorems
+    thm_res = json.load(urlopen(url+"/api/hypergraph/theorems"))
+    assert "@graph" in thm_res
+    assert len(thm_res["@graph"]) >= 4
+
 

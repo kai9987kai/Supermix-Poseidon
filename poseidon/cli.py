@@ -26,6 +26,7 @@ def main():
         "oracle-fit", "oracle-evaluate", "verify-oracle-fit", "verify-oracle-evaluation",
         "hyper-experiment", "world-3d",
         "ecosystem-experiment", "verify-ecosystem", "world-ecosystem",
+        "poseidon-x-experiment", "verify-poseidon-x", "world-multivector",
         "nexus-omega-assay", "verify-nexus-omega",
         "nexus-omega-discovery", "verify-nexus-omega-discovery",
     ])
@@ -36,7 +37,7 @@ def main():
     p.add_argument("--episodes", type=int, default=None)
     p.add_argument("--scarcity", type=float, default=None)
     p.add_argument("--adapter")
-    p.add_argument("--planner", choices=["policy", "mpc", "hybrid", "risk_aware", "uncertainty", "atlas", "contrast", "horizon", "odyssey", "helm", "odysseus", "aura", "metamorph", "chimera", "hyperion", "titan", "trident", "cognitive", "hyper"], default="policy", help="world simulation planner")
+    p.add_argument("--planner", choices=["policy", "mpc", "hybrid", "risk_aware", "uncertainty", "atlas", "contrast", "horizon", "odyssey", "helm", "odysseus", "aura", "metamorph", "chimera", "hyperion", "titan", "trident", "cognitive", "hyper", "poseidon_x"], default="policy", help="world simulation planner")
     p.add_argument("--use-pomdp", action="store_true", help="use partially observable POMDP TidePool environment")
     p.add_argument("--max-steps", type=int, default=None)
     p.add_argument("--anchors", type=int, default=24)
@@ -543,6 +544,40 @@ def main():
         target = Path(args.prompt)
         data = json.loads(target.read_text(encoding="utf-8"))
         print(json.dumps({"verified": verify_ecosystem_receipt(data), "sha256": data.get("receipt_sha256")}, indent=2))
+        return
+
+    if args.command == "world-multivector":
+        from .geometric_algebra import GeometricKinematicsEngine, Multivector3D
+        engine = GeometricKinematicsEngine(dt=0.2)
+        vorticity = Multivector3D.from_bivector(b12=0.4, b23=0.1, b31=0.2)
+        steps = args.max_steps if args.max_steps is not None else 20
+        for _ in range(steps):
+            engine.apply_thrust_and_torque(thrust_forward=6.0, torque_yaw_b12=0.1, fluid_vorticity=vorticity)
+        print(json.dumps({
+            "status": "success",
+            "position": engine.pos.to_vector_tuple(),
+            "velocity": engine.vel.to_vector_tuple(),
+            "rotor": [engine.rotor.mv.s, engine.rotor.mv.b12, engine.rotor.mv.b23, engine.rotor.mv.b31],
+            "vorticity": [vorticity.b12, vorticity.b23, vorticity.b31],
+        }, indent=2))
+        return
+
+    if args.command == "poseidon-x-experiment":
+        runtime = Poseidon(args.root)
+        episodes = args.episodes if args.episodes is not None else 2
+        max_steps = args.max_steps if args.max_steps is not None else 32
+        result = runtime.poseidon_x_experiment(seed=args.seed or 101, episodes=episodes, max_steps=max_steps)
+        print(json.dumps(result, indent=2))
+        return
+
+    if args.command == "verify-poseidon-x":
+        from .poseidon_x_experiment import verify_poseidon_x_receipt
+        from pathlib import Path
+        if not args.prompt:
+            p.error("verify-poseidon-x requires a receipt path")
+        target = Path(args.prompt)
+        data = json.loads(target.read_text(encoding="utf-8"))
+        print(json.dumps({"verified": verify_poseidon_x_receipt(data), "sha256": data.get("receipt_sha256")}, indent=2))
         return
 
     if args.command in ("experiment", "contrast-experiment", "horizon-experiment", "odyssey-experiment", "helm-experiment", "odysseus-experiment", "aura-experiment", "metamorph-experiment", "chimera-experiment", "hyperion-experiment", "titan-experiment", "trident-experiment", "cognitive-experiment", "hyper-experiment"):
