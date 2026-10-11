@@ -147,6 +147,7 @@ class CognitiveAgent:
         self.last_uncertainty: float = 0.0
         self.step_count: int = 0
         self.dreams_consolidated: int = 0
+        self._pending_prediction: tuple[list[float], int, list[float], float] | None = None
 
     def reset(self, mode: str | None = None) -> None:
         """Resets the agent's internal state for a new episode."""
@@ -156,12 +157,18 @@ class CognitiveAgent:
             self.mode = mode
 
         self.mnemosyne.reset(mode=self.mode)
-        self.metacognition = MetacognitiveMonitor()
+        self.metacognition = MetacognitiveMonitor(self.metacognition.config)
+        self.planner.override_history.clear()
+        self.planner.step_counter = 0
+        self.adapter.replay.buffer.clear()
+        self.dream.dream_history.clear()
+        self.dream.consolidated_count = 0
         self.last_observation = None
         self.predicted_next_obs = None
         self.last_uncertainty = 0.0
         self.step_count = 0
         self.dreams_consolidated = 0
+        self._pending_prediction = None
 
     def act(self, observation: Sequence[float]) -> CognitiveDecision:
         """Computes action decision through integrated cognitive hierarchy."""
@@ -189,8 +196,12 @@ class CognitiveAgent:
         latent_state = core_out["memory"]
         neuro_out = self.router(latent_state, vitals)
 
-        # 4. Multi-Horizon Risk-Sensitive Planning
-        plan_out = self.planner.plan(obs_list)
+        # 4. Multi-Horizon Risk-Sensitive Planning with Causal Memory & Metacognitive Context
+        plan_out = self.planner.plan(
+            obs_list,
+            memory_context=mem_info,
+            metacognitive_state=meta_state,
+        )
 
         # 5. World Model Preview & Active Inference across all candidate actions
         predicted_outcomes = []
@@ -303,6 +314,10 @@ class CognitiveAgent:
         )
 
         self.last_observation = obs_list
+        # Cache the forecast for the action that will actually execute, including
+        # a guardrail veto. Keep the previous forecast for the next memory update.
+        prediction, uncertainty = candidate_efes[final_action]
+        self._pending_prediction = (obs_list.copy(), final_action, prediction.copy(), uncertainty)
         return decision
 
     def plan(self, observation: Sequence[float]) -> dict[str, Any]:
@@ -318,9 +333,25 @@ class CognitiveAgent:
         info: Any = None,
         done: bool = False,
     ) -> None:
-        """Records transition across memory, replay buffer, and computes next prediction."""
+        """Match the executed (observation, action) forecast to its realized successor."""
         obs_list = list(observation)
         next_obs_list = list(next_observation)
+
+        pending = self._pending_prediction
+        if pending is not None and pending[0] == obs_list and pending[1] == action:
+            prediction, uncertainty = pending[2], pending[3]
+        else:
+            # Compatibility for direct transition callers or externally overridden
+            # actions: compute from the predecessor only, before ingesting outcome.
+            with torch.no_grad():
+                obs_t = torch.tensor(obs_list, dtype=torch.float32).reshape(1, -1)
+                latent = self.core.model(["Survive"], obs_t)["memory"]
+                wm_out = self.oracle(latent, obs_t, torch.tensor([action], dtype=torch.long))
+                prediction = (obs_t + wm_out["mean_delta"]).clamp(0.0, 1.0)[0].tolist()
+                uncertainty = float(wm_out["calibrated_uncertainty"].item())
+        self._pending_prediction = None
+        self.predicted_next_obs = list(prediction)
+        self.last_uncertainty = uncertainty
 
         # Record in Mnemosyne episodic store
         self.mnemosyne.record_transition(
@@ -350,19 +381,6 @@ class CognitiveAgent:
             predicted_uncertainty=self.last_uncertainty,
         )
 
-        # Generate world-model prediction for next step surprise calculation
-        obs_t = torch.tensor(obs_list, dtype=torch.float32).reshape(1, -1)
-        act_t = torch.tensor([action], dtype=torch.long)
-        core_out = self.core.model(["Survive"], obs_t)
-        lat_t = core_out["memory"]
-
-        with torch.no_grad():
-            wm_out = self.oracle(lat_t, obs_t, act_t)
-            delta = wm_out["mean_delta"].squeeze(0)
-            pred_next = torch.clamp(obs_t.squeeze(0) + delta, 0.0, 1.0)
-            self.predicted_next_obs = pred_next.tolist()
-            self.last_uncertainty = float(wm_out["calibrated_uncertainty"].item())
-
         self.step_count += 1
 
     def rollout(
@@ -372,13 +390,14 @@ class CognitiveAgent:
         mode: str | None = None,
     ) -> dict[str, Any]:
         """Rolls out a full episode recording transitions, metrics, and overrides."""
+        if type(max_steps) is not int or not 1 <= max_steps <= 10000:
+            raise ValueError("max_steps must be an integer in [1, 10000]")
         self.reset(mode=mode)
-        initial = env.snapshot() if hasattr(env, "snapshot") else None
-        obs = env.reset() if hasattr(env, "reset") else env.observe()
+        obs = env.reset()
+        initial = env.snapshot()
         total_reward = 0.0
         decisions: list[dict[str, Any]] = []
         trajectory: list[dict[str, Any]] = []
-        survived = True
 
         for step in range(max_steps):
             decision = self.act(obs)
@@ -396,23 +415,23 @@ class CognitiveAgent:
                 next_obs, reward, done, info = env.step(act)
 
             total_reward += reward
-            self.observe_transition(obs, act, reward, next_obs, done=done)
+            self.observe_transition(obs, act, reward, next_obs, info=info, done=done)
 
             trajectory.append({
                 "observation": obs,
                 "action": act,
                 "action_name": ACTIONS[act],
                 "reward": reward,
+                "done": bool(done),
                 "next_observation": next_obs,
-                "state": env.state() if hasattr(env, "state") else {"position": [0, 0]},
-                "info": info if 'info' in locals() else {},
+                "state": env.state(),
+                "info": info,
                 "decision": dec_dict,
             })
 
-            if next_obs[0] <= 0.0 or done:
-                survived = (next_obs[0] > 0.0)
-                break
             obs = next_obs
+            if done:
+                break
 
         overrides = sum(1 for d in decisions if d["override"])
         return {
@@ -420,10 +439,14 @@ class CognitiveAgent:
             "mode": self.mode,
             "steps": len(decisions),
             "total_reward": float(total_reward),
-            "survived": bool(survived),
+            "survived": bool(env.alive),
+            "death": not env.alive,
+            "death_reason": env.death_reason,
+            "truncated": bool(env.alive and (env.done or len(decisions) == max_steps)),
+            "terminal_reason": "death" if not env.alive else "horizon" if env.done else "rollout_limit",
             "overrides": overrides,
             "override_rate": float(overrides / len(decisions)) if decisions else 0.0,
-            "final_health": float(obs[0]),
+            "final_health": float(env.health),
             "initial_snapshot": initial,
             "trajectory": trajectory,
             "decisions": decisions,

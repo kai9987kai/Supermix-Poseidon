@@ -78,11 +78,14 @@ class HorizonXPlanner:
         hydration = max(0.0, min(1.0, float(obs[2])))
         return float(health * min(energy, hydration))
 
-    def compute_dynamic_lambda(self, obs: Sequence[float]) -> float:
+    def compute_dynamic_lambda(self, obs: Sequence[float], metacognitive_state: Any | None = None) -> float:
         """Modulates risk aversion lambda_t based on reserves, preventing pessimism trap."""
         rho_t = self.compute_reserve_index(obs)
         scale = max(self.config.min_risk_scale, rho_t)
-        return float(self.config.base_lambda * scale)
+        base = self.config.base_lambda * scale
+        if metacognitive_state is not None and getattr(metacognitive_state, "epistemic_caution_active", False):
+            base *= 1.5
+        return float(base)
 
     def evaluate_action_at_horizon(
         self,
@@ -117,11 +120,13 @@ class HorizonXPlanner:
         self,
         observation: Sequence[float],
         candidate_actions: Sequence[int] | None = None,
+        memory_context: dict[str, Any] | None = None,
+        metacognitive_state: Any | None = None,
     ) -> dict[str, Any]:
         """Selects action maximizing composite multi-horizon risk-adjusted score."""
         obs_tensor = torch.tensor(list(observation), dtype=torch.float32)
         base_action = self.core.act(list(observation))
-        lambda_t = self.compute_dynamic_lambda(observation)
+        lambda_t = self.compute_dynamic_lambda(observation, metacognitive_state=metacognitive_state)
         rho_t = self.compute_reserve_index(observation)
 
         core_out = self.core.model(["Survive"], obs_tensor.reshape(1, -1))
@@ -154,6 +159,21 @@ class HorizonXPlanner:
                 )
                 h_scores[h] = h_res["score"]
                 composite_score += h_weights[h] * h_res["score"]
+
+            # Causal Memory Modulation from Mnemosyne / NEXUS-Omega
+            if memory_context is not None and memory_context.get("mode") not in ("erased", "memory_free"):
+                f_lcb = float(memory_context.get("estimated_food_lcb", observation[6]))
+                w_lcb = float(memory_context.get("estimated_water_lcb", observation[7]))
+                
+                # Energy deficit modulation
+                energy_deficit = max(0.0, 0.6 - float(observation[1]))
+                if act == 1 and energy_deficit > 0.0 and f_lcb > float(observation[6]):
+                    composite_score += 0.05 * energy_deficit * (f_lcb - float(observation[6]))
+
+                # Hydration deficit modulation
+                water_deficit = max(0.0, 0.6 - float(observation[2]))
+                if act == 2 and water_deficit > 0.0 and w_lcb > float(observation[7]):
+                    composite_score += 0.05 * water_deficit * (w_lcb - float(observation[7]))
 
             action_evals.append({
                 "action": act,

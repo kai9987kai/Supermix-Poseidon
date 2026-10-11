@@ -25,6 +25,7 @@ def main():
         "cognitive-experiment", "verify-cognitive",
         "oracle-fit", "oracle-evaluate", "verify-oracle-fit", "verify-oracle-evaluation",
         "hyper-experiment", "world-3d",
+        "nexus-omega-assay", "verify-nexus-omega",
     ])
     p.add_argument("prompt", nargs="?", default="")
     p.add_argument("--root", default=".")
@@ -591,6 +592,46 @@ def main():
         print(json.dumps({
             "exported_obj": obj_file,
             "scene": world.to_dict()
+        }, indent=2, ensure_ascii=False))
+        return
+
+    if args.command == "nexus-omega-assay":
+        from .nexus_omega import IndependentScientificAuditor, HypothesisSpec
+        auditor = IndependentScientificAuditor(max_steps=args.max_steps or 32)
+        hypothesis = HypothesisSpec(
+            hypothesis_id="hyp_nexus_omega_persistence",
+            statement="Causal memory fabric significantly improves POMDP survival over ablated memory",
+            null_hypothesis="There is no difference in reward between intact and ablated memory",
+            independent_variable="Working memory presence (intact vs ablated)",
+            dependent_variable="Episode total reward",
+            alpha=0.05,
+            minimum_effect_size=0.01,
+        )
+        receipt = auditor.run_causal_memory_assay(hypothesis)
+        four_fold = auditor.run_four_fold_memory_test(seed=args.seed or 42)
+        output = {
+            "receipt": receipt.__dict__,
+            "four_fold_verification": four_fold,
+        }
+        print(json.dumps(output, indent=2, ensure_ascii=False))
+        return
+
+    if args.command == "verify-nexus-omega":
+        from .nexus_omega import IndependentScientificAuditor, HypothesisSpec
+        auditor = IndependentScientificAuditor(max_steps=16)
+        hypothesis = HypothesisSpec(
+            hypothesis_id="hyp_verification_check",
+            statement="Memory verification check",
+            null_hypothesis="No difference",
+            independent_variable="Ablation",
+            dependent_variable="Reward",
+        )
+        receipt = auditor.run_causal_memory_assay(hypothesis)
+        print(json.dumps({
+            "status": "verified",
+            "receipt_hash": receipt.receipt_hash,
+            "verdict": receipt.verdict,
+            "retained": receipt.retained_in_library,
         }, indent=2, ensure_ascii=False))
         return
 
