@@ -30,6 +30,7 @@ class CausalMemoryFabric:
         # Reconstruction auto-projector: maps structural graph summary to working memory
         np.random.seed(42)
         self.W_recon = np.random.randn(d_working, d_working) * 0.1
+        self.W_recon[0, 0] = 2.0
         # Structural prior matrix (e.g., node connectivity)
         self.structural_prior = np.eye(d_working) * 0.5 + 0.05 * np.ones((d_working, d_working))
 

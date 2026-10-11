@@ -26,6 +26,7 @@ def main():
         "oracle-fit", "oracle-evaluate", "verify-oracle-fit", "verify-oracle-evaluation",
         "hyper-experiment", "world-3d",
         "nexus-omega-assay", "verify-nexus-omega",
+        "nexus-omega-discovery", "verify-nexus-omega-discovery",
     ])
     p.add_argument("prompt", nargs="?", default="")
     p.add_argument("--root", default=".")
@@ -632,6 +633,48 @@ def main():
             "receipt_hash": receipt.receipt_hash,
             "verdict": receipt.verdict,
             "retained": receipt.retained_in_library,
+        }, indent=2, ensure_ascii=False))
+        return
+
+    if args.command == "nexus-omega-discovery":
+        from .nexus_omega import AutonomousDiscoveryEngine
+        engine = AutonomousDiscoveryEngine(max_steps=args.max_steps or 32)
+        ledger = engine.run_discovery_cycle(
+            seed_base=args.seed or 50000,
+            num_seeds=args.episodes or 8,
+        )
+        output = {
+            "ledger_id": ledger.ledger_id,
+            "timestamp": ledger.timestamp,
+            "ratified_laws": ledger.ratified_laws,
+            "refutation_graveyard": ledger.refutation_graveyard,
+            "ledger_sha256": ledger.ledger_sha256,
+        }
+        print(json.dumps(output, indent=2, ensure_ascii=False))
+        return
+
+    if args.command == "verify-nexus-omega-discovery":
+        from pathlib import Path
+        from .nexus_omega import AutonomousDiscoveryEngine, verify_discovery_receipt
+        if args.prompt:
+            p_path = Path(args.prompt)
+            data = json.loads(p_path.read_text(encoding="utf-8"))
+        else:
+            engine = AutonomousDiscoveryEngine(max_steps=16)
+            ledger = engine.run_discovery_cycle(seed_base=args.seed or 50000, num_seeds=args.episodes or 4)
+            data = {
+                "ledger_id": ledger.ledger_id,
+                "timestamp": ledger.timestamp,
+                "ratified_laws": ledger.ratified_laws,
+                "refutation_graveyard": ledger.refutation_graveyard,
+                "ledger_sha256": ledger.ledger_sha256,
+            }
+        is_valid = verify_discovery_receipt(data)
+        print(json.dumps({
+            "status": "verified" if is_valid else "rejected",
+            "ledger_sha256": data["ledger_sha256"],
+            "ratified_laws_count": len(data["ratified_laws"]),
+            "refutations_count": len(data["refutation_graveyard"]),
         }, indent=2, ensure_ascii=False))
         return
 

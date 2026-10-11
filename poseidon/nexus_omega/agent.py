@@ -136,6 +136,14 @@ class NexusOmegaAgent:
 
         return e_t
 
+    def comparator_update(self, predicted_state: np.ndarray, realized_state: np.ndarray) -> None:
+        """Applies direct comparator residual error update from counterfactual or external prediction."""
+        error = realized_state - predicted_state
+        delta_mem = np.dot(self.W_comp, error[:self.d_obs])
+        self.memory.write_working(delta_mem)
+
+    observe = observe_transition
+
     def apply_intervention(self, spec: InterventionSpec) -> None:
         """Applies causal intervention operator directly to memory fabric."""
         self.memory.apply_intervention(spec)

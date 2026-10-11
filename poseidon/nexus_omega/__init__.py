@@ -12,12 +12,28 @@ from poseidon.nexus_omega.contracts import (
     MemoryCarrierType,
     HypothesisSpec,
     AuditReceipt,
+    DevelopmentalStage,
+    EpigeneticProfile,
+    ExuviaShell,
+    CounterfactualQuery,
+    CounterfactualResult,
+    DiscoveryResult,
+    DiscoveryLedger,
 )
 from poseidon.nexus_omega.memory import CausalMemoryFabric
 from poseidon.nexus_omega.world_model import EnsembleWorldModel
 from poseidon.nexus_omega.agent import NexusOmegaAgent
 from poseidon.nexus_omega.benchmark import POMDPPhaseWorld
 from poseidon.nexus_omega.auditor import IndependentScientificAuditor
+from poseidon.nexus_omega.counterfactual import CounterfactualEngine
+from poseidon.nexus_omega.epigenetics import (
+    EpigeneticMorphogenesisSystem,
+    EPIGENETIC_PROFILES,
+)
+from poseidon.nexus_omega.discovery import (
+    AutonomousDiscoveryEngine,
+    verify_discovery_receipt,
+)
 
 __all__ = [
     "StructuredObservation",
@@ -28,9 +44,21 @@ __all__ = [
     "MemoryCarrierType",
     "HypothesisSpec",
     "AuditReceipt",
+    "DevelopmentalStage",
+    "EpigeneticProfile",
+    "ExuviaShell",
+    "CounterfactualQuery",
+    "CounterfactualResult",
+    "DiscoveryResult",
+    "DiscoveryLedger",
     "CausalMemoryFabric",
     "EnsembleWorldModel",
     "NexusOmegaAgent",
     "POMDPPhaseWorld",
     "IndependentScientificAuditor",
+    "CounterfactualEngine",
+    "EpigeneticMorphogenesisSystem",
+    "EPIGENETIC_PROFILES",
+    "AutonomousDiscoveryEngine",
+    "verify_discovery_receipt",
 ]

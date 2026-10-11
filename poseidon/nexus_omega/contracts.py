@@ -133,3 +133,97 @@ class AuditReceipt:
         }
         self.receipt_hash = hashlib.sha256(json.dumps(payload, sort_keys=True).encode("utf-8")).hexdigest()
         return self.receipt_hash
+
+
+class DevelopmentalStage(str, Enum):
+    PROTOCELL = "protocell"
+    LARVAL_FORAGER = "larval_forager"
+    PUPAL_DIAPAUSE = "pupal_diapause"
+    IMAGO_NAVIGATOR = "imago_navigator"
+    SENESCENT_ARCHIVE = "senescent_archive"
+
+
+@dataclass(frozen=True)
+class EpigeneticProfile:
+    stage: DevelopmentalStage
+    basal_metabolism: float        # Multiplier on vital decay rates
+    sensory_gain: float            # Multiplier on resource / gradient cues
+    risk_penalty_scale: float      # Horizon-X lambda risk factor
+    plasticity_rate: float         # Weight/adapter adaptation learning rate
+    mobility_efficiency: float     # Stamina translation efficiency
+    receptive_horizon: float       # Spatial perception radius scale
+
+
+@dataclass
+class ExuviaShell:
+    """Cryptographic trace of an ecdysis event shedding an old morphological profile."""
+    from_stage: DevelopmentalStage
+    to_stage: DevelopmentalStage
+    step: int
+    biomass_accumulated: float
+    health_at_ecdysis: float
+    stamina_at_ecdysis: float
+    shell_sha256: str = ""
+
+    def __post_init__(self):
+        if not self.shell_sha256:
+            payload = {
+                "from_stage": self.from_stage.value,
+                "to_stage": self.to_stage.value,
+                "step": self.step,
+                "biomass": round(float(self.biomass_accumulated), 4),
+                "health": round(float(self.health_at_ecdysis), 4),
+                "stamina": round(float(self.stamina_at_ecdysis), 4),
+            }
+            self.shell_sha256 = hashlib.sha256(json.dumps(payload, sort_keys=True).encode("utf-8")).hexdigest()
+
+
+@dataclass
+class CounterfactualQuery:
+    factual_state: np.ndarray
+    factual_action: int
+    factual_next_state: np.ndarray
+    counterfactual_action: int
+    exogenous_noise: Optional[np.ndarray] = None
+
+
+@dataclass
+class CounterfactualResult:
+    query: CounterfactualQuery
+    counterfactual_predicted_state: np.ndarray
+    regret: float
+    preventable_by_policy: bool
+    attribution: str  # "policy_error", "exogenous_shock", "unavoidable_attrition"
+
+
+@dataclass
+class DiscoveryResult:
+    hypothesis: HypothesisSpec
+    baseline_reward: float
+    candidate_reward: float
+    reward_advantage: float
+    p_value: float
+    effect_size: float
+    verdict: str  # "ACCEPTED", "REFUTED"
+    seeds_evaluated: List[int]
+    confidence_interval: Tuple[float, float] = (0.0, 0.0)
+
+
+@dataclass
+class DiscoveryLedger:
+    ledger_id: str
+    timestamp: str
+    ratified_laws: List[Dict[str, Any]] = field(default_factory=list)
+    refutation_graveyard: List[Dict[str, Any]] = field(default_factory=list)
+    ledger_sha256: str = ""
+
+    def seal(self) -> str:
+        payload = {
+            "ledger_id": self.ledger_id,
+            "timestamp": self.timestamp,
+            "ratified": self.ratified_laws,
+            "refutations": self.refutation_graveyard,
+        }
+        self.ledger_sha256 = hashlib.sha256(json.dumps(payload, sort_keys=True).encode("utf-8")).hexdigest()
+        return self.ledger_sha256
+
