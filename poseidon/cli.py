@@ -25,6 +25,7 @@ def main():
         "cognitive-experiment", "verify-cognitive",
         "oracle-fit", "oracle-evaluate", "verify-oracle-fit", "verify-oracle-evaluation",
         "hyper-experiment", "world-3d",
+        "ecosystem-experiment", "verify-ecosystem", "world-ecosystem",
         "nexus-omega-assay", "verify-nexus-omega",
         "nexus-omega-discovery", "verify-nexus-omega-discovery",
     ])
@@ -508,6 +509,40 @@ def main():
         env = ContinuousTidePool3D(seed=args.seed)
         result = agent.rollout_3d(env, max_steps=args.max_steps if args.max_steps is not None else 64)
         print(json.dumps({k: v for k, v in result.items() if k != "decisions"}, indent=2))
+        return
+
+    if args.command == "world-ecosystem":
+        from .ecosystem_3d import ContinuousEcosystem3D
+        runtime = Poseidon(args.root)
+        eco = runtime.ecosystem(seed=args.seed or 42)
+        eco.spawn_default_colony(n_grazers=2, n_predators=1, n_symbionts=1)
+        actions = {"grazer_0": 4, "grazer_1": 1, "predator_0": 4, "symbiont_0": 0}
+        max_steps = args.max_steps if args.max_steps is not None else 32
+        for _ in range(max_steps):
+            obs_dict, rewards, dones, telemetry = eco.step(actions)
+        print(json.dumps({
+            "status": "success",
+            "telemetry": telemetry,
+            "population_alive": {aid: a.alive for aid, a in eco.agents.items()},
+        }, indent=2))
+        return
+
+    if args.command == "ecosystem-experiment":
+        runtime = Poseidon(args.root)
+        episodes = args.episodes if args.episodes is not None else 2
+        max_steps = args.max_steps if args.max_steps is not None else 32
+        result = runtime.ecosystem_experiment(seed=args.seed or 42, episodes=episodes, max_steps=max_steps)
+        print(json.dumps(result, indent=2))
+        return
+
+    if args.command == "verify-ecosystem":
+        from .ecosystem_experiment import verify_ecosystem_receipt
+        from pathlib import Path
+        if not args.prompt:
+            p.error("verify-ecosystem requires a receipt path")
+        target = Path(args.prompt)
+        data = json.loads(target.read_text(encoding="utf-8"))
+        print(json.dumps({"verified": verify_ecosystem_receipt(data), "sha256": data.get("receipt_sha256")}, indent=2))
         return
 
     if args.command in ("experiment", "contrast-experiment", "horizon-experiment", "odyssey-experiment", "helm-experiment", "odysseus-experiment", "aura-experiment", "metamorph-experiment", "chimera-experiment", "hyperion-experiment", "titan-experiment", "trident-experiment", "cognitive-experiment", "hyper-experiment"):

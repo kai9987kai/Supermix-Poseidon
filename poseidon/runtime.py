@@ -323,6 +323,27 @@ class Poseidon:
             "core_frozen": True,
         }
 
+    def ecosystem(self, seed: int = 42):
+        from .ecosystem_3d import ContinuousEcosystem3D
+        return ContinuousEcosystem3D(seed=seed)
+
+    def ecosystem_status(self):
+        return {
+            "ready": True,
+            "version": "1.0.0",
+            "type": "multi_agent_continuous_3d_trophic_ecosystem",
+            "trophic_roles": ["grazer", "predator", "symbiont"],
+            "bio_pulse_signaling": "duty_cycled_flipper_ntag_modulation",
+            "shield": "tessera_ltl_invariant_shield",
+            "topology": "persistent_homology_carrier_observatory",
+        }
+
+    def ecosystem_experiment(self, seed: int = 42, episodes: int = 2, max_steps: int = 40):
+        from .ecosystem_experiment import run_ecosystem_experiment
+        with self.lock:
+            seeds = list(range(seed, seed + episodes))
+            return run_ecosystem_experiment(seeds=seeds, steps_per_episode=max_steps)
+
     def mnemorph_status(self):
         relative = "outputs/mnemorph/RECEIPT.json"
         path = self.root / relative
@@ -1220,7 +1241,7 @@ class Poseidon:
             core_ready = active_core_path(self.root).is_file()
         except (ValueError, TypeError, OSError) as error:
             core_ready, core_error = False, str(error)
-        result = {"version": __version__, "name": "Supermix Poseidon", "language_ready": (self.root/"models/language/model.safetensors").exists(), "core_ready": core_ready, "atlas": self.atlas_status(), "contrast": self.contrast_status(), "horizon": self.horizon_status(), "odyssey": self.odyssey_status(), "helm": self.helm_status(), "odysseus": self.odysseus_status(), "mco": self.mco_status(), "aura": self.aura_status(), "tessera": self.tessera_status(), "mnemorph": self.mnemorph_status(), "metamorph": self.metamorph_status(), "chimera": self.chimera_status(), "hyperion": self.hyperion_status(), "titan": self.titan_status(), "trident": self.trident_status(), "reports": reports, "limits": "Experimental composite system. Controlled geometric media. Tool-assisted maths. Synthetic survival."} | source_status()
+        result = {"version": __version__, "name": "Supermix Poseidon", "language_ready": (self.root/"models/language/model.safetensors").exists(), "core_ready": core_ready, "atlas": self.atlas_status(), "contrast": self.contrast_status(), "horizon": self.horizon_status(), "odyssey": self.odyssey_status(), "helm": self.helm_status(), "odysseus": self.odysseus_status(), "mco": self.mco_status(), "aura": self.aura_status(), "tessera": self.tessera_status(), "mnemorph": self.mnemorph_status(), "metamorph": self.metamorph_status(), "chimera": self.chimera_status(), "hyperion": self.hyperion_status(), "titan": self.titan_status(), "trident": self.trident_status(), "hyper_agent": self.hyper_agent_status(), "ecosystem": self.ecosystem_status(), "reports": reports, "limits": "Experimental composite system. Controlled geometric media. Tool-assisted maths. Synthetic survival."} | source_status()
         if core_error:
             result["core_error"] = core_error
         return result

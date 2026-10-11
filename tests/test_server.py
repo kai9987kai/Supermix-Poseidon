@@ -109,3 +109,26 @@ def test_metamorph_experiment_request_validation(server):
     assert "checkpoint" in json.load(error.value)["error"].lower()
 
 
+def test_ecosystem_and_memory_endpoints(server):
+    url, _ = server
+    # Test GET /api/ecosystem/telemetry
+    res = json.load(urlopen(url+"/api/ecosystem/telemetry"))
+    assert "alive_counts" in res
+    assert res["tick"] >= 1
+
+    # Test GET /api/memory/topology
+    top_res = json.load(urlopen(url+"/api/memory/topology"))
+    assert "metrics" in top_res
+    assert "betti_0" in top_res["metrics"]
+    assert top_res["metrics"]["betti_0"] >= 1
+
+    # Test POST /api/tessera/shield
+    shield_res = json.load(post(url+"/api/tessera/shield", {
+        "obs": [1.0, 0.05, 0.8, 0.5, 0.1, 0.05, 0.5, 0.5, 0.5, 0.5, 0.5, 0.2, 0.0, 0.0, 0.5, 0.5],
+        "action": 4,
+    }))
+    assert shield_res["shield_triggered"] is True
+    assert shield_res["certified_action"] == 1
+    assert len(shield_res["certificate_sha256"]) == 64
+
+

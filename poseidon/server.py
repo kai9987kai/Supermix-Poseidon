@@ -49,6 +49,26 @@ def make_handler(runtime, port):
                 except Exception as error:
                     self.send_json(500, {"error": str(error), "type": type(error).__name__})
                 return
+            if path == "/api/ecosystem/telemetry":
+                try:
+                    eco = runtime.ecosystem()
+                    eco.spawn_default_colony(n_grazers=2, n_predators=1, n_symbionts=1)
+                    _, _, _, telemetry = eco.step({"grazer_0": 4, "predator_0": 4, "symbiont_0": 0})
+                    self.send_json(200, telemetry)
+                except Exception as error:
+                    self.send_json(500, {"error": str(error), "type": type(error).__name__})
+                return
+            if path == "/api/memory/topology":
+                try:
+                    from .memory_observatory import MemoryCarrierObservatory
+                    obs = MemoryCarrierObservatory()
+                    sample = [[1.0, 0.8, 0.8, 0.9], [1.0, 0.7, 0.75, 0.85], [0.95, 0.85, 0.8, 0.8]]
+                    audit = obs.analyze_trajectory_topology(sample)
+                    frame = obs.synthesize_telemetry_frame(audit)
+                    self.send_json(200, frame)
+                except Exception as error:
+                    self.send_json(500, {"error": str(error), "type": type(error).__name__})
+                return
             if path in ("/", "/index.html", "/style.css", "/app.js"):
                 file = WEB/("index.html" if path in ("/", "/index.html") else path[1:])
             elif path.startswith("/artifacts/"):
@@ -129,12 +149,29 @@ def make_handler(runtime, port):
                 except RuntimeError as error:
                     self.send_json(409, {"error": str(error)})
                 return
-            if self.path not in ("/api/respond", "/api/remember", "/api/experiment", "/api/contrast-experiment", "/api/horizon-experiment", "/api/odyssey-experiment", "/api/helm-experiment", "/api/odysseus-experiment", "/api/mco-experiment", "/api/aura-experiment", "/api/tessera-experiment", "/api/mnemorph-experiment", "/api/metamorph-experiment", "/api/chimera-experiment", "/api/hyperion-experiment", "/api/titan-experiment", "/api/trident-experiment", "/api/cognitive-experiment"):
+            if self.path not in ("/api/respond", "/api/remember", "/api/experiment", "/api/contrast-experiment", "/api/horizon-experiment", "/api/odyssey-experiment", "/api/helm-experiment", "/api/odysseus-experiment", "/api/mco-experiment", "/api/aura-experiment", "/api/tessera-experiment", "/api/mnemorph-experiment", "/api/metamorph-experiment", "/api/chimera-experiment", "/api/hyperion-experiment", "/api/titan-experiment", "/api/trident-experiment", "/api/cognitive-experiment", "/api/ecosystem-experiment", "/api/tessera/shield"):
                 self.send_json(404, {"error": "Not found"}); return
             if not busy.acquire(blocking=False):
                 self.send_json(409, {"error": "Poseidon is processing another request. Try again shortly."}); return
             try:
-                if self.path == "/api/mco-experiment":
+                if self.path == "/api/ecosystem-experiment":
+                    assert_source_current()
+                    episodes = payload.get("episodes", 2)
+                    max_steps = payload.get("max_steps", 32)
+                    result = runtime.ecosystem_experiment(seed=payload.get("seed", 42), episodes=episodes, max_steps=max_steps)
+                elif self.path == "/api/tessera/shield":
+                    from .tessera_prover import TesseraProver
+                    prover = TesseraProver()
+                    obs_vec = payload.get("obs", [1.0, 0.8, 0.8, 0.8])
+                    cand = payload.get("action", 4)
+                    certified, receipt = prover.shield_action(obs_vec, cand)
+                    result = {
+                        "certified_action": certified,
+                        "shield_triggered": receipt.shield_triggered,
+                        "is_safe": receipt.is_safe,
+                        "certificate_sha256": receipt.certificate_sha256,
+                    }
+                elif self.path == "/api/mco-experiment":
                     assert_source_current()
                     result = runtime.mco_experiment()
                 elif self.path == "/api/tessera-experiment":

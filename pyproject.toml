@@ -24,3 +24,4 @@ poseidon = ["web/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = [".", "tools"]
