@@ -33,6 +33,7 @@ from .mnemosyne import MnemosyneConfig, MnemosyneMemory
 from .molt import MoltEngine
 from .morphogenesis import MorphogeneticAdapter
 from .oracle import OracleConfig, OracleEnsemble
+from .research.oracle_adapter import ResearchOracleAdapter, oracle_status
 from .quantum_planner import QuantumSuperpositionPlanner
 from .world import ACTIONS, N_ACTIONS, OBS_SIZE
 from .worldlab import POMDPTidePool
@@ -63,6 +64,9 @@ class HyperDecision:
     dominant_drive: str = "nominal"
     monologue: str = ""
     sleep_cycles: int = 0
+    planning_enabled: bool = False
+    fallback_reason: str | None = None
+    oracle: dict[str, Any] = field(default_factory=dict)
 
     def __int__(self) -> int:
         return self.action
@@ -94,6 +98,9 @@ class HyperDecision:
             "monologue": self.monologue,
             "sleep_cycles": self.sleep_cycles,
             "candidates": self.candidates,
+            "planning_enabled": self.planning_enabled,
+            "fallback_reason": self.fallback_reason,
+            "oracle": self.oracle,
         }
 
 
@@ -107,11 +114,13 @@ class HyperAgent:
         core: CoreRuntime | None = None,
         active_inference_config: ActiveInferenceConfig | None = None,
         horizon_config: HorizonXConfig | None = None,
+        oracle_checkpoint: str | Path | None = None,
     ):
         self.core = core or CoreRuntime(active_core_path())
 
         # Subsystems
-        self.oracle = OracleEnsemble(OracleConfig(ensemble_size=3, hidden_size=64))
+        self.oracle = (ResearchOracleAdapter(oracle_checkpoint) if oracle_checkpoint is not None
+                       else OracleEnsemble(OracleConfig(ensemble_size=3, hidden_size=64)))
         self.mnemosyne = MnemosyneMemory(MnemosyneConfig())
         self.planner = HorizonXPlanner(core=self.core, oracle=self.oracle, config=horizon_config)
         self.active_inference = ActiveInferenceEvaluator(active_inference_config)
@@ -139,6 +148,10 @@ class HyperAgent:
         self.phase_plane.reset()
         self.ghost.reset()
         self.morpheus.reset()
+        self.planner.override_history.clear()
+        self.planner.step_counter = 0
+        if isinstance(self.oracle, ResearchOracleAdapter):
+            self.oracle.reset_counters()
         self.last_observation = None
         self.predicted_next_obs = None
         self.last_causal_attribution = None
@@ -150,16 +163,27 @@ class HyperAgent:
         obs_t = torch.tensor(obs_list, dtype=torch.float32).reshape(1, -1)
         self.step_counter += 1
 
+        plan_out = self.planner.plan(obs_list)
+        if not plan_out["planning_enabled"]:
+            self.last_observation = obs_list
+            return HyperDecision(
+                action=plan_out["base_action"], action_name=plan_out["base_action_name"],
+                base_action=plan_out["base_action"], base_action_name=plan_out["base_action_name"],
+                override=False, margin=0.0, quantum_coherence=0.0, interference_gain=0.0,
+                causal_effect=0.0, preventable_regret=False, free_energy_objective=0.0,
+                active_neurons=self.molt.current_hidden, morphogenesis_state="frozen",
+                alert_level="nominal", guardrail_veto=False,
+                candidates=plan_out["candidate_evaluations"], planning_enabled=False,
+                fallback_reason=plan_out["fallback_reason"], oracle=oracle_status(self.oracle))
+
         # 1. Memory, Metacognitive State & Phase-Plane Analysis
         mem_info = self.mnemosyne.step_observation(obs_list, self.predicted_next_obs)
         meta_state = self.metacognition.evaluate_state(obs_list)
         phase_audit = self.phase_plane.analyze_phase_space(obs_list)
 
         # 2. MOLT Morphogenesis Trigger
-        morph_state = self.molt.step_metacognitive_trigger(
-            epistemic_volatility=meta_state.epistemic_volatility,
-            surprise=mem_info["surprise"],
-        )
+        # Frozen evaluation: adaptation needs its own matched experiment.
+        morph_state = "frozen"
 
         # 3. Base Core Model & MOLT Residual Logits
         core_out = self.core.model(["Survive"], obs_t)
@@ -167,7 +191,6 @@ class HyperAgent:
         molt_delta = self.molt(obs_t)
 
         # 4. Multi-Horizon Risk-Sensitive Planning
-        plan_out = self.planner.plan(obs_list)
         base_action = plan_out["base_action"]
 
         # 5. Causeway do(a) Interventional Predictions
@@ -253,7 +276,7 @@ class HyperAgent:
             predicted_healths=predicted_healths,
         )
         final_action = guard_audit.action
-        final_override = override or guard_audit.vetoed
+        final_override = final_action != base_action
 
         # 11. Ghost in the Machine Introspective Monologue Synthesis
         ghost_audit = self.ghost.synthesize_monologue(
@@ -295,6 +318,8 @@ class HyperAgent:
             monologue=ghost_audit.monologue,
             sleep_cycles=self.morpheus.sleep_cycle_counter,
             candidates=synthesized_candidates,
+            planning_enabled=True,
+            oracle=oracle_status(self.oracle),
         )
 
         self.last_observation = obs_list
@@ -313,6 +338,9 @@ class HyperAgent:
         done_or_info: Any = None,
     ) -> None:
         """Audits causal attribution and updates world predictions."""
+        if not oracle_status(self.oracle)["trained"]:
+            self.predicted_next_obs = None
+            return
         attribution = self.causeway.attribute_causality(obs, action, next_obs)
         self.last_causal_attribution = attribution
 
@@ -323,17 +351,12 @@ class HyperAgent:
             d = wm_res["mean_delta"].squeeze(0)
             self.predicted_next_obs = torch.clamp(obs_t.squeeze(0) + d, 0.0, 1.0).tolist()
 
-        # Check for sleep onset & offline counterfactual dream consolidation
-        stamina_val = obs[3] if len(obs) > 3 else 0.5
-        if self.morpheus.is_sleep_indicated(action, stamina_val):
-            self.morpheus.execute_sleep_cycle(
-                episodic_records=self.mnemosyne.episodic.records,
-                causeway_scm=self.causeway,
-                morph_adapter=self.molt,
-            )
+        # Online sleep/morphology updates require a separate adaptation protocol.
 
     def rollout_3d(self, env: ContinuousTidePool3D, max_steps: int = 64) -> dict[str, Any]:
         """Rolls out the HyperAgent inside the Continuous 3D Genesis environment."""
+        if oracle_status(self.oracle)["trained"]:
+            raise ValueError("The selected ORACLE supports tidepool-v1, not the continuous 3D environment")
         self.reset()
         obs = [0.0] * OBS_SIZE
         obs[0] = 1.0

@@ -86,6 +86,8 @@ def test_pomdp_snapshot_replays_sensor_rng_and_reset():
     first = env.reset()
     env.step(4)
     env.observe()  # Snapshot must preserve arbitrary sensor draws, not just tick.
+    env.rng.gauss(0.0, 0.2)  # Also preserve Random's cached second Gaussian draw.
+    assert env.rng.getstate()[2] is not None
     snapshot = json.loads(json.dumps(env.snapshot()))
     restored = POMDPTidePool.from_snapshot(snapshot)
     assert restored.observe() == env.observe()

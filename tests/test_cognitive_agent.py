@@ -34,12 +34,14 @@ def test_cognitive_agent_act_and_observe(core):
     # Observe transition
     next_obs = [0.52] * OBS_SIZE
     agent.observe_transition(obs, decision.action, 0.5, next_obs, done=False)
-    assert agent.predicted_next_obs is not None
-    assert len(agent.predicted_next_obs) == OBS_SIZE
+    assert agent.predicted_next_obs is None
+    assert agent.metacognition.step_counter == 0
+    assert len(agent.adapter.replay) == 1
 
-    # Next step should have surprise calculated from the prediction
+    # An untrained fallback must not invent forecast error or synthetic replay.
     decision2 = agent.act(next_obs)
-    assert decision2.surprise > 0.0
+    assert decision2.surprise == 0.0
+    assert decision2.action == core.act(next_obs)
 
 
 def test_cognitive_agent_rollout_tidepool(core):
@@ -74,7 +76,22 @@ def test_cognitive_agent_matched_lesion_modes(core):
 
 
 def test_prediction_matches_current_transition_not_previous(core):
+    from poseidon.research.oracle_adapter import ResearchOracleAdapter
+
+    class FixedPredictor(ResearchOracleAdapter):
+        """Deterministic test forecast with the trained adapter interface."""
+        def __init__(self):
+            torch.nn.Module.__init__(self)
+
+        def status(self):
+            return {"trained": True}
+
+        def forward(self, latent, observation, actions):
+            return {"mean_delta": torch.ones_like(observation) * actions[:, None] * 0.01,
+                    "calibrated_uncertainty": torch.full((len(observation),), 0.05)}
+
     agent = CognitiveAgent(core=core, mode="memory_free")
+    agent.oracle = FixedPredictor()
     agent.reset()
     # observe_transition remains valid for callers that do not call act first.
     for action, value in ((2, 0.4), (4, 0.7)):

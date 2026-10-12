@@ -111,7 +111,9 @@ class DreamConsolidator:
             total_reward += tot_r
 
             # Inoculate: If dream trajectory found safe survival, inject into replay buffer
-            if dream_res["survival_probability"] > 0.8:
+            if (dream_res.get("failure_probability_calibrated", False)
+                    and dream_res.get("survival_probability") is not None
+                    and dream_res["survival_probability"] > 0.8):
                 recovery_samples += 1
                 traj = dream_res["trajectory"]
                 curr_o = mem.observation

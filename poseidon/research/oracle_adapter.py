@@ -5,6 +5,7 @@ survival probabilities or guarantees for selected actions and imagined rollouts.
 """
 from __future__ import annotations
 
+import copy
 import hashlib
 from pathlib import Path
 from types import SimpleNamespace
@@ -13,7 +14,7 @@ from typing import Any, Sequence
 import torch
 from torch import nn
 
-from .oracle_training import _load_model, load_oracle_artifact, source_hashes
+from .oracle_training import _bounded_read, _decode_artifact, _load_model, source_hashes
 from ..world import N_ACTIONS, OBS_SIZE
 
 
@@ -26,8 +27,9 @@ class ResearchOracleAdapter(nn.Module):
     def __init__(self, artifact_path: str | Path):
         super().__init__()
         self.artifact_path = Path(artifact_path).resolve()
-        self.payload = load_oracle_artifact(self.artifact_path)
-        self.artifact_sha256 = hashlib.sha256(self.artifact_path.read_bytes()).hexdigest()
+        raw = _bounded_read(self.artifact_path, 512 * 1024 * 1024)
+        self.payload = _decode_artifact(raw)
+        self.artifact_sha256 = hashlib.sha256(raw).hexdigest()
         recorded = self.payload["training_manifest"]["source_sha256"]
         current = source_hashes()
         for name in ("world.py", "contracts.py", "oracle_model.py"):
@@ -57,6 +59,8 @@ class ResearchOracleAdapter(nn.Module):
             "artifact_sha256": self.artifact_sha256,
             "model_sha256": self.payload["model_sha256"],
             "data_protocol": self.payload["training_manifest"].get("data_protocol", "legacy-v1"),
+            "architecture": self.payload["config"].get("architecture", "mlp-v1"),
+            "residual_selection": copy.deepcopy(self.payload["training"].get("residual_selection")),
             "calibration_available": True,
             "calibration_scope": "recorded data-policy episodes; selected-action and OOD coverage unverified",
             "failure_probability_calibrated": False,
@@ -75,6 +79,10 @@ class ResearchOracleAdapter(nn.Module):
             return False, "insufficient_training_action_exposure"
         return True, None
 
+    def reset_counters(self) -> None:
+        self.member_forward_calls = 0
+        self.prediction_rows = 0
+
     @staticmethod
     def _validate_observation(observation: torch.Tensor) -> None:
         if observation.ndim != 2 or observation.shape[1] != OBS_SIZE or observation.shape[0] == 0:
@@ -92,11 +100,9 @@ class ResearchOracleAdapter(nn.Module):
         summary = self.model.summarize(output)
         if any(not bool(torch.isfinite(value).all()) for value in summary.values()):
             raise FloatingPointError("ORACLE produced nonfinite predictions")
-        self.member_forward_calls += len(self.model.members)
-        self.prediction_rows += obs.shape[0]
         state_half_width = self.state_quantile * summary["delta_total_variance"].sqrt()
         reward_half_width = self.reward_quantile * summary["reward_total_variance"].sqrt()
-        return {
+        result = {
             "mean_delta": summary["delta_mean"],
             "mean_reward": summary["reward_mean"],
             "mean_failure": summary["death_probability"],
@@ -109,6 +115,11 @@ class ResearchOracleAdapter(nn.Module):
             "rewards": output["reward_mean"],
             "failures": output["death_logit"].sigmoid(),
         }
+        if any(not bool(torch.isfinite(value).all()) for value in result.values()):
+            raise FloatingPointError("ORACLE produced nonfinite scaled predictions")
+        self.member_forward_calls += len(self.model.members)
+        self.prediction_rows += obs.shape[0]
+        return result
 
     @torch.inference_mode()
     def imagine_trajectory(self, initial_latent: torch.Tensor | None,
@@ -122,7 +133,9 @@ class ResearchOracleAdapter(nn.Module):
         reward_sum = uncertainty_sum = 0.0
         for tick, action in enumerate(action_sequence):
             out = self(None, observation, torch.tensor([action], dtype=torch.long))
-            next_observation = (observation + out["mean_delta"]).clamp(0, 1)
+            # The ridge anchor deliberately retains float64 precision. Feed
+            # recursive observations back in the neural encoder's input dtype.
+            next_observation = (observation + out["mean_delta"]).clamp(0, 1).to(observation.dtype)
             reward = float(out["mean_reward"].item())
             radius = float(out["calibrated_uncertainty"].item())
             trajectory.append({"step": tick, "action": action,

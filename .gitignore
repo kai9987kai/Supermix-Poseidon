@@ -13,3 +13,4 @@ runs/**/*.safetensors
 runs/**/*.jsonl
 runs/**/*.tmp
 *.tmp
+build/

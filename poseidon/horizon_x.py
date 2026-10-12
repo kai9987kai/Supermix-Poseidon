@@ -30,6 +30,7 @@ import torch
 
 from .core import CoreRuntime
 from .oracle import OracleEnsemble, OracleRuntime
+from .research.oracle_adapter import oracle_status
 from .world import ACTIONS, N_ACTIONS, OBS_SIZE
 
 
@@ -41,6 +42,16 @@ class HorizonXConfig:
     min_risk_scale: float = 0.10
     override_threshold: float = 0.04
     horizon_decay: float = 0.85
+
+    def __post_init__(self):
+        if (not self.horizons or any(type(h) is not int or not 1 <= h <= 32 for h in self.horizons)
+                or len(set(self.horizons)) != len(self.horizons)):
+            raise ValueError("horizons must contain unique integers in [1, 32]")
+        if any(type(value) not in (int, float) or not math.isfinite(value) or value < 0
+               for value in (self.base_lambda, self.base_beta, self.override_threshold)):
+            raise ValueError("planner coefficients must be finite and nonnegative")
+        if not 0 < self.horizon_decay <= 1 or not 0 <= self.min_risk_scale <= 1:
+            raise ValueError("invalid planner risk scale or horizon decay")
 
 
 @dataclass
@@ -105,15 +116,19 @@ class HorizonXPlanner:
         imagination = self.oracle.imagine_trajectory(latent_state, obs_tensor, seq)
         r_exp = imagination["total_predicted_reward"]
         u_exp = imagination["total_uncertainty"]
-        p_fail = 1.0 - imagination["survival_probability"]
+        survival = imagination.get("survival_probability")
+        calibrated_failure = imagination.get("failure_probability_calibrated", False)
+        p_fail = 1.0 - survival if calibrated_failure and survival is not None else None
 
         # Normalized return per step - risk penalty - failure penalty
-        score = (r_exp / horizon) - (lambda_t * u_exp) - (self.config.base_beta * p_fail)
+        score = (r_exp / horizon) - (lambda_t * u_exp) - (self.config.base_beta * (p_fail or 0.0))
+        if not math.isfinite(score):
+            raise FloatingPointError("nonfinite ORACLE planning score")
         return {
             "score": float(score),
             "expected_reward": float(r_exp),
             "uncertainty": float(u_exp),
-            "failure_prob": float(p_fail),
+            "failure_prob": p_fail,
         }
 
     def plan(
@@ -125,19 +140,41 @@ class HorizonXPlanner:
     ) -> dict[str, Any]:
         """Selects action maximizing composite multi-horizon risk-adjusted score."""
         obs_tensor = torch.tensor(list(observation), dtype=torch.float32)
+        if (obs_tensor.shape != (OBS_SIZE,) or not torch.isfinite(obs_tensor).all()
+                or ((obs_tensor < 0) | (obs_tensor > 1)).any()):
+            raise ValueError("observation must contain 16 finite values in [0, 1]")
         base_action = self.core.act(list(observation))
         lambda_t = self.compute_dynamic_lambda(observation, metacognitive_state=metacognitive_state)
         rho_t = self.compute_reserve_index(observation)
 
+        status = oracle_status(self.oracle)
+        supported, reason = (self.oracle.planning_support(observation) if status["trained"]
+                             else (False, "no_trained_oracle_selected"))
+        actions_to_eval = list(candidate_actions) if candidate_actions is not None else list(range(N_ACTIONS))
+        if not actions_to_eval or any(type(a) is not int or not 0 <= a < N_ACTIONS for a in actions_to_eval):
+            raise ValueError("candidate actions must be valid integers")
+        actions_to_eval = sorted(set(actions_to_eval) | {base_action})
+        horizons = tuple(h for h in self.config.horizons
+                         if 1 <= h <= getattr(self.oracle, "max_planning_horizon", 0))
+        if not supported or not horizons:
+            self.step_counter += 1
+            return {"selected_action": base_action, "selected_action_name": ACTIONS[base_action],
+                    "base_action": base_action, "base_action_name": ACTIONS[base_action],
+                    "override": False, "margin": 0.0, "chosen_score": 0.0,
+                    "reserve_index": rho_t, "dynamic_lambda": lambda_t,
+                    "planning_enabled": False, "fallback_reason": reason or "unsupported_horizons",
+                    "oracle": status,
+                    "candidate_evaluations": [{"action": a, "action_name": ACTIONS[a],
+                                               "composite_score": 0.0, "horizon_scores": {},
+                                               "evaluated": False} for a in actions_to_eval]}
+
         core_out = self.core.model(["Survive"], obs_tensor.reshape(1, -1))
         latent_state = core_out["memory"].squeeze(0)
-
-        actions_to_eval = candidate_actions if candidate_actions is not None else list(range(N_ACTIONS))
 
         # Weights across horizons: w_H \propto decay^{idx}
         h_weights = {}
         total_w = 0.0
-        for i, h in enumerate(self.config.horizons):
+        for i, h in enumerate(horizons):
             w = math.pow(self.config.horizon_decay, i)
             h_weights[h] = w
             total_w += w
@@ -148,7 +185,7 @@ class HorizonXPlanner:
         for act in actions_to_eval:
             h_scores = {}
             composite_score = 0.0
-            for h in self.config.horizons:
+            for h in horizons:
                 h_res = self.evaluate_action_at_horizon(
                     latent_state=latent_state,
                     obs_tensor=obs_tensor,
@@ -175,6 +212,8 @@ class HorizonXPlanner:
                 if act == 2 and water_deficit > 0.0 and w_lcb > float(observation[7]):
                     composite_score += 0.05 * water_deficit * (w_lcb - float(observation[7]))
 
+            if not math.isfinite(composite_score):
+                raise FloatingPointError("nonfinite ORACLE composite score")
             action_evals.append({
                 "action": act,
                 "action_name": ACTIONS[act],
@@ -219,6 +258,9 @@ class HorizonXPlanner:
             "reserve_index": rho_t,
             "dynamic_lambda": lambda_t,
             "candidate_evaluations": action_evals,
+            "planning_enabled": True,
+            "fallback_reason": None,
+            "oracle": oracle_status(self.oracle),
         }
 
     def summary(self) -> dict[str, Any]:

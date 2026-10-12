@@ -83,10 +83,11 @@ def test_invalid_world_settings_fail_before_loading_core(tmp_path, monkeypatch, 
 def test_world_cli_passes_explicit_and_default_settings(tmp_path, monkeypatch, capsys):
     from poseidon import cli
     calls = []
+    selected_oracles = []
 
     class Runtime:
-        def __init__(self, *args):
-            pass
+        def __init__(self, *args, oracle_checkpoint=None):
+            selected_oracles.append(oracle_checkpoint)
 
         def respond(self, *args, **kwargs):
             calls.append(kwargs)
@@ -97,9 +98,14 @@ def test_world_cli_passes_explicit_and_default_settings(tmp_path, monkeypatch, c
     cli.main()
     monkeypatch.setattr(sys, "argv", ["poseidon", "world"])
     cli.main()
+    monkeypatch.setattr(sys, "argv", ["poseidon", "world", "--planner", "cognitive",
+                                     "--oracle-checkpoint", "candidate/oracle.pt"])
+    cli.main()
     capsys.readouterr()
     assert calls[0]["scarcity"] == 3.5 and calls[0]["max_steps"] == 777
     assert calls[1]["scarcity"] == 1.0 and calls[1]["max_steps"] == 256
+    assert selected_oracles == [None, None, "candidate/oracle.pt"]
+    assert calls[2]["planner"] == "cognitive"
 
 
 def test_readiness_status_does_not_queue_behind_world_work(tmp_path, monkeypatch):

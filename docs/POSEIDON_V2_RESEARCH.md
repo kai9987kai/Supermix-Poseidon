@@ -3,10 +3,10 @@
 **Project:** kai9987kai/Supermix-Poseidon; engineering documentation with no external institutional authorship claimed.
 **System Version:** `2.0.0`  
 **Audited Revision:** `97eebc637865a815b458c50fb7ef8200ef1c61df` (11 October 2026)
-**Schema Identifier:** `poseidon-cognitive-experiment-v2`  
+**Current Receipt Schema:** `poseidon-cognitive-experiment-v3` (legacy v2 checksum-only receipts are rejected)
 **Core Baseline Weights:** Frozen Tidal Core (`runs/tidal_dagger/core.pt`), SHA-256 `a053104ae63dc7f86baa15b4b34e46730e1ccb92117f221801fb21f90d2d6c27`.
 
-**Evidence status:** This document describes experimental implementations and intended mechanisms. The runtime ORACLE is initialized without trained weights or fitted calibration; the separate trained research ORACLE is not yet connected to the cognitive agents. Memory/router outputs currently contribute v2 telemetry rather than planner inputs. The cognitive receipt verifier checks a JSON digest without replay. The [current audit](research/architecture-audit-2026-10-11.md) takes precedence over capability claims below; the [operation design](superpowers/specs/2026-10-11-learning-transfer-design.md) specifies the required integration and validation work.
+**Evidence status, 12 October 2026:** This document contains the original module designs. The [learning foundation report](research/learning-foundation-2026-10-12.md) and [residual prediction results report](research/residual-prediction-results-2026-10-12.md) take precedence for current behavior: explicit trained ORACLE integration, linear-residual state anchoring, frozen-policy fallback, one-step planning, full controller/environment replay, isolated parameter search and measured candidate limitations. The earlier [audit](research/architecture-audit-2026-10-11.md) is preserved as historical evidence. The [operation design](superpowers/specs/2026-10-11-learning-transfer-design.md) specifies remaining learned-memory and structural-transfer work.
 
 ---
 
@@ -27,7 +27,7 @@ Poseidon v2.0 includes six experimental mechanisms:
 - **NEURO**: Neuromodulated sparse connectome routing with small-world topological graph masks and metabolic gain scaling.
 - **WORLDLAB**: Synthetic partially observed TidePool variants with fog, sensor noise, tidal effects and a simulation bridge contract.
 
-Some existing controller and research experiments support replay and source binding. The v2 cognitive receipt verifier currently establishes checksum consistency only; it does not establish reproducibility, complete pairing or improved performance.
+The v3 cognitive receipt verifier establishes source/model binding, complete pairing, exact controller/environment replay and recomputed summaries. Reproducibility does not by itself establish improved performance.
 
 ---
 
@@ -35,7 +35,7 @@ Some existing controller and research experiments support replay and source bind
 
 ### 2.1 POSEIDON ORACLE: Calibrated Predictive World Model Ensemble
 
-The runtime ORACLE contains $K$ independently initialized dynamics heads $\theta_1, \dots, \theta_K$. The cognitive coordinator does not load trained heads; the formula describes their prediction interface:
+The legacy diagnostic ORACLE contains $K$ independently initialized dynamics heads $\theta_1, \dots, \theta_K$. Cognitive coordinators now optionally load the distinct trained research ensemble. The formula describes the shared state-prediction interface:
 
 $$\hat{s}_{t+1}^{(k)} = s_t + \Delta_{\theta_k}(s_t, a_t)$$
 

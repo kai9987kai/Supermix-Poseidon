@@ -14,7 +14,6 @@ Produces an auditable cryptographically-hashed receipt.
 from __future__ import annotations
 
 from contextlib import contextmanager
-import copy
 from dataclasses import asdict
 import hashlib
 import json
@@ -29,7 +28,7 @@ import torch
 from .cognitive_agent import CognitiveAgent
 from .core import CoreRuntime, active_core_path
 from .provenance import assert_source_current
-from .world import ACTIONS, N_ACTIONS, OBS_SIZE, TidePool, WORLD_VERSION
+from .world import ACTIONS, N_ACTIONS, TidePool, WORLD_VERSION
 from .worldlab import POMDPConfig, POMDPTidePool
 
 COGNITIVE_EXPERIMENT_SCHEMA = "poseidon-cognitive-experiment-v3"
@@ -54,8 +53,11 @@ def _source_identity() -> dict[str, str]:
 
 
 def _file_digest(path: str | Path) -> str:
+    digest = hashlib.sha256()
     with Path(path).open("rb") as stream:
-        return hashlib.file_digest(stream, "sha256").hexdigest()
+        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
 def _model_identity(core: CoreRuntime) -> dict[str, Any]:
@@ -191,6 +193,7 @@ def _run_single_seed(
             "trajectory": trajectory,
         }
 
+
 def run_cognitive_benchmark(
     core_path: str | Path | None = None,
     seed_base: int = 90000000,
@@ -311,195 +314,129 @@ def _summarize(arm_results: dict[str, list[dict[str, Any]]]) -> tuple[dict, dict
 
 
 def verify_cognitive_receipt(receipt: dict[str, Any], core_path: str | Path | None = None) -> bool:
-    """Verifies cryptographic hash, provenance, schema, metrics, and exact physical replay of an experiment receipt."""
-    if not isinstance(receipt, dict):
-        raise ValueError("Receipt must be a dictionary")
+    """Validate identities, replay every transition/controller and recompute claims.
 
-    receipt_keys = set(receipt.keys())
-    expected_keys = {
-        "schema",
-        "world_version",
-        "controller_randomization",
-        "model",
-        "oracle_artifact",
-        "source_sha256",
-        "seed_base",
-        "episodes",
-        "max_steps",
-        "scarcity",
-        "use_pomdp",
-        "arms",
-        "paired",
-        "episodes_data",
-        "sha256",
-    }
-    if receipt_keys != expected_keys:
-        raise ValueError(
-            f"Receipt keys mismatch: missing {expected_keys - receipt_keys}, unexpected {receipt_keys - expected_keys}"
-        )
+    Legacy v2 receipts have no model/source binding and may omit exact sensor
+    state. They are unsupported rather than certified by a hash.
+    Success retains the public boolean contract; invalid evidence raises ValueError.
+    """
+    try:
+        return _verify_cognitive_receipt(receipt, core_path)
+    except (KeyError, IndexError, TypeError, AttributeError, OverflowError, OSError, RecursionError) as error:
+        raise ValueError("Malformed or unavailable cognitive evidence") from error
 
-    # 1. Verify cryptographic hash
-    claimed_sha = receipt["sha256"]
-    body = {k: v for k, v in receipt.items() if k != "sha256"}
-    canonical_body = json.loads(json.dumps(body))
-    computed_sha = hashlib.sha256(json.dumps(canonical_body, sort_keys=True).encode("utf-8")).hexdigest()
-    if claimed_sha != computed_sha:
-        raise ValueError(f"Receipt hash mismatch: claimed {claimed_sha}, calculated {computed_sha}")
 
-    # 2. Verify schema and environment constants
-    if receipt["schema"] != COGNITIVE_EXPERIMENT_SCHEMA:
-        raise ValueError(f"Unsupported schema {receipt['schema']}, expected {COGNITIVE_EXPERIMENT_SCHEMA}")
-    if receipt["world_version"] != WORLD_VERSION:
-        raise ValueError(f"World version mismatch: {receipt['world_version']} != {WORLD_VERSION}")
-    if receipt["controller_randomization"] != CONTROLLER_RANDOMIZATION:
-        raise ValueError(
-            f"Controller randomization mismatch: {receipt['controller_randomization']} != {CONTROLLER_RANDOMIZATION}"
-        )
+def _same(actual: Any, expected: Any, label: str) -> None:
+    # JSON equality handles sensor-state tuples persisted as lists, distinguishes
+    # booleans from integer claims, and rejects nonfinite numbers.
+    if _digest(actual) != _digest(expected):
+        raise ValueError(f"Cognitive receipt {label} mismatch")
 
-    # 3. Verify protocol parameters
-    _validate_protocol(
-        receipt["seed_base"],
-        receipt["episodes"],
-        receipt["max_steps"],
-        receipt["scarcity"],
-        receipt["use_pomdp"],
-    )
 
-    # 4. Verify source code provenance
-    current_sources = _source_identity()
-    if receipt["source_sha256"] != current_sources:
-        raise ValueError("Source file hash mismatch with active environment")
-
-    # 5. Verify core model identity
+def _verify_cognitive_receipt(receipt: dict[str, Any], core_path: str | Path | None) -> bool:
+    fields = {"schema", "world_version", "controller_randomization", "model", "oracle_artifact", "source_sha256",
+              "seed_base", "episodes", "max_steps", "scarcity", "use_pomdp", "arms", "paired", "episodes_data", "sha256"}
+    if not isinstance(receipt, dict) or set(receipt) != fields:
+        raise ValueError("Invalid cognitive receipt fields (complete v3 evidence required)")
+    if (receipt["schema"] != COGNITIVE_EXPERIMENT_SCHEMA or receipt["world_version"] != WORLD_VERSION
+            or receipt["controller_randomization"] != CONTROLLER_RANDOMIZATION):
+        raise ValueError("Unsupported cognitive receipt protocol; v2 hash-only evidence cannot be replay-certified")
+    _validate_protocol(*(receipt[key] for key in ("seed_base", "episodes", "max_steps", "scarcity", "use_pomdp")))
+    if receipt["sha256"] != _digest({key: value for key, value in receipt.items() if key != "sha256"}):
+        raise ValueError("Cognitive receipt hash mismatch")
+    sources = _source_identity()
+    _same(receipt["source_sha256"], sources, "source identity")
     core, model_identity = _load_bound_core(core_path or active_core_path())
-    if receipt["model"] != model_identity:
-        raise ValueError("Core model state or configuration mismatch")
+    _same(receipt["model"], model_identity, "model identity")
+    oracle_identity = receipt["oracle_artifact"]
+    oracle_path = None
+    if oracle_identity is not None:
+        if (not isinstance(oracle_identity, dict) or set(oracle_identity) != {"path", "sha256"}
+                or not isinstance(oracle_identity["path"], str) or not oracle_identity["path"]):
+            raise ValueError("Invalid ORACLE artifact identity")
+        oracle_path = oracle_identity["path"]
+        _same(oracle_identity, _oracle_identity(oracle_path), "ORACLE artifact identity")
 
-    # 6. Verify oracle artifact if present
-    if receipt["oracle_artifact"] is not None:
-        oracle_info = receipt["oracle_artifact"]
-        if not isinstance(oracle_info, dict) or "path" not in oracle_info or "sha256" not in oracle_info:
-            raise ValueError("Malformed oracle artifact specification")
-        if _oracle_identity(oracle_info["path"]) != oracle_info:
-            raise ValueError("Oracle artifact hash mismatch")
-
-    # 7. Verify episodes_data structure and seed alignments
-    episodes_data = receipt["episodes_data"]
-    if not isinstance(episodes_data, dict) or set(episodes_data.keys()) != set(ARMS):
-        raise ValueError(f"episodes_data must contain all arms: {ARMS}")
-
-    seed_base = receipt["seed_base"]
-    episodes_count = receipt["episodes"]
-    max_steps = receipt["max_steps"]
-    scarcity = receipt["scarcity"]
-    use_pomdp = receipt["use_pomdp"]
-    expected_seeds = [seed_base + i for i in range(episodes_count)]
-
+    data = receipt["episodes_data"]
+    if not isinstance(data, dict) or set(data) != set(ARMS):
+        raise ValueError("Missing or unexpected cognitive arms")
+    seeds = list(range(receipt["seed_base"], receipt["seed_base"] + receipt["episodes"]))
+    # Validate complete unique pairs before expensive neural replay.
     for arm in ARMS:
-        records = episodes_data[arm]
-        if not isinstance(records, list) or len(records) != episodes_count:
-            raise ValueError(f"Arm '{arm}' must have exactly {episodes_count} episode records")
-        seeds = [r.get("seed") for r in records if isinstance(r, dict)]
-        if seeds != expected_seeds:
-            raise ValueError(f"Arm '{arm}' seeds {seeds} do not match expected sequence {expected_seeds}")
+        records = data[arm]
+        if (not isinstance(records, list) or len(records) != len(seeds)
+                or any(not isinstance(record, dict) for record in records)
+                or any(type(record.get("seed")) is not int for record in records)
+                or [record["seed"] for record in records] != seeds
+                or any(record.get("arm") != arm for record in records)):
+            raise ValueError("Missing, duplicate or unordered cognitive arm/seed pairs")
 
-    # 8. Verify statistical summaries and paired comparisons
-    expected_summaries, expected_paired = _summarize(episodes_data)
-    if receipt["arms"] != expected_summaries:
-        raise ValueError("Summary arm metrics disagree with episode records")
-    if receipt["paired"] != expected_paired:
-        raise ValueError("Paired comparison statistics disagree with episode records")
-
-    # 9. Verify step-by-step physical replay of trajectories
+    verified = {arm: [] for arm in ARMS}
     for arm in ARMS:
-        for ep_idx, ep in enumerate(episodes_data[arm]):
-            if not isinstance(ep, dict):
-                raise ValueError(f"Episode {ep_idx} in arm '{arm}' is not a dict")
-
-            if ep.get("arm") != arm:
-                raise ValueError(f"Episode arm tag '{ep.get('arm')}' does not match arm '{arm}'")
-            if ep.get("death") != (not ep.get("survived")):
-                raise ValueError("Death and survived flags are logically inconsistent")
-
-            trajectory = ep.get("trajectory")
-            if not isinstance(trajectory, list):
-                raise ValueError(f"Episode trajectory missing or not a list in arm '{arm}'")
-            if len(trajectory) != ep.get("steps"):
-                raise ValueError(f"Trajectory length {len(trajectory)} does not match recorded steps {ep.get('steps')}")
-
-            init_snap = ep.get("initial_snapshot")
-            if not isinstance(init_snap, dict):
-                raise ValueError("Initial snapshot missing or not a dict")
-
-            # Restore environment from initial snapshot
-            try:
-                if use_pomdp:
-                    env = POMDPTidePool.from_snapshot(init_snap)
-                else:
-                    env = TidePool.from_snapshot(init_snap)
-            except Exception as e:
-                raise ValueError(f"Failed to restore environment snapshot: {e}") from e
-
-            total_reward = 0.0
-            for step_idx, step_record in enumerate(trajectory):
-                action = step_record.get("action")
-                if type(action) is not int or not 0 <= action < N_ACTIONS:
-                    raise ValueError(f"Invalid action {action} at step {step_idx}")
-
-                # Check decision field if present
-                decision = step_record.get("decision")
-                if isinstance(decision, dict) and decision.get("action") != action:
-                    raise ValueError(f"Decision action {decision.get('action')} does not match executed action {action}")
-
-                # Step the restored environment
-                if use_pomdp:
-                    step_res = env.step(action)
-                    real_obs = step_res.observation
-                    real_reward = step_res.reward
-                    real_done = step_res.done
-                else:
-                    real_obs, real_reward, real_done, _ = env.step(action)
-
-                # Check reward
-                if abs(real_reward - step_record.get("reward", 0.0)) > 1e-6:
-                    raise ValueError(
-                        f"Replayed reward {real_reward} != claimed reward {step_record.get('reward')} at step {step_idx}"
-                    )
-
-                # Check done flag
-                if bool(real_done) != bool(step_record.get("done")):
-                    raise ValueError(f"Replayed done flag {real_done} != claimed {step_record.get('done')} at step {step_idx}")
-
-                # Check next observation
-                claimed_next_obs = step_record.get("next_observation")
-                if not isinstance(claimed_next_obs, list) or len(claimed_next_obs) != len(real_obs):
-                    raise ValueError(f"Observation dimension mismatch at step {step_idx}")
-                if any(abs(a - b) > 1e-5 for a, b in zip(real_obs, claimed_next_obs)):
-                    raise ValueError(f"Replayed next observation does not match claimed observation at step {step_idx}")
-
-                # Check state consistency
-                real_state = env.state()
-                claimed_state = step_record.get("state")
-                if isinstance(claimed_state, dict):
-                    if real_state.get("x") != claimed_state.get("x") or real_state.get("y") != claimed_state.get("y"):
-                        raise ValueError(f"Agent position mismatch at step {step_idx}")
-                    if abs(real_state.get("health", 0.0) - claimed_state.get("health", 0.0)) > 1e-6:
-                        raise ValueError(f"Health mismatch at step {step_idx}")
-
-                total_reward += real_reward
-                if real_done:
-                    break
-
-            # Verify terminal state
-            is_alive = env.alive
-            if bool(is_alive) != bool(ep.get("survived")):
-                raise ValueError(f"Replayed survival {is_alive} != claimed {ep.get('survived')}")
-
-            if abs(total_reward - ep.get("total_reward", 0.0)) > 1e-5:
-                raise ValueError(f"Replayed total reward {total_reward} != claimed {ep.get('total_reward')}")
-
-            final_h = env.health
-            if abs(final_h - ep.get("final_health", 0.0)) > 1e-5:
-                raise ValueError(f"Replayed final health {final_h} != claimed {ep.get('final_health')}")
-
+        for record in data[arm]:
+            _replay_environment(record, receipt)
+            # Controller replay binds selected actions, forecast telemetry,
+            # guardrail decisions and override claims to the model and source.
+            replayed = _run_single_seed(arm, record["seed"], receipt["max_steps"], receipt["scarcity"],
+                                        receipt["use_pomdp"], core, oracle_checkpoint=oracle_path)
+            _same(record, replayed, f"controller replay {arm}/{record['seed']}")
+            verified[arm].append(replayed)
+    summaries, paired = _summarize(verified)
+    _same(receipt["arms"], summaries, "arm summaries")
+    _same(receipt["paired"], paired, "paired summaries")
+    _same(_source_identity(), sources, "source identity after replay")
+    _same(_model_identity(core), model_identity, "model identity after replay")
+    _same(_oracle_identity(oracle_path), oracle_identity, "ORACLE identity after replay")
     return True
+
+
+def _replay_environment(record: dict[str, Any], receipt: dict[str, Any]) -> None:
+    fields = {"arm", "seed", "steps", "total_reward", "survived", "death", "death_reason", "truncated",
+              "terminal_reason", "final_health", "overrides", "override_rate", "initial_snapshot", "trajectory"}
+    if set(record) != fields:
+        raise ValueError("Invalid cognitive episode fields")
+    trace = record["trajectory"]
+    if (not isinstance(trace, list) or not 1 <= len(trace) <= receipt["max_steps"]
+            or type(record["steps"]) is not int or record["steps"] != len(trace)):
+        raise ValueError("Empty, incomplete or invalid cognitive trajectory")
+    env = _environment(record["seed"], receipt["scarcity"], receipt["max_steps"], receipt["use_pomdp"])
+    observation = env.reset(seed=record["seed"])
+    _same(record["initial_snapshot"], env.snapshot(), "initial snapshot after reset")
+    # Restore actual evidence, including the post-observation sensor RNG state.
+    # Calling observe() here would consume an extra noise draw.
+    env = (POMDPTidePool.from_snapshot(record["initial_snapshot"]) if receipt["use_pomdp"]
+           else TidePool.from_snapshot(record["initial_snapshot"]))
+    total_reward = 0.0
+    overrides = 0
+    event_fields = {"observation", "action", "action_name", "reward", "done", "next_observation", "state", "info", "decision"}
+    for index, event in enumerate(trace):
+        if not isinstance(event, dict) or set(event) != event_fields:
+            raise ValueError("Invalid cognitive transition fields")
+        action = event["action"]
+        if type(action) is not int or not 0 <= action < N_ACTIONS:
+            raise ValueError("Invalid cognitive action")
+        if env.done:
+            raise ValueError("Cognitive trajectory continues after terminal transition")
+        _same(event["observation"], observation, f"observation at {index}")
+        if receipt["use_pomdp"]:
+            result = env.step(action)
+            observation, reward, done, info = result.observation, result.reward, result.done, result.info
+        else:
+            observation, reward, done, info = env.step(action)
+        actual = {"action_name": ACTIONS[action], "next_observation": observation, "reward": reward,
+                  "done": done, "info": info, "state": env.state()}
+        _same({key: event[key] for key in actual}, actual, f"transition at {index}")
+        decision = event["decision"]
+        if (not isinstance(decision, dict) or type(decision.get("action")) is not int
+                or decision["action"] != action or decision.get("action_name") != ACTIONS[action]
+                or type(decision.get("override")) is not bool):
+            raise ValueError("Cognitive decision disagrees with executed action")
+        overrides += int(decision["override"])
+        total_reward += reward
+    if not env.done:
+        raise ValueError("Cognitive trajectory omits the rest of the episode")
+    outcomes = {"total_reward": total_reward, "survived": bool(env.alive), "death": not env.alive,
+                "death_reason": env.death_reason, "truncated": bool(env.alive and env.done),
+                "terminal_reason": "death" if not env.alive else "horizon", "final_health": float(env.health),
+                "overrides": overrides, "override_rate": float(overrides / len(trace))}
+    _same({key: record[key] for key in outcomes}, outcomes, "terminal outcomes")

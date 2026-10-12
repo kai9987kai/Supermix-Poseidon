@@ -9,8 +9,15 @@ from .reasoning import extract_math, solve
 from .language import LanguageRuntime
 
 class Poseidon:
-    def __init__(self, root=".", adapter=None):
+    def __init__(self, root=".", adapter=None, oracle_checkpoint=None):
         self.root = Path(root).resolve()
+        self.oracle_checkpoint = None
+        if oracle_checkpoint is not None:
+            checkpoint = Path(oracle_checkpoint)
+            self.oracle_checkpoint = checkpoint if checkpoint.is_absolute() else self.root / checkpoint
+            # Fail explicitly at selection time, never silently substitute a model.
+            from .research.oracle_adapter import ResearchOracleAdapter
+            ResearchOracleAdapter(self.oracle_checkpoint)
         self.lock = threading.RLock()
         self.language = LanguageRuntime(self.root/"models/language", adapter=adapter)
         self._core = None
@@ -267,7 +274,12 @@ class Poseidon:
 
     def cognitive_agent(self, mode: str = "intact"):
         from .cognitive_agent import CognitiveAgent
-        return CognitiveAgent(core=self.core(), mode=mode)
+        return CognitiveAgent(core=self.core(), mode=mode, oracle_checkpoint=self.oracle_checkpoint)
+
+    def oracle_status(self):
+        from .research.oracle_adapter import ResearchOracleAdapter, oracle_status
+        return (ResearchOracleAdapter(self.oracle_checkpoint).status() if self.oracle_checkpoint is not None
+                else oracle_status(None))
 
     def cognitive_agent_status(self):
         relative = "outputs/cognitive_experiments/RECEIPT.json"
@@ -281,9 +293,12 @@ class Poseidon:
                 "core_frozen": True,
                 "receipt_ready": False,
                 "path": relative,
+                "oracle": self.oracle_status(),
             }
         try:
             receipt = json.loads(path.read_text(encoding="utf-8"))
+            from .cognitive_experiment import verify_cognitive_receipt
+            verify_cognitive_receipt(receipt, core_path=self.core().path)
             return {
                 "ready": True,
                 "version": "2.0.0",
@@ -295,6 +310,8 @@ class Poseidon:
                 "receipt_sha256": receipt.get("sha256"),
                 "summary": receipt.get("arms"),
                 "paired": receipt.get("paired"),
+                "oracle": self.oracle_status(),
+                "receipt_verified": True,
             }
         except Exception:
             return {
@@ -303,15 +320,19 @@ class Poseidon:
                 "type": "unified_cognitive_agent_coordinator",
                 "receipt_ready": False,
                 "path": relative,
-                "error": "Cognitive experiment receipt is malformed.",
+                "receipt_verified": False,
+                "oracle": self.oracle_status(),
+                "error": "Cognitive experiment receipt failed semantic verification.",
             }
 
     def hyper_agent(self):
         from .hyper_agent import HyperAgent
-        return HyperAgent(core=self.core())
+        return HyperAgent(core=self.core(), oracle_checkpoint=self.oracle_checkpoint)
 
     def hyper_agent_status(self):
         return {
+            "oracle": self.oracle_status(),
+            "predictive_control_promoted": False,
             "ready": True,
             "version": "3.0.0",
             "type": "hyper_causal_quantum_morphogenetic_agent",
@@ -1076,6 +1097,7 @@ class Poseidon:
                 max_steps=max_steps,
                 scarcity=scarcity,
                 use_pomdp=use_pomdp,
+                oracle_checkpoint=self.oracle_checkpoint,
                 progress=check,
             )
             check({"phase": "verifying"})
@@ -1121,6 +1143,8 @@ class Poseidon:
             self.lock.release()
 
     def hyper_experiment(self, seed=90000001, episodes=4, max_steps=64, scarcity=2.5):
+        if self.oracle_checkpoint is not None:
+            raise ValueError("Trained ORACLE experiments require cognitive-experiment; the legacy hyper assay includes unsupported 3D worlds")
         from .hyper_experiment import run_hyper_experiment
         from .world import _integer, _number
         seed = _integer(seed, "seed", 0, 2**63 - 9)

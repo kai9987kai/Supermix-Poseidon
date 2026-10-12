@@ -3,24 +3,24 @@
 [![Hugging Face](https://img.shields.io/badge/Hugging%20Face-Supermix--Poseidon-yellow)](https://huggingface.co/Kai9987kai/Supermix-Poseidon)
 [![GitHub](https://img.shields.io/badge/GitHub-Supermix--Poseidon-blue)](https://github.com/kai9987kai/Supermix-Poseidon)
 
-Poseidon is an experimental **cognitive AI workbench** combining a trained Tidal core with optional prediction, memory, planning and adaptation modules. Subsystem availability and passing unit tests do not establish improved learning or transfer. The [11 October architecture audit](docs/research/architecture-audit-2026-10-11.md) records current wiring, verification and evaluation limits.
+Poseidon is an experimental **cognitive AI workbench** combining a trained Tidal core with optional prediction, memory, planning and adaptation modules. The [learning foundation report](docs/research/learning-foundation-2026-10-12.md) records the trained-predictor integration, replay verification and measured limitations. The [11 October architecture audit](docs/research/architecture-audit-2026-10-11.md) preserves the earlier baseline findings.
 
 ## v2.0 Cognitive Platform Architecture
 
 The v2.0 coordinator instantiates six experimental subsystems around the frozen Tidal core checkpoint:
 
-1. **ORACLE**: `poseidon/oracle.py` provides independently initialized heads, a fitted disagreement/error curve and trajectory imagination. CognitiveAgent and HyperAgent currently construct fresh, uncalibrated heads. The separately trained, episode-bootstrap predictor in `poseidon/research/` has replayable fit/evaluation receipts and remains inactive; it is not yet wired into those agents.
+1. **ORACLE**: CognitiveAgent and HyperAgent accept an explicit trained research artifact through `--oracle-checkpoint`. The episode-bootstrap ensemble predicts state changes, reward and an uncalibrated death target. Artifact/source checks and training-action support gate its use. Without a selected artifact, both controllers exactly preserve frozen Tidal actions. No candidate is automatically promoted.
 2. **MNEMOSYNE (`poseidon/mnemosyne.py`)**: Biologically inspired 3-tier memory hierarchy:
    - **Tier 1 (Working Memory)**: Recurrent GRU context cell dynamically updated by prediction surprise ($e_{t-1} = \|o_t - \hat{o}_t\|_2$).
    - **Tier 2 (Episodic Store)**: Value-gated experiential memory weighted by reward, surprise, and recency.
    - **Tier 3 (Spatial Map)**: Online Bayesian replenishment estimation with conservative lower-confidence bounds (LCB).
-   - **Matched Lesion Modes**: `intact`, `erased`, `shifted`, `random_retrieval`, and `memory_free` are implemented. Memory outputs currently feed v2 telemetry; causal decision benefit has not been established.
-3. **HORIZON-X (`poseidon/horizon_x.py`)**: Planner with default horizons `{1,4,8,16}` and reserve-dependent risk penalties. It currently uses the fresh runtime ORACLE; reserve modulation is a heuristic requiring outcome validation.
+   - **Matched Lesion Modes**: `intact`, `erased`, `shifted`, `random_retrieval`, and `memory_free` are implemented. Resource estimates feed a heuristic score adjustment when trained planning is enabled; learned incremental memory value remains a research objective.
+3. **HORIZON-X (`poseidon/horizon_x.py`)**: Reserve-dependent predictive scoring. The current trained artifact supports one-step planning only; unsupported horizons and insufficient action exposure fall back to Tidal. State interval widths are diagnostics, and uncalibrated death outputs never become survival certificates.
 4. **ADAPT (`poseidon/adapt.py`)**: Experimental residual adaptation, replay and anchor checks. Useful adaptation and retention require separate held-out evidence.
 5. **NEURO (`poseidon/neuro.py`)**: Sparse routing with graph masks and gain scaling. The v2 coordinator reports its outputs as telemetry; they do not currently alter the planner input.
 6. **WORLDLAB (`poseidon/worldlab.py`)**: Synthetic partially observed TidePool with fog, sensor noise, tidal effects and an external simulation bridge contract. It is not a validated physical or biological model.
 
-See the [subsystem documentation](docs/POSEIDON_V2_RESEARCH.md), [24-project source review](docs/research/portfolio-refresh-2026-10-11.md) and [proposed learning and transfer operation](docs/superpowers/specs/2026-10-11-learning-transfer-design.md). The new v3/OmniPlane modules are additional experiments; their presence does not resolve the predictor integration or evidence gaps.
+See the [subsystem documentation](docs/POSEIDON_V2_RESEARCH.md), [24-project source review](docs/research/portfolio-refresh-2026-10-11.md) and [learning and transfer design](docs/superpowers/specs/2026-10-11-learning-transfer-design.md). Cognitive v3 receipts replay every environment transition and controller decision, including noisy sensor RNG, and bind core/model/source identities. Parameter search uses isolated copies and retains inactive candidates. Additional v3/OmniPlane modules remain experimental.
 
 ## Run locally
 

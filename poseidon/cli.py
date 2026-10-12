@@ -23,7 +23,7 @@ def main():
         "titan-experiment", "verify-titan",
         "trident-experiment", "verify-trident",
         "cognitive-experiment", "verify-cognitive",
-        "oracle-fit", "oracle-evaluate", "verify-oracle-fit", "verify-oracle-evaluation",
+        "oracle-fit", "oracle-evaluate", "oracle-screen", "verify-oracle-fit", "verify-oracle-evaluation",
         "hyper-experiment", "world-3d",
         "ecosystem-experiment", "verify-ecosystem", "world-ecosystem",
         "poseidon-x-experiment", "verify-poseidon-x", "world-multivector",
@@ -37,6 +37,7 @@ def main():
     p.add_argument("--episodes", type=int, default=None)
     p.add_argument("--scarcity", type=float, default=None)
     p.add_argument("--adapter")
+    p.add_argument("--oracle-checkpoint", help="explicit trained research ORACLE for cognitive/hyper TidePool control")
     p.add_argument("--planner", choices=["policy", "mpc", "hybrid", "risk_aware", "uncertainty", "atlas", "contrast", "horizon", "odyssey", "helm", "odysseus", "aura", "metamorph", "chimera", "hyperion", "titan", "trident", "cognitive", "hyper", "poseidon_x"], default="policy", help="world simulation planner")
     p.add_argument("--use-pomdp", action="store_true", help="use partially observable POMDP TidePool environment")
     p.add_argument("--max-steps", type=int, default=None)
@@ -57,10 +58,21 @@ def main():
     p.add_argument("--oracle-hidden-size", type=int, default=128)
     p.add_argument("--oracle-ensemble-size", type=int, default=5)
     p.add_argument("--oracle-coverage", type=float, default=0.90)
+    p.add_argument("--oracle-data-protocol", choices=["legacy-v1", "episode-mixture-v2"], default="episode-mixture-v2")
+    p.add_argument("--oracle-architecture", choices=["mlp-v1", "linear-residual-v1"], default="mlp-v1",
+                   help="opt-in trained state predictor architecture for oracle-fit")
     p.add_argument("--eval-episodes", type=int, default=32, help="fresh episodes per ORACLE evaluation condition")
     p.add_argument("--bootstrap-reps", type=int, default=2000)
     p.add_argument("--skip-replay", action="store_true", help="verify receipt hashes without regenerating episodes")
     args = p.parse_args()
+    if args.oracle_architecture != "mlp-v1" and args.command != "oracle-fit":
+        p.error("--oracle-architecture is only supported by oracle-fit")
+    if args.command == "oracle-screen" and args.skip_replay:
+        p.error("oracle-screen requires full replay; --skip-replay is not supported")
+    if args.oracle_checkpoint and args.command not in ("world", "status", "cognitive-experiment", "hyper-experiment", "world-3d"):
+        p.error("--oracle-checkpoint is supported by world, status, and cognitive-experiment (TidePool only)")
+    if args.oracle_checkpoint and args.command == "world" and args.planner not in ("cognitive", "hyper"):
+        p.error("--oracle-checkpoint requires --planner cognitive or hyper")
     default_seeds = {"atlas-fit": 81000001, "experiment": 93000001,
                      "contrast-fit": 101000001, "contrast-experiment": 104000001,
                      "horizon-fit": 107000001, "horizon-experiment": 108000001,
@@ -101,6 +113,8 @@ def main():
             hidden_size=args.oracle_hidden_size,
             ensemble_size=args.oracle_ensemble_size,
             coverage=args.oracle_coverage,
+            data_protocol=args.oracle_data_protocol,
+            architecture=args.oracle_architecture,
             progress=progress,
         )
         print(json.dumps(receipt, indent=2, ensure_ascii=False))
@@ -122,6 +136,17 @@ def main():
                                   episodes_per_condition=args.eval_episodes,
                                   bootstrap_reps=args.bootstrap_reps)
         print(json.dumps(receipt, indent=2, ensure_ascii=False))
+        return
+
+    if args.command == "oracle-screen":
+        from pathlib import Path
+        from .research.prediction_gate import assess_prediction_gate
+        if not args.prompt:
+            p.error("oracle-screen requires an evaluation receipt path")
+        path = Path(args.prompt)
+        if not path.is_absolute():
+            path = Path(args.root) / path
+        print(json.dumps(assess_prediction_gate(path), indent=2, ensure_ascii=False))
         return
 
     if args.command == "verify-oracle-fit":
@@ -505,7 +530,7 @@ def main():
 
     if args.command == "world-3d":
         from .genesis_3d import ContinuousTidePool3D
-        runtime = Poseidon(args.root)
+        runtime = Poseidon(args.root, oracle_checkpoint=args.oracle_checkpoint)
         agent = runtime.hyper_agent()
         env = ContinuousTidePool3D(seed=args.seed)
         result = agent.rollout_3d(env, max_steps=args.max_steps if args.max_steps is not None else 64)
@@ -581,7 +606,7 @@ def main():
         return
 
     if args.command in ("experiment", "contrast-experiment", "horizon-experiment", "odyssey-experiment", "helm-experiment", "odysseus-experiment", "aura-experiment", "metamorph-experiment", "chimera-experiment", "hyperion-experiment", "titan-experiment", "trident-experiment", "cognitive-experiment", "hyper-experiment"):
-        runtime = Poseidon(args.root)
+        runtime = Poseidon(args.root, oracle_checkpoint=args.oracle_checkpoint)
         if args.command == "hyper-experiment":
             result = runtime.hyper_experiment(args.seed, args.episodes, args.max_steps if args.max_steps is not None else 64, args.scarcity)
             print(json.dumps(result, indent=2))
@@ -748,7 +773,7 @@ def main():
         }, indent=2, ensure_ascii=False))
         return
 
-    runtime = Poseidon(args.root, args.adapter)
+    runtime = Poseidon(args.root, args.adapter, oracle_checkpoint=args.oracle_checkpoint)
     if args.command == "status":
         result = runtime.status()
     else:

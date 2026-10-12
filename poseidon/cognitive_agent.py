@@ -31,6 +31,7 @@ from .metacognition import MetacognitionConfig, MetacognitiveMonitor, Metacognit
 from .mnemosyne import MNEMOSYNE_MODES, MnemosyneConfig, MnemosyneMemory
 from .neuro import NeuroConfig, NeuromodulatedRouter
 from .oracle import OracleConfig, OracleEnsemble
+from .research.oracle_adapter import ResearchOracleAdapter, oracle_status
 from .world import ACTIONS, N_ACTIONS, OBS_SIZE, TidePool
 from .worldlab import POMDPConfig, POMDPTidePool, StepResult
 
@@ -67,6 +68,9 @@ class CognitiveDecision:
     active_invariants: list[str] = field(default_factory=list)
     guardrail_violations: list[dict[str, Any]] = field(default_factory=list)
     candidates: list[dict[str, Any]] = field(default_factory=list)
+    planning_enabled: bool = False
+    fallback_reason: str | None = None
+    oracle: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -99,6 +103,9 @@ class CognitiveDecision:
             "guardrail_violations": self.guardrail_violations,
             "candidates": self.candidates if self.candidates else self.evaluations,
             "evaluations": self.evaluations,
+            "planning_enabled": self.planning_enabled,
+            "fallback_reason": self.fallback_reason,
+            "oracle": self.oracle,
         }
 
 
@@ -117,6 +124,7 @@ class CognitiveAgent:
         adapt_config: AdaptConfig | None = None,
         neuro_config: NeuroConfig | None = None,
         active_inference_config: ActiveInferenceConfig | None = None,
+        oracle_checkpoint: str | Path | None = None,
     ):
         self.core = core or CoreRuntime(active_core_path())
         self.mode = mode
@@ -124,7 +132,8 @@ class CognitiveAgent:
             raise ValueError(f"mode must be one of {MNEMOSYNE_MODES}, got {mode}")
 
         # Subsystems
-        self.oracle = OracleEnsemble(oracle_config or OracleConfig())
+        self.oracle = (ResearchOracleAdapter(oracle_checkpoint) if oracle_checkpoint is not None
+                       else OracleEnsemble(oracle_config or OracleConfig()))
         mnemo_cfg = mnemosyne_config or MnemosyneConfig(mode=self.mode)
         mnemo_cfg.mode = self.mode
         self.mnemosyne = MnemosyneMemory(mnemo_cfg)
@@ -169,6 +178,8 @@ class CognitiveAgent:
         self.step_count = 0
         self.dreams_consolidated = 0
         self._pending_prediction = None
+        if isinstance(self.oracle, ResearchOracleAdapter):
+            self.oracle.reset_counters()
 
     def act(self, observation: Sequence[float]) -> CognitiveDecision:
         """Computes action decision through integrated cognitive hierarchy."""
@@ -202,6 +213,22 @@ class CognitiveAgent:
             memory_context=mem_info,
             metacognitive_state=meta_state,
         )
+
+        if not plan_out["planning_enabled"]:
+            self.last_observation = obs_list
+            self._pending_prediction = None
+            return CognitiveDecision(
+                action=plan_out["base_action"], action_name=plan_out["base_action_name"],
+                base_action=plan_out["base_action"], base_action_name=plan_out["base_action_name"],
+                override=False, margin=0.0, surprise=mem_info["surprise"],
+                reserve_index=plan_out["reserve_index"], dynamic_lambda=plan_out["dynamic_lambda"],
+                active_sparsity=float(neuro_out["active_sparsity"].item()),
+                neuromodulatory_gain=float(neuro_out["gain"].item()),
+                memory_patch=mem_info["patch_id"], food_lcb=mem_info["estimated_food_lcb"],
+                water_lcb=mem_info["estimated_water_lcb"], mode=self.mode,
+                evaluations=plan_out["candidate_evaluations"],
+                planning_enabled=False, fallback_reason=plan_out["fallback_reason"],
+                oracle=oracle_status(self.oracle))
 
         # 5. World Model Preview & Active Inference across all candidate actions
         predicted_outcomes = []
@@ -265,7 +292,7 @@ class CognitiveAgent:
 
         final_action = guard_audit.action
         final_action_name = guard_audit.action_name
-        final_override = plan_out["override"] or guard_audit.vetoed
+        final_override = final_action != plan_out["base_action"]
 
         # Construct candidates for UI telemetry
         candidate_rows = []
@@ -311,6 +338,8 @@ class CognitiveAgent:
             guardrail_violations=guard_audit.violation_details,
             candidates=candidate_rows,
             evaluations=plan_out["candidate_evaluations"],
+            planning_enabled=True,
+            oracle=oracle_status(self.oracle),
         )
 
         self.last_observation = obs_list
@@ -336,6 +365,17 @@ class CognitiveAgent:
         """Match the executed (observation, action) forecast to its realized successor."""
         obs_list = list(observation)
         next_obs_list = list(next_observation)
+
+        if not oracle_status(self.oracle)["trained"]:
+            # Retain observed experience, without presenting random predictions
+            # as model error, uncertainty, or synthetic training targets.
+            self.mnemosyne.record_transition(observation=obs_list, action=action,
+                                             reward=reward, next_observation=next_obs_list)
+            self.adapter.replay.add(obs=obs_list, action=action, reward=reward, next_obs=next_obs_list)
+            self._pending_prediction = None
+            self.predicted_next_obs = None
+            self.step_count += 1
+            return
 
         pending = self._pending_prediction
         if pending is not None and pending[0] == obs_list and pending[1] == action:
@@ -370,7 +410,8 @@ class CognitiveAgent:
         )
 
         # Generative Dream Consolidation on Rest action (action == 0)
-        if action == 0 and self.mode not in ("erased", "memory_free"):
+        if (action == 0 and self.mode not in ("erased", "memory_free")
+                and getattr(self.oracle, "failure_probability_calibrated", False)):
             dream_summary = self.dream.consolidate_during_rest()
             self.dreams_consolidated += dream_summary.synthetic_rollouts_generated
 

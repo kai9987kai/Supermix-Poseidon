@@ -11,6 +11,7 @@ import io
 import json
 import math
 import os
+import pickle
 import random
 from pathlib import Path
 from typing import Any, Callable, Sequence
@@ -21,7 +22,8 @@ import torch.nn.functional as F
 from ..world import N_ACTIONS, TidePool, WORLD_VERSION, event_uniform, teacher_action
 from .contracts import (Episode, EpisodeSplit, TransitionRecord, assert_disjoint_splits,
                         canonical_bytes, split_summary, tidepool_contract)
-from .oracle_model import ORACLE_SCHEMA, OracleConfig, OracleEnsemble
+from .oracle_model import (ORACLE_SCHEMA, OracleConfig, OracleEnsemble, linear_delta_features,
+                           MLP_ARCHITECTURE, LINEAR_RESIDUAL_ARCHITECTURE, RESIDUAL_SCALE_GRID)
 
 FIT_RECEIPT_SCHEMA = "poseidon-oracle-fit-receipt-v1"
 TRAIN_SCARCITY = (0.8, 1.0, 1.25, 1.5)
@@ -198,13 +200,6 @@ def _batch(rows: Sequence[TransitionRecord]) -> tuple[torch.Tensor, ...]:
     return obs, actions, deltas, rewards, deaths
 
 
-def linear_delta_features(observation: torch.Tensor, action: torch.Tensor) -> torch.Tensor:
-    """Separate affine observation-to-delta maps for each executed action."""
-    obs_bias = torch.cat((observation, torch.ones_like(observation[:, :1])), dim=1)
-    one_hot = F.one_hot(action, num_classes=N_ACTIONS).to(observation.dtype)
-    return (one_hot[:, :, None] * obs_bias[:, None, :]).flatten(1)
-
-
 def _fit_linear_delta(rows: Sequence[TransitionRecord]) -> dict:
     obs, actions, deltas, _, _ = _batch(rows)
     features = linear_delta_features(obs.double(), actions)
@@ -241,16 +236,48 @@ def _loss(output: dict[str, torch.Tensor], deltas: torch.Tensor, rewards: torch.
 
 
 @torch.inference_mode()
-def _selection_loss(model: OracleEnsemble, split: EpisodeSplit, positive_weight: float) -> float:
+def _selection_loss(model: OracleEnsemble, split: EpisodeSplit, positive_weight: float, *,
+                    residual_scale: float | None = None) -> float:
     rows = _flatten(split)
     obs, actions, deltas, rewards, deaths = _batch(rows)
-    prediction = model(obs, actions)
+    prediction = model(obs, actions, residual_scale=residual_scale)
     losses = [_loss({name: prediction[name][index] for name in prediction}, deltas, rewards, deaths, positive_weight)
               for index in range(model.config.ensemble_size)]
     result = float(torch.stack(losses).mean())
     if not math.isfinite(result):
         raise FloatingPointError("nonfinite ORACLE selection loss")
     return result
+
+
+@torch.inference_mode()
+def _residual_selection(model: OracleEnsemble, split: EpisodeSplit) -> dict[str, Any]:
+    """Frozen shrink grid, scored on equal-weight complete selection episodes.
+
+    Read the raw neural residual independently of the saved scale. This makes
+    both selection and later replay valid even when the selected scale is zero.
+    """
+    if model.config.architecture != LINEAR_RESIDUAL_ARCHITECTURE or split.name != "selection":
+        raise ValueError("residual scaling requires the registered selection partition")
+    split.validate()
+    scores = [{"scale": scale, "state_mse": 0.0} for scale in RESIDUAL_SCALE_GRID]
+    for episode in split.episodes:
+        obs, actions, deltas, _, _ = _batch(episode.transitions)
+        raw = model(obs, actions, residual_scale=1.0)["delta_residual_mean"]
+        anchor = model.members[0].anchor_delta(obs, actions).unsqueeze(0)
+        for score in scores:
+            prediction = (anchor + score["scale"] * raw).mean(dim=0)
+            mse = float((deltas.double() - prediction).square().mean())
+            if not math.isfinite(mse):
+                raise FloatingPointError("nonfinite residual selection score")
+            score["state_mse"] += mse
+    for score in scores:
+        score["state_mse"] /= len(split.episodes)
+    chosen = min(scores, key=lambda score: (score["state_mse"], score["scale"]))
+    return {"method": "selection_state_mse_grid_v1", "partition": "selection",
+            "aggregation": "equal_weight_episode_mean", "tie_break": "smaller_scale",
+            "scores": scores, "selected_scale": chosen["scale"],
+            "selection_episodes": len(split.episodes),
+            "checkpoint_nll_residual_scale": 1.0}
 
 
 @torch.inference_mode()
@@ -313,6 +340,7 @@ def fit_oracle(
     ensemble_size: int = 5,
     coverage: float = 0.90,
     data_protocol: str = MIXTURE_DATA_PROTOCOL,
+    architecture: str = MLP_ARCHITECTURE,
     progress: Callable[[dict[str, Any]], None] | None = None,
 ) -> dict[str, Any]:
     """Fit an independently initialized, episode-bootstrap predictive ensemble.
@@ -332,8 +360,10 @@ def fit_oracle(
         if type(value) is not int or not low <= value <= high:
             raise ValueError(f"{name} must be an integer in [{low}, {high}]")
     generation = generation_protocol(data_protocol)
-    config = OracleConfig(hidden_size=hidden_size, ensemble_size=ensemble_size)
+    config = OracleConfig(hidden_size=hidden_size, ensemble_size=ensemble_size, architecture=architecture)
     config.validate()
+    if architecture == LINEAR_RESIDUAL_ARCHITECTURE and data_protocol != MIXTURE_DATA_PROTOCOL:
+        raise ValueError("linear-residual-v1 requires episode-mixture-v2")
     if type(base_seed) is not int or not 0 <= base_seed <= 2**63 - 3_000_000:
         raise ValueError("base_seed must leave room for four disjoint million-seed namespaces")
     if isinstance(coverage, bool) or not math.isfinite(coverage) or not 0.5 <= coverage < 1:
@@ -358,7 +388,10 @@ def fit_oracle(
     negative_count = len(train_rows) - positive_count
     positive_weight = min(30.0, negative_count / max(1, positive_count)) if positive_count else 1.0
 
-    model = OracleEnsemble(config, seed=base_seed + 71_003)
+    linear_baseline = _fit_linear_delta(train_rows) if data_protocol == MIXTURE_DATA_PROTOCOL else None
+    linear_coefficients = (torch.tensor(linear_baseline["coefficients"], dtype=torch.float64)
+                           if architecture == LINEAR_RESIDUAL_ARCHITECTURE else None)
+    model = OracleEnsemble(config, seed=base_seed + 71_003, linear_coefficients=linear_coefficients)
     optimizers = [torch.optim.AdamW(member.parameters(), lr=3e-4, weight_decay=1e-5)
                   for member in model.members]
     training_groups = {episode.seed: list(episode.transitions) for episode in splits["train"].episodes}
@@ -411,6 +444,11 @@ def fit_oracle(
         raise RuntimeError("ORACLE selection did not produce a checkpoint")
     model.load_state_dict(best_state)
     model.eval()
+    residual_selection = None
+    if architecture == LINEAR_RESIDUAL_ARCHITECTURE:
+        residual_selection = _residual_selection(model, splits["selection"])
+        model.set_residual_scale(residual_selection["selected_scale"])
+        best_state = _state_to_cpu(model)
 
     state_scores, reward_scores = [], []
     calibration_episode_rows = []
@@ -489,8 +527,10 @@ def fit_oracle(
             "death_target_status": "uncalibrated_both_classes" if positive_count else "unevaluated_no_positive_training_labels",
             "batch_size": batch_size,
             "bootstrap_member_exposure": _bootstrap_exposure(splits["train"], bootstrap_draws),
-            "linear_delta_baseline": _fit_linear_delta(train_rows),
+            "linear_delta_baseline": linear_baseline,
         })
+    if residual_selection is not None:
+        artifact_payload["training"]["residual_selection"] = residual_selection
     out_path.mkdir(parents=True, exist_ok=True)
     artifact_path = out_path / "oracle.pt"
     artifact_tmp = out_path / "oracle.pt.tmp"
@@ -676,6 +716,10 @@ def _validate_training(training: dict, manifest: dict, config: OracleConfig, pro
     if protocol == MIXTURE_DATA_PROTOCOL:
         required |= {"action_counts", "training_negative_death_labels", "death_target_status", "batch_size",
                      "bootstrap_member_exposure", "linear_delta_baseline"}
+    if config.architecture == LINEAR_RESIDUAL_ARCHITECTURE:
+        if protocol != MIXTURE_DATA_PROTOCOL:
+            raise ValueError("linear-residual-v1 requires episode-mixture-v2")
+        required.add("residual_selection")
     if not isinstance(training, dict) or set(training) != required:
         raise ValueError("invalid ORACLE training fields")
     updates = _integer(training["updates_requested"], "training updates", 1, 100000)
@@ -731,13 +775,41 @@ def _validate_training(training: dict, manifest: dict, config: OracleConfig, pro
                         "pool_action_counts": [sum(episodes[seed]["action_counts"][action] for seed in draws) for action in range(N_ACTIONS)]}
             _same(member, expected, "bootstrap member exposure")
         linear = training["linear_delta_baseline"]
-        if (set(linear) != {"method", "ridge", "fit_partition", "coefficients"}
+        if (not isinstance(linear, dict) or set(linear) != {"method", "ridge", "fit_partition", "coefficients"}
                 or linear["method"] != "action_conditioned_affine_delta_ridge_v1"
                 or linear["fit_partition"] != "train" or linear["ridge"] != 1e-3):
             raise ValueError("invalid ORACLE linear delta baseline protocol")
+        values = linear["coefficients"]
+        if (not isinstance(values, list) or len(values) != N_ACTIONS * (config.observation_size + 1)
+                or any(not isinstance(row, list) or len(row) != config.observation_size for row in values)):
+            raise ValueError("invalid ORACLE linear baseline coefficient shape")
+        for row in values:
+            for value in row:
+                _number(value, "linear baseline coefficient")
         coefficients = torch.tensor(linear["coefficients"], dtype=torch.float64)
         if coefficients.shape != (N_ACTIONS * (config.observation_size + 1), config.observation_size) or not bool(torch.isfinite(coefficients).all()):
             raise ValueError("invalid ORACLE linear baseline coefficients")
+    if config.architecture == LINEAR_RESIDUAL_ARCHITECTURE:
+        selection = training["residual_selection"]
+        required_selection = {"method", "partition", "aggregation", "tie_break", "scores", "selected_scale",
+                              "selection_episodes", "checkpoint_nll_residual_scale"}
+        if not isinstance(selection, dict) or set(selection) != required_selection:
+            raise ValueError("invalid ORACLE residual selection fields")
+        for field, expected in {"method": "selection_state_mse_grid_v1", "partition": "selection",
+                                "aggregation": "equal_weight_episode_mean", "tie_break": "smaller_scale",
+                                "selection_episodes": len(manifest["seed_sets"]["selection"]),
+                                "checkpoint_nll_residual_scale": 1.0}.items():
+            _same(selection[field], expected, f"residual selection {field}")
+        scores = selection["scores"]
+        if not isinstance(scores, list) or len(scores) != len(RESIDUAL_SCALE_GRID):
+            raise ValueError("ORACLE residual selection grid is incomplete")
+        for row, scale in zip(scores, RESIDUAL_SCALE_GRID):
+            if not isinstance(row, dict) or set(row) != {"scale", "state_mse"}:
+                raise ValueError("invalid ORACLE residual selection score fields")
+            _same(row["scale"], scale, "residual selection grid")
+            _number(row["state_mse"], "residual selection MSE", 0)
+        best_scale = min(scores, key=lambda row: (row["state_mse"], row["scale"]))["scale"]
+        _same(selection["selected_scale"], best_scale, "residual selected scale")
 
 
 def _validate_artifact(payload: dict[str, Any]) -> None:
@@ -748,7 +820,8 @@ def _validate_artifact(payload: dict[str, Any]) -> None:
     if payload["activated"] is not False:
         raise ValueError("ORACLE candidate must remain opt-in")
     config_data = payload["config"]
-    if not isinstance(config_data, dict) or set(config_data) != {"hidden_size", "ensemble_size", "observation_size", "action_count"}:
+    config_fields = {"hidden_size", "ensemble_size", "observation_size", "action_count"}
+    if not isinstance(config_data, dict) or set(config_data) not in (config_fields, config_fields | {"architecture"}):
         raise ValueError("invalid ORACLE config")
     config = OracleConfig(**config_data)
     config.validate()
@@ -761,12 +834,23 @@ def _validate_artifact(payload: dict[str, Any]) -> None:
     state = payload["model_state_dict"]
     if not isinstance(state, dict) or not state:
         raise ValueError("invalid ORACLE model tensors")
-    for tensor in state.values():
-        if not isinstance(tensor, torch.Tensor) or tensor.dtype != torch.float32 or not bool(torch.isfinite(tensor).all()):
-            raise ValueError("ORACLE model tensors must be finite float32 values")
+    anchor_keys = ({f"members.{index}.linear_coefficients" for index in range(config.ensemble_size)}
+                   if config.architecture == LINEAR_RESIDUAL_ARCHITECTURE else set())
+    for name, tensor in state.items():
+        expected_dtype = torch.float64 if name in anchor_keys else torch.float32
+        if not isinstance(tensor, torch.Tensor) or tensor.dtype != expected_dtype or not bool(torch.isfinite(tensor).all()):
+            raise ValueError("ORACLE model tensors must be finite values with registered dtypes")
     if model_state_sha256(payload["model_state_dict"]) != payload["model_sha256"]:
         raise ValueError("ORACLE model state hash mismatch")
     _load_model(payload)  # strict keys and tensor shapes
+    if config.architecture == LINEAR_RESIDUAL_ARCHITECTURE:
+        coefficients = torch.tensor(payload["training"]["linear_delta_baseline"]["coefficients"], dtype=torch.float64)
+        scale = payload["training"]["residual_selection"]["selected_scale"]
+        for index in range(config.ensemble_size):
+            if not torch.equal(state[f"members.{index}.linear_coefficients"], coefficients):
+                raise ValueError("ORACLE frozen linear anchor contradicts training baseline")
+            if float(state[f"members.{index}.residual_scale"].item()) != scale:
+                raise ValueError("ORACLE frozen residual scale contradicts selection")
 
 
 def _decode_artifact(raw: bytes) -> dict[str, Any]:
@@ -774,7 +858,7 @@ def _decode_artifact(raw: bytes) -> dict[str, Any]:
         payload = torch.load(io.BytesIO(raw), map_location="cpu", weights_only=True)
         _validate_artifact(payload)
         return payload
-    except (KeyError, TypeError, RuntimeError, OverflowError, AttributeError) as error:
+    except (KeyError, TypeError, RuntimeError, OverflowError, AttributeError, EOFError, pickle.UnpicklingError) as error:
         raise ValueError(f"invalid ORACLE artifact: {error}") from error
 
 
@@ -795,10 +879,10 @@ def _load_model(payload: dict[str, Any]) -> OracleEnsemble:
 
 def verify_fit_receipt(receipt_path: str | Path, *, replay_data: bool = True) -> dict[str, Any]:
     path = Path(receipt_path)
-    if not path.is_file() or path.stat().st_size > 32 * 1024 * 1024:
-        raise ValueError("ORACLE fit receipt is missing or too large")
-    receipt = json.loads(path.read_text(encoding="utf-8"))
-    if not isinstance(receipt, dict) or receipt.get("schema") != FIT_RECEIPT_SCHEMA:
+    receipt = json.loads(_bounded_read(path, 32 * 1024 * 1024))
+    required = {"schema", "status", "activated", "world_version", "model_sha256", "artifact_sha256",
+                "artifact_path", "config", "training_manifest", "training", "calibration", "limits", "receipt_sha256"}
+    if not isinstance(receipt, dict) or set(receipt) != required or receipt.get("schema") != FIT_RECEIPT_SCHEMA:
         raise ValueError("unsupported ORACLE fit receipt")
     expected_receipt_hash = receipt.pop("receipt_sha256", None)
     if not isinstance(expected_receipt_hash, str) or _sha256_bytes(canonical_bytes(receipt)) != expected_receipt_hash:
@@ -812,14 +896,17 @@ def verify_fit_receipt(receipt_path: str | Path, *, replay_data: bool = True) ->
     artifact_path = Path(receipt.get("artifact_path", ""))
     if not artifact_path.is_absolute():
         artifact_path = path.parent / artifact_path
-    if not artifact_path.is_file() or _file_sha256(artifact_path) != receipt.get("artifact_sha256"):
+    artifact_bytes = _bounded_read(artifact_path, 512 * 1024 * 1024)
+    if _sha256_bytes(artifact_bytes) != receipt.get("artifact_sha256"):
         raise ValueError("ORACLE artifact file hash mismatch")
-    payload = load_oracle_artifact(artifact_path)
+    payload = _decode_artifact(artifact_bytes)
     if payload["model_sha256"] != receipt.get("model_sha256"):
         raise ValueError("ORACLE model identity mismatch")
     for key in ("config", "training", "calibration", "training_manifest"):
         if canonical_bytes(receipt.get(key)) != canonical_bytes(payload.get(key)):
             raise ValueError(f"ORACLE receipt {key} contradicts artifact payload")
+    if not isinstance(receipt["limits"], list) or not receipt["limits"] or any(not isinstance(value, str) for value in receipt["limits"]):
+        raise ValueError("invalid ORACLE fit limitations")
     if replay_data:
         protocol = receipt["training_manifest"]
         if source_hashes() != protocol["source_sha256"]:
@@ -838,6 +925,29 @@ def verify_fit_receipt(receipt_path: str | Path, *, replay_data: bool = True) ->
             if actual != expected:
                 raise ValueError(f"ORACLE {name} transitions do not replay from the recorded seeds")
         model = _load_model(payload)
+        training = payload["training"]
+        train_rows = _flatten(replayed["train"])
+        overall_reward = sum(row.reward for row in train_rows) / len(train_rows)
+        action_rows = [[row for row in train_rows if row.action == action] for action in range(N_ACTIONS)]
+        # Match the historical sequential accumulator exactly; Python 3.12's
+        # compensated sum() differs in the last bits from repeated +=.
+        reward_sums = [0.0] * N_ACTIONS
+        for row in train_rows:
+            reward_sums[row.action] += row.reward
+        reward_means = [reward_sums[action] / len(rows) if rows else overall_reward
+                        for action, rows in enumerate(action_rows)]
+        _same(training["reward_mean_by_action"], reward_means, "replayed reward baseline")
+        _same(training["death_count_by_action"], [sum(row.death for row in rows) for rows in action_rows], "replayed death exposure")
+        if data_protocol == MIXTURE_DATA_PROTOCOL:
+            _same(training["linear_delta_baseline"], _fit_linear_delta(train_rows), "replayed linear baseline")
+            _same(training["bootstrap_member_exposure"], _bootstrap_exposure(replayed["train"], training["bootstrap_episode_draws"]), "replayed bootstrap exposure")
+        if model.config.architecture == LINEAR_RESIDUAL_ARCHITECTURE:
+            _same(training["residual_selection"], _residual_selection(model, replayed["selection"]),
+                  "replayed residual selection scores")
+        checkpoint_scale = 1.0 if model.config.architecture == LINEAR_RESIDUAL_ARCHITECTURE else None
+        if _selection_loss(model, replayed["selection"], training["death_positive_weight"],
+                           residual_scale=checkpoint_scale) != training["selection_nll"]:
+            raise ValueError("ORACLE selected checkpoint loss does not replay")
         replayed_calibration = [episode_calibration_scores(model, episode) for episode in replayed["calibration"].episodes]
         state_scores = [score[0] for score in replayed_calibration]
         reward_scores = [score[1] for score in replayed_calibration]
@@ -850,4 +960,6 @@ def verify_fit_receipt(receipt_path: str | Path, *, replay_data: bool = True) ->
             raise ValueError("ORACLE reward conformal quantile does not replay")
     receipt["receipt_sha256"] = expected_receipt_hash
     return {"valid": True, "replayed_data": replay_data, "artifact_sha256": receipt["artifact_sha256"],
-            "model_sha256": receipt["model_sha256"], "episode_splits": list(receipt["training_manifest"]["seed_sets"])}
+            "model_sha256": receipt["model_sha256"], "episode_splits": list(receipt["training_manifest"]["seed_sets"]),
+            "data_protocol": receipt["training_manifest"].get("data_protocol", LEGACY_DATA_PROTOCOL),
+            "verification_scope": "artifact_binding_environment_and_prediction_replay" if replay_data else "artifact_binding_and_structure"}

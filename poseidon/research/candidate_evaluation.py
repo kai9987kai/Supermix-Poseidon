@@ -15,7 +15,9 @@ import torch
 from .contracts import EpisodeSplit, split_summary
 from .oracle_model import OracleEnsemble
 from .oracle_training import (_atomic_json, _batch, _file_sha256, _load_model,
-                              load_oracle_artifact, source_hashes, collect_split)
+                              load_oracle_artifact, source_hashes, collect_split,
+                              LEGACY_DATA_PROTOCOL, MIXTURE_DATA_PROTOCOL, generation_protocol,
+                              linear_delta_features, protocol_split_summary, episode_behavior)
 from .contracts import canonical_bytes
 
 EVALUATION_SCHEMA = "poseidon-oracle-evaluation-v1"
@@ -49,6 +51,10 @@ def _evaluate_split(model: OracleEnsemble, split: EpisodeSplit, artifact: dict[s
     death_baseline = float(train["death_probability_prior"])
     state_quantile = float(artifact["calibration"]["state_standardized_error_quantile"])
     reward_quantile = float(artifact["calibration"]["reward_standardized_error_quantile"])
+    data_protocol = artifact["training_manifest"].get("data_protocol", LEGACY_DATA_PROTOCOL)
+    linear_baseline = train.get("linear_delta_baseline")
+    linear_coefficients = (torch.tensor(linear_baseline["coefficients"], dtype=torch.float64)
+                           if linear_baseline is not None else None)
     episode_metrics = []
     model.eval()
     for episode in split.episodes:
@@ -87,10 +93,14 @@ def _evaluate_split(model: OracleEnsemble, split: EpisodeSplit, artifact: dict[s
             "mean_state_interval_half_width": float((state_quantile * delta_scale).mean()),
             "mean_reward_interval_half_width": float((reward_quantile * reward_scale).mean()),
         })
+        if linear_coefficients is not None:
+            predicted_delta = linear_delta_features(obs.double(), actions) @ linear_coefficients
+            episode_metrics[-1]["linear_action_delta_mse"] = float((deltas.double() - predicted_delta).square().mean())
+            episode_metrics[-1]["behavior_policy"] = episode_behavior(episode.seed, data_protocol)
     state_gain = [row["persistence_state_delta_mse"] - row["candidate_state_delta_mse"] for row in episode_metrics]
     reward_gain = [row["action_mean_reward_mae"] - row["candidate_reward_mae"] for row in episode_metrics]
     death_gain = [row["training_prior_death_brier"] - row["candidate_death_brier"] for row in episode_metrics]
-    return {
+    result = {
         "episodes": len(episode_metrics),
         "transitions": sum(row["steps"] for row in episode_metrics),
         "death_transitions": sum(row["deaths"] for row in episode_metrics),
@@ -114,6 +124,27 @@ def _evaluate_split(model: OracleEnsemble, split: EpisodeSplit, artifact: dict[s
         },
         "per_episode": episode_metrics,
     }
+    if linear_coefficients is not None:
+        linear_gain = [row["linear_action_delta_mse"] - row["candidate_state_delta_mse"] for row in episode_metrics]
+        result["metrics"].update({
+            "linear_action_delta_mse": _mean(episode_metrics, "linear_action_delta_mse"),
+            "paired_state_mse_gain_over_linear": sum(linear_gain) / len(linear_gain),
+            "paired_state_mse_gain_over_linear_95pct_bootstrap_interval": _bootstrap_interval(linear_gain, seed=episode_metrics[0]["seed"] + 504, reps=bootstrap_reps),
+        })
+        result["death_target_status"] = ("uncalibrated_both_classes_present" if result["death_transitions"] else
+                                          "unevaluated_no_positive_test_labels")
+        result["by_behavior"] = {}
+        for behavior in sorted({row["behavior_policy"] for row in episode_metrics}):
+            group = [row for row in episode_metrics if row["behavior_policy"] == behavior]
+            result["by_behavior"][behavior] = {
+                "episodes": len(group), "death_transitions": sum(row["deaths"] for row in group),
+                "candidate_state_delta_mse": _mean(group, "candidate_state_delta_mse"),
+                "linear_action_delta_mse": _mean(group, "linear_action_delta_mse"),
+                "state_episode_interval_coverage": _mean(group, "state_episode_interval_covered"),
+                "reward_episode_interval_coverage": _mean(group, "reward_episode_interval_covered"),
+                "mean_state_interval_half_width": _mean(group, "mean_state_interval_half_width"),
+            }
+    return result
 
 
 def evaluate_oracle(
@@ -147,11 +178,13 @@ def evaluate_oracle(
     if len(all_eval_seeds) != len(set(all_eval_seeds)) or known_seeds.intersection(all_eval_seeds):
         raise ValueError("evaluation episode seeds overlap fit partitions or each other")
     max_steps = int(fit_manifest["max_steps"])
+    data_protocol = fit_manifest.get("data_protocol", LEGACY_DATA_PROTOCOL)
     test_splits = {
         "id_test": collect_split("id_test", seed_sets["id_test"], max_steps=max_steps,
-                                  fixed_scarcity=1.25),
+                                  fixed_scarcity=1.25 if data_protocol == LEGACY_DATA_PROTOCOL else None,
+                                  data_protocol=data_protocol),
         "ood_scarcity_test": collect_split("ood_scarcity_test", seed_sets["ood_scarcity_test"], max_steps=max_steps,
-                                           fixed_scarcity=2.5),
+                                           fixed_scarcity=2.5, data_protocol=data_protocol),
     }
     summary_by_condition = {}
     for name, split in test_splits.items():
@@ -161,7 +194,7 @@ def evaluate_oracle(
     # Evaluation code is added separately to the training sources so the exact
     # analysis logic is visible even if the fitted artifact predates it.
     source["candidate_evaluation.py"] = _file_sha256(Path(__file__).resolve())
-    training_summaries = {name: split_summary(split) for name, split in test_splits.items()}
+    training_summaries = {name: protocol_split_summary(split, data_protocol) for name, split in test_splits.items()}
     receipt = {
         "schema": EVALUATION_SCHEMA,
         "status": "evaluated_candidate_not_promoted",
@@ -197,6 +230,14 @@ def evaluate_oracle(
             "Death Brier scores are not a probability calibration claim; the binary death head was not calibrated.",
         ],
     }
+    if data_protocol == MIXTURE_DATA_PROTOCOL:
+        receipt["protocol"].update({
+            "data_protocol": data_protocol,
+            "id_condition": "held-out seeds from the identical frozen calibration environment/behavior mixture",
+            "id_generation": generation_protocol(data_protocol),
+            "state_linear_baseline": "training-only ridge affine observation delta conditioned on executed action",
+            "calibrator": "disjoint calibration episodes only; applied unchanged to both ID and OOD",
+        })
     receipt["receipt_sha256"] = hashlib.sha256(canonical_bytes(receipt)).hexdigest()
     out_path.mkdir(parents=True, exist_ok=True)
     _atomic_json(out_path / "evaluation_receipt.json", receipt)

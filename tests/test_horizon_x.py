@@ -59,9 +59,11 @@ def test_multi_horizon_planning_and_ledger(core, oracle):
     assert "dynamic_lambda" in res
     assert len(res["candidate_evaluations"]) == N_ACTIONS
 
+    assert res["planning_enabled"] is False
+    assert res["selected_action"] == core.act(obs)
     for cand in res["candidate_evaluations"]:
-        assert 1 in cand["horizon_scores"]
-        assert 4 in cand["horizon_scores"]
+        assert cand["horizon_scores"] == {}
+        assert cand["evaluated"] is False
 
     summary = planner.summary()
     assert summary["total_steps"] == 1

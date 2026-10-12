@@ -4,6 +4,7 @@ Repeated fixed-seed results are selection evidence, not an unbiased estimate of
 improvement. Only the final selected candidate is compared with the original
 baseline on disjoint audit seeds, and audit results never feed proposal selection.
 No command restores, stages, commits, or promotes files in the shared checkout.
+An explicit --oracle artifact is required; fallback-only searches stop inactive.
 """
 from __future__ import annotations
 
@@ -36,6 +37,11 @@ TEST_FILES = [
 SOURCE_DIRS = ("poseidon", "tests", "configs")
 SOURCE_FILES = ("pyproject.toml", "pytest.ini", "setup.cfg", "requirements.txt")
 CORE_RELATIVE_PATH = "runs/search_core.pt"
+ORACLE_RELATIVE_PATH = "runs/search_oracle.pt"
+
+
+class InactiveSearchError(RuntimeError):
+    """The controller cannot exercise the searched predictive parameters."""
 
 # Search Space Definitions: (filepath, regex_pattern, min_val, max_val, format_str)
 SEARCH_SPACE = [
@@ -227,7 +233,9 @@ def source_binding(workspace: Path) -> dict:
                 for path in source_files(workspace)}
     digest = hashlib.sha256(json.dumps(manifest, sort_keys=True).encode()).hexdigest()
     return {"source_sha256": digest, "source_files": manifest,
-            "core_sha256": file_hash(workspace / CORE_RELATIVE_PATH)}
+            "core_sha256": file_hash(workspace / CORE_RELATIVE_PATH),
+            "oracle_sha256": (file_hash(workspace / ORACLE_RELATIVE_PATH)
+                              if (workspace / ORACLE_RELATIVE_PATH).is_file() else None)}
 
 
 def resolve_core(source_root: Path, core_path: Path | None) -> Path:
@@ -248,12 +256,14 @@ def resolve_core(source_root: Path, core_path: Path | None) -> Path:
     return path
 
 
-def copy_workspace(source: Path, destination: Path, core: Path, deadline: float) -> dict:
+def copy_workspace(source: Path, destination: Path, core: Path, deadline: float,
+                   *, oracle: Path | None = None) -> dict:
     """Copy bytes, never links; refuse a moving source rather than mix revisions."""
     remaining_seconds(deadline)
     files = source_files(source)
     before = {path.relative_to(source).as_posix(): file_hash(path) for path in files}
     core_before = file_hash(core)
+    oracle_before = file_hash(oracle) if oracle is not None else None
     destination.mkdir(parents=True)
     for path in files:
         remaining_seconds(deadline)
@@ -264,6 +274,9 @@ def copy_workspace(source: Path, destination: Path, core: Path, deadline: float)
     target_core.parent.mkdir(parents=True, exist_ok=True)
     remaining_seconds(deadline)
     shutil.copyfile(core, target_core)
+    if oracle is not None:
+        remaining_seconds(deadline)
+        shutil.copyfile(oracle, destination / ORACLE_RELATIVE_PATH)
     (destination / "runs/active_core.json").write_text(
         json.dumps({"checkpoint": CORE_RELATIVE_PATH, "sha256": core_before,
                     "reason": "isolated search snapshot; never active in shared checkout"}, indent=2),
@@ -274,13 +287,15 @@ def copy_workspace(source: Path, destination: Path, core: Path, deadline: float)
         raise RuntimeError("source or core changed while copying; snapshot is unusable")
     if binding["core_sha256"] != core_before:
         raise RuntimeError("copied core does not match its source")
+    if oracle is not None and (file_hash(oracle) != oracle_before or binding["oracle_sha256"] != oracle_before):
+        raise RuntimeError("ORACLE changed while copying or copied artifact does not match its source")
     return binding
 
 
 def run_command(command: list[str], *, workspace: Path, deadline: float,
                 log_name: str = "command") -> subprocess.CompletedProcess:
     """Run one owned child with a hard remaining-time limit and local temp files."""
-    timeout = remaining_seconds(deadline)
+    remaining_seconds(deadline)
     temporary = workspace / ".tmp"
     temporary.mkdir(exist_ok=True)
     env = os.environ.copy()
@@ -292,8 +307,8 @@ def run_command(command: list[str], *, workspace: Path, deadline: float,
                                stderr=subprocess.PIPE, text=True, encoding="utf-8", errors="replace")
     stdout, stderr = "", ""
     try:
-        stdout, stderr = process.communicate(timeout=timeout)
-    except (subprocess.TimeoutExpired, KeyboardInterrupt):
+        stdout, stderr = process.communicate(timeout=remaining_seconds(deadline))
+    except (TimeoutError, subprocess.TimeoutExpired, KeyboardInterrupt):
         # Only the child created above is stopped; unrelated user jobs are never touched.
         process.kill()
         stdout, stderr = process.communicate()
@@ -315,10 +330,16 @@ def run_tests(workspace: Path, *, deadline: float) -> bool:
 
 
 def run_benchmark(workspace: Path, *, seeds: list[int], deadline: float,
-                  label: str = "selection") -> dict:
+                  label: str = "selection", oracle_path: Path | None = None) -> dict:
     """Fresh agent/core per episode; retain raw outcomes for every specified seed."""
+    if oracle_path is not None:
+        oracle_path = Path(oracle_path).resolve()
+        if not oracle_path.is_relative_to(workspace.resolve()) or not oracle_path.is_file():
+            raise ValueError("benchmark ORACLE must be an existing workspace-local copied artifact")
+    checkpoint = str(oracle_path) if oracle_path is not None else None
     script = f"""
 import json, random, torch
+from collections import Counter
 from poseidon.cognitive_agent import CognitiveAgent
 from poseidon.core import CoreRuntime
 from poseidon.worldlab import POMDPTidePool, POMDPConfig
@@ -328,12 +349,19 @@ rows = []
 for seed in {seeds!r}:
     random.seed(seed)
     torch.manual_seed(seed)
-    agent = CognitiveAgent(core=CoreRuntime({CORE_RELATIVE_PATH!r}))
+    agent = CognitiveAgent(core=CoreRuntime({CORE_RELATIVE_PATH!r}), oracle_checkpoint={checkpoint!r})
     env = POMDPTidePool(POMDPConfig(seed=seed, scarcity={EVAL_SCARCITY}, sensor_noise_std=0.02,
                                   fog_threshold=0.65), max_steps={EVAL_MAX_STEPS})
     outcome = agent.rollout(env, max_steps={EVAL_MAX_STEPS})
+    decisions = outcome['decisions']
+    if len(decisions) != outcome['steps'] or any(type(d['planning_enabled']) is not bool for d in decisions):
+        raise ValueError('benchmark requires complete planning telemetry')
+    enabled = sum(d['planning_enabled'] for d in decisions)
+    fallback = dict(Counter(d.get('fallback_reason') or 'unspecified_fallback'
+                            for d in decisions if not d['planning_enabled']))
     rows.append({{'seed': seed, 'total_reward': outcome['total_reward'], 'survived': outcome['survived'],
-                 'steps': outcome['steps'], 'overrides': outcome['overrides'], 'trajectory': outcome}})
+                 'steps': outcome['steps'], 'overrides': outcome['overrides'],
+                 'planning_enabled_steps': enabled, 'fallback_reasons': fallback, 'trajectory': outcome}})
 print('__RESULT__' + json.dumps({{'per_seed': rows}}, allow_nan=False))
 """
     result = run_command([sys.executable, "-c", script], workspace=workspace,
@@ -350,12 +378,24 @@ print('__RESULT__' + json.dumps({{'per_seed': rows}}, allow_nan=False))
     for row in rows:
         if (not math.isfinite(row["total_reward"]) or type(row["survived"]) is not bool
                 or type(row["steps"]) is not int or type(row["overrides"]) is not int
-                or not 0 <= row["overrides"] <= row["steps"] <= EVAL_MAX_STEPS):
+                or not 0 <= row["overrides"] <= row["steps"] <= EVAL_MAX_STEPS
+                or type(row["planning_enabled_steps"]) is not int
+                or not 0 <= row["planning_enabled_steps"] <= row["steps"]
+                or not isinstance(row["fallback_reasons"], dict)
+                or any(not isinstance(reason, str) or type(count) is not int or count < 1
+                       for reason, count in row["fallback_reasons"].items())
+                or sum(row["fallback_reasons"].values()) + row["planning_enabled_steps"] != row["steps"]):
             raise ValueError("benchmark contains invalid or nonfinite outcomes")
     rewards = [row["total_reward"] for row in rows]
+    fallback_reasons = {}
+    for row in rows:
+        for reason, count in row["fallback_reasons"].items():
+            fallback_reasons[reason] = fallback_reasons.get(reason, 0) + count
     return {"per_seed": rows, "rewards": rewards, "mean_reward": sum(rewards) / len(rows),
             "survival_rate": sum(row["survived"] for row in rows) / len(rows),
             "overrides": sum(row["overrides"] for row in rows),
+            "planning_enabled_steps": sum(row["planning_enabled_steps"] for row in rows),
+            "fallback_reasons": fallback_reasons,
             "total_steps": sum(row["steps"] for row in rows)}
 
 
@@ -426,12 +466,14 @@ def write_json(path: Path, payload: dict) -> None:
 
 def run_search(*, source_root: Path = ROOT, output_root: Path = OUT_DIR,
                end_time: datetime, seed: int = 1729, max_iterations: int | None = None,
-               core_path: Path | None = None) -> dict:
+               core_path: Path | None = None, oracle_path: Path | None = None) -> dict:
     """Search frozen copies with 20% of the time reserved for the final audit.
 
     The source tree may already be dirty. It is never an execution workspace or
     an incumbent destination. Selection can overfit its four reused seeds; audit
     is one descriptive four-seed check, not a generalization or significance claim.
+    Explicit ORACLE selection is required to exercise predictive parameters;
+    missing artifacts or an entirely disabled planner stop before proposals.
     """
     source_root, output_root = Path(source_root).resolve(), Path(output_root).resolve()
     if max_iterations is not None and (type(max_iterations) is not int or max_iterations < 1):
@@ -453,6 +495,10 @@ def run_search(*, source_root: Path = ROOT, output_root: Path = OUT_DIR,
               "selection_budget_fraction": 0.8, "source_root": str(source_root),
               "baseline_workspace": str(baseline), "selection_seeds": list(SELECTION_SEEDS),
               "audit_seeds": list(AUDIT_SEEDS), "selected_candidate": None, "candidates": [],
+              "protocol": {"max_steps": EVAL_MAX_STEPS, "scarcity": EVAL_SCARCITY,
+                           "sensor_noise_std": 0.02, "fog_threshold": 0.65, "torch_threads": 2,
+                           "episode_reset": "fresh_core_and_agent",
+                           "search_source_sha256": file_hash(Path(__file__))},
               "audit": {"status": "not_run", "reason": "no selected candidate"},
               "report_path": str(run_dir / "report.json"), "active": False,
               "interpretation": "Selection reuses fixed seeds and may overfit. Disjoint audit seeds are used "
@@ -462,13 +508,26 @@ def run_search(*, source_root: Path = ROOT, output_root: Path = OUT_DIR,
     rng = random.Random(seed)
     try:
         remaining_seconds(selection_deadline)
+        if oracle_path is None:
+            raise InactiveSearchError("No trained ORACLE selected; use --oracle to enable predictive parameter search.")
+        source_oracle = Path(oracle_path)
+        source_oracle = (source_oracle if source_oracle.is_absolute() else source_root / source_oracle).resolve()
+        if not source_oracle.is_file():
+            raise ValueError(f"selected ORACLE artifact does not exist: {source_oracle}")
         source_core = resolve_core(source_root, core_path)
-        binding = copy_workspace(source_root, baseline, source_core, selection_deadline)
+        binding = copy_workspace(source_root, baseline, source_core, selection_deadline, oracle=source_oracle)
         result["baseline_binding"] = binding
         result["core_origin"] = str(source_core)
+        result["oracle_origin"] = str(source_oracle)
         incumbent, incumbent_binding = baseline, binding
-        base = run_benchmark(baseline, seeds=SELECTION_SEEDS, deadline=selection_deadline)
+        base = run_benchmark(baseline, seeds=SELECTION_SEEDS, deadline=selection_deadline,
+                             oracle_path=baseline / ORACLE_RELATIVE_PATH)
+        if source_binding(baseline) != binding:
+            raise RuntimeError("baseline source, frozen core or ORACLE changed during evaluation")
         result["baseline_selection"] = base
+        if base["planning_enabled_steps"] == 0:
+            raise InactiveSearchError("Planning was disabled for every baseline step; predictive parameter search is inert. "
+                                      f"Fallback reasons: {base['fallback_reasons']}")
         incumbent_result = base
         iteration = 0
         while time.monotonic() < selection_deadline and (max_iterations is None or iteration < max_iterations):
@@ -481,9 +540,14 @@ def run_search(*, source_root: Path = ROOT, output_root: Path = OUT_DIR,
             current["workspace"] = str(candidate)
             if proposal["old"] == proposal["new"]:
                 current["status"] = "SKIPPED_UNCHANGED"
+                current.pop("workspace")
+                write_json(run_dir / f"receipt_{iteration:04d}.json", current)
                 current = None
                 continue
-            copy_workspace(incumbent, candidate, incumbent / CORE_RELATIVE_PATH, selection_deadline)
+            copied_binding = copy_workspace(incumbent, candidate, incumbent / CORE_RELATIVE_PATH, selection_deadline,
+                                             oracle=incumbent / ORACLE_RELATIVE_PATH)
+            if copied_binding != incumbent_binding:
+                raise RuntimeError("incumbent source, frozen core or ORACLE changed since selection")
             spec = next(item for item in SEARCH_SPACE if item["name"] == proposal["name"])
             write_param_value(spec, proposal["new"], candidate)
             candidate_binding = source_binding(candidate)
@@ -491,9 +555,15 @@ def run_search(*, source_root: Path = ROOT, output_root: Path = OUT_DIR,
             if not run_tests(candidate, deadline=selection_deadline):
                 current["status"] = "REJECTED_TESTS_FAILED"
             else:
-                candidate_result = run_benchmark(candidate, seeds=SELECTION_SEEDS, deadline=selection_deadline)
+                candidate_result = run_benchmark(candidate, seeds=SELECTION_SEEDS, deadline=selection_deadline,
+                                                oracle_path=candidate / ORACLE_RELATIVE_PATH)
                 if source_binding(candidate) != candidate_binding:
-                    raise RuntimeError("candidate source or frozen core changed during evaluation")
+                    raise RuntimeError("candidate source, frozen core or ORACLE changed during evaluation")
+                if candidate_result["planning_enabled_steps"] == 0:
+                    current["selection"] = {"incumbent": incumbent_result, "candidate": candidate_result}
+                    current["status"] = "REJECTED_PLANNING_DISABLED"
+                    raise InactiveSearchError("Planning was disabled for every candidate step; search stopped. "
+                                              f"Fallback reasons: {candidate_result['fallback_reasons']}")
                 paired = comparison(incumbent_result, candidate_result)
                 current["selection"] = {"incumbent": incumbent_result, "candidate": candidate_result, **paired}
                 current["status"] = "SELECTED_INACTIVE" if paired["improvement_supported"] else "REJECTED_NO_IMPROVEMENT"
@@ -505,6 +575,8 @@ def run_search(*, source_root: Path = ROOT, output_root: Path = OUT_DIR,
             write_json(Path(result["report_path"]), result)
             current = None
         result["status"] = "completed"
+    except InactiveSearchError as error:
+        result["status"], result["reason"] = "inactive", str(error)
     except KeyboardInterrupt:
         result["status"] = "cancelled"
         if current is not None:
@@ -529,13 +601,19 @@ def run_search(*, source_root: Path = ROOT, output_root: Path = OUT_DIR,
                                     "candidate_binding": result["selected_candidate"]["binding"]}
         try:
             remaining_seconds(deadline)
-            audit["baseline"] = run_benchmark(baseline, seeds=AUDIT_SEEDS, deadline=deadline, label="audit")
+            audit["baseline"] = run_benchmark(baseline, seeds=AUDIT_SEEDS, deadline=deadline, label="audit",
+                                              oracle_path=baseline / ORACLE_RELATIVE_PATH)
             selected = Path(result["selected_candidate"]["workspace"])
-            audit["candidate"] = run_benchmark(selected, seeds=AUDIT_SEEDS, deadline=deadline, label="audit")
+            audit["candidate"] = run_benchmark(selected, seeds=AUDIT_SEEDS, deadline=deadline, label="audit",
+                                               oracle_path=selected / ORACLE_RELATIVE_PATH)
             if source_binding(baseline) != result["baseline_binding"] or source_binding(selected) != audit["candidate_binding"]:
-                raise RuntimeError("source or core changed during audit")
+                raise RuntimeError("source, core or ORACLE changed during audit")
+            if audit["baseline"]["planning_enabled_steps"] == 0 or audit["candidate"]["planning_enabled_steps"] == 0:
+                raise InactiveSearchError("Audit planning was entirely disabled; improvement cannot be supported.")
             audit.update(comparison(audit["baseline"], audit["candidate"]))
             audit["status"] = "completed"
+        except InactiveSearchError as error:
+            audit["status"], audit["reason"] = "inactive", str(error)
         except KeyboardInterrupt:
             audit["status"], result["status"] = "cancelled", "cancelled"
         except (TimeoutError, subprocess.TimeoutExpired):
@@ -547,10 +625,11 @@ def run_search(*, source_root: Path = ROOT, output_root: Path = OUT_DIR,
     result["finished_at"] = datetime.now().isoformat()
     write_json(Path(result["report_path"]), result)
     report = (f"# Poseidon isolated parameter search\n\nStatus: {result['status']}\n\n"
+              f"{result.get('reason', '')}\n\n"
               f"Proposals: {len(result['candidates'])}. Audit: {result['audit']['status']}.\n\n"
               f"{result['interpretation']}\n\n"
               "The source checkout, Git HEAD and active core pointer were not promoted or restored.\n\n"
-              "Full source/core bindings, raw per-seed results and candidate paths are in report.json.\n")
+              "Full source/core/ORACLE bindings, raw per-seed results and candidate paths are in report.json.\n")
     (run_dir / "OVERNIGHT_REPORT.md").write_text(report, encoding="utf-8")
     return result
 
@@ -562,6 +641,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--seed", type=int, default=1729, help="Deterministic proposal RNG seed")
     parser.add_argument("--max-iterations", type=int, help="Additional finite proposal limit")
     parser.add_argument("--core", type=Path, help="Explicit trained core; defaults to the active checkpoint")
+    parser.add_argument("--oracle", type=Path, help="Explicit trained ORACLE; search stops inactive if omitted or planning is disabled")
     parser.add_argument("--output-dir", type=Path, default=OUT_DIR)
     args = parser.parse_args(argv)
     try:
@@ -572,9 +652,12 @@ def main(argv: list[str] | None = None) -> int:
         parser.error(str(error))
     print(f"Isolated search ending at {end_time.isoformat()}; selected candidates stay inactive.", flush=True)
     result = run_search(source_root=ROOT, output_root=args.output_dir, end_time=end_time,
-                        seed=args.seed, max_iterations=args.max_iterations, core_path=args.core)
+                        seed=args.seed, max_iterations=args.max_iterations, core_path=args.core,
+                        oracle_path=args.oracle)
     print(f"Search {result['status']}; report: {result['report_path']}", flush=True)
-    return 1 if result["status"] == "failed" else (130 if result["status"] == "cancelled" else 0)
+    if result.get("reason"):
+        print(result["reason"], flush=True)
+    return {"failed": 1, "inactive": 2, "cancelled": 130}.get(result["status"], 0)
 
 
 if __name__ == "__main__":
