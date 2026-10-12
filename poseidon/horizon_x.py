@@ -212,6 +212,11 @@ class HorizonXPlanner:
                 if act == 2 and water_deficit > 0.0 and w_lcb > float(observation[7]):
                     composite_score += 0.05 * water_deficit * (w_lcb - float(observation[7]))
 
+                # Decision-Value-Gated Episodic Memory modulation
+                dv_deltas = memory_context.get("decision_value_deltas")
+                if dv_deltas is not None and len(dv_deltas) == N_ACTIONS:
+                    composite_score += float(dv_deltas[act])
+
             if not math.isfinite(composite_score):
                 raise FloatingPointError("nonfinite ORACLE composite score")
             action_evals.append({

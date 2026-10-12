@@ -14,6 +14,8 @@ from typing import Mapping, Sequence
 from ..world import ACTIONS, OBSERVATION_NAMES, OBS_SIZE, WORLD_VERSION
 
 CONTRACT_VERSION = "poseidon-transition-contract-v1"
+ALIAS_WORLD_VERSION = "alias-tidepool-v1"
+SUPPORTED_WORLD_VERSIONS = (WORLD_VERSION, ALIAS_WORLD_VERSION)
 
 
 @dataclass(frozen=True)
@@ -26,8 +28,8 @@ class EnvironmentContract:
     def validate(self) -> None:
         if self.version != CONTRACT_VERSION:
             raise ValueError("unsupported environment-contract version")
-        if self.world_version != WORLD_VERSION:
-            raise ValueError("environment contract targets a different world version")
+        if self.world_version not in SUPPORTED_WORLD_VERSIONS:
+            raise ValueError("environment contract targets an unsupported world version")
         if len(self.observation_names) != OBS_SIZE or len(set(self.observation_names)) != OBS_SIZE:
             raise ValueError("observation schema is invalid")
         if self.observation_names != OBSERVATION_NAMES or self.actions != ACTIONS:
@@ -36,6 +38,12 @@ class EnvironmentContract:
 
 def tidepool_contract() -> EnvironmentContract:
     contract = EnvironmentContract(CONTRACT_VERSION, WORLD_VERSION, OBSERVATION_NAMES, ACTIONS)
+    contract.validate()
+    return contract
+
+
+def alias_tidepool_contract() -> EnvironmentContract:
+    contract = EnvironmentContract(CONTRACT_VERSION, ALIAS_WORLD_VERSION, OBSERVATION_NAMES, ACTIONS)
     contract.validate()
     return contract
 

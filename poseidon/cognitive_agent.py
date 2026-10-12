@@ -125,6 +125,7 @@ class CognitiveAgent:
         neuro_config: NeuroConfig | None = None,
         active_inference_config: ActiveInferenceConfig | None = None,
         oracle_checkpoint: str | Path | None = None,
+        decision_value_memory: Any | None = None,
     ):
         self.core = core or CoreRuntime(active_core_path())
         self.mode = mode
@@ -132,6 +133,7 @@ class CognitiveAgent:
             raise ValueError(f"mode must be one of {MNEMOSYNE_MODES}, got {mode}")
 
         # Subsystems
+        self.decision_value_memory = decision_value_memory
         self.oracle = (ResearchOracleAdapter(oracle_checkpoint) if oracle_checkpoint is not None
                        else OracleEnsemble(oracle_config or OracleConfig()))
         mnemo_cfg = mnemosyne_config or MnemosyneConfig(mode=self.mode)
@@ -166,6 +168,8 @@ class CognitiveAgent:
             self.mode = mode
 
         self.mnemosyne.reset(mode=self.mode)
+        if self.decision_value_memory is not None:
+            self.decision_value_memory.reset(mode=self.mode if self.mode in ("intact", "similarity", "erased", "shifted", "donor", "baseline") else "intact")
         self.metacognition = MetacognitiveMonitor(self.metacognition.config)
         self.planner.override_history.clear()
         self.planner.step_counter = 0
@@ -191,6 +195,10 @@ class CognitiveAgent:
             observation=obs_list,
             predicted_observation=self.predicted_next_obs,
         )
+        if self.decision_value_memory is not None:
+            dv_decision = self.decision_value_memory.query(obs_list)
+            mem_info["decision_value_deltas"] = dv_decision.gated_deltas
+            mem_info["decision_memory"] = dv_decision.to_dict()
 
         # 2. Metacognitive Monitoring
         meta_state = self.metacognition.evaluate_state(obs_list)
@@ -372,6 +380,9 @@ class CognitiveAgent:
             self.mnemosyne.record_transition(observation=obs_list, action=action,
                                              reward=reward, next_observation=next_obs_list)
             self.adapter.replay.add(obs=obs_list, action=action, reward=reward, next_obs=next_obs_list)
+            if self.decision_value_memory is not None:
+                self.decision_value_memory.add_entry(obs_list, action, reward, next_obs_list)
+                self.decision_value_memory.update_belief(next_obs_list, action, reward)
             self._pending_prediction = None
             self.predicted_next_obs = None
             self.step_count += 1
@@ -408,6 +419,11 @@ class CognitiveAgent:
             reward=reward,
             next_obs=next_obs_list,
         )
+
+        if self.decision_value_memory is not None:
+            res = [next_obs_list[i] - self.predicted_next_obs[i] for i in range(len(next_obs_list))]
+            self.decision_value_memory.add_entry(obs_list, action, reward, next_obs_list, residual=res)
+            self.decision_value_memory.update_belief(next_obs_list, action, reward)
 
         # Generative Dream Consolidation on Rest action (action == 0)
         if (action == 0 and self.mode not in ("erased", "memory_free")
