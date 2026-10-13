@@ -40,7 +40,7 @@ class HorizonXConfig:
     base_lambda: float = 0.75
     base_beta: float = 3.0
     min_risk_scale: float = 0.10
-    override_threshold: float = 0.04
+    override_threshold: float = 0.045
     horizon_decay: float = 0.85
 
     def __post_init__(self):
