@@ -227,6 +227,17 @@ def test_nexus_omega_server_endpoints(server):
     assert len(disc_res["ledger_sha256"]) == 64
     assert disc_res["ratified_laws_count"] >= 0
 
+    # 3. GET /api/nexus-omega/factored-state
+    fac_res = json.load(urlopen(url + "/api/nexus-omega/factored-state"))
+    assert "action" in fac_res
+    assert "decision" in fac_res
+    assert "factored_state" in fac_res
+    assert "endogenous" in fac_res["factored_state"]
+    assert "exogenous" in fac_res["factored_state"]
+    assert "causal_regime" in fac_res["factored_state"]
+    assert "free_energy_objective" in fac_res["decision"]
+
+
 
 
 

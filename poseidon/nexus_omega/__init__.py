@@ -19,9 +19,14 @@ from poseidon.nexus_omega.contracts import (
     CounterfactualResult,
     DiscoveryResult,
     DiscoveryLedger,
+    FactoredState,
+    FactoredPredictionOutput,
+    CausalEFEDecision,
 )
 from poseidon.nexus_omega.memory import CausalMemoryFabric
 from poseidon.nexus_omega.world_model import EnsembleWorldModel
+from poseidon.nexus_omega.causal_world_model import FactoredCausalWorldModel
+from poseidon.nexus_omega.causal_efe import CausalEFEPlanner
 from poseidon.nexus_omega.agent import NexusOmegaAgent
 from poseidon.nexus_omega.benchmark import POMDPPhaseWorld
 from poseidon.nexus_omega.auditor import IndependentScientificAuditor
@@ -61,4 +66,9 @@ __all__ = [
     "EPIGENETIC_PROFILES",
     "AutonomousDiscoveryEngine",
     "verify_discovery_receipt",
+    "FactoredState",
+    "FactoredPredictionOutput",
+    "CausalEFEDecision",
+    "FactoredCausalWorldModel",
+    "CausalEFEPlanner",
 ]

@@ -378,6 +378,26 @@ async function pollTelemetry(){
     if($('#epistemicDriveText'))$('#epistemicDriveText').textContent=`Active Inference Drive: ${Number(tel.active_inference_drive).toFixed(3)} | Epistemic Reduction: ${Number(tel.epistemic_reduction).toFixed(3)}`;
     if($('#overrideStatus')){$('#overrideStatus').textContent=tel.planner_override?'OVERRIDE':'NOMINAL';$('#overrideStatus').style.background=tel.planner_override?'#f59e0b':'#10b981';$('#overrideStatus').style.color='white';}
     if($('#overrideText'))$('#overrideText').textContent=`Override: ${tel.planner_override} | Margin: +${Number(tel.override_margin).toFixed(4)} | Scope: ${tel.readiness_scope||'calibrated-stage6-core'}`;
+
+    const fRes=await fetch('/api/nexus-omega/factored-state');
+    if(fRes.ok){
+      const fData=await fRes.json();
+      const d=fData.decision;
+      if(d){
+        if($('#factoredStateText') && d.factored_state){
+          const fs=d.factored_state;
+          $('#factoredStateText').textContent=`Endo: [${fs.endogenous?.join(', ')}] | Exo: [${fs.exogenous?.join(', ')}] | Regime: storm=${fs.causal_regime?.[0]}`;
+        }
+        if($('#efeText')){
+          $('#efeText').textContent=`G(a): ${d.free_energy_objective > 0 ? '+':''}${d.free_energy_objective} | Prag: ${d.pragmatic_value} | Epist: ${d.epistemic_value} | LCB: ${d.conformal_lcb} | Guard: ${d.conformal_override?'OVERRIDE':'NOMINAL'}`;
+          if($('#efeStatus')){
+            $('#efeStatus').textContent=d.conformal_override?'GUARD ACTIVE':'CALIBRATED';
+            $('#efeStatus').style.background=d.conformal_override?'#f59e0b':'#10b981';
+            $('#efeStatus').style.color='white';
+          }
+        }
+      }
+    }
   }catch{}
 }
 if($('#pollTelemetryBtn'))$('#pollTelemetryBtn').onclick=()=>pollTelemetry();

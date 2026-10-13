@@ -227,3 +227,58 @@ class DiscoveryLedger:
         self.ledger_sha256 = hashlib.sha256(json.dumps(payload, sort_keys=True).encode("utf-8")).hexdigest()
         return self.ledger_sha256
 
+
+@dataclass(frozen=True)
+class FactoredState:
+    """Factored Causal Latent Space separating physiological and environmental invariants."""
+    endogenous_vitals: np.ndarray      # Shape (4,): health, energy, hydration, stamina
+    exogenous_field: np.ndarray        # Shape (4,): exposure, storm_cue, food_scarcity, water_scarcity
+    causal_regime: np.ndarray          # Shape (2,): storm_persistence, replenishment_rate
+
+
+@dataclass
+class FactoredPredictionOutput:
+    """Prediction output with partitioned epistemic uncertainty."""
+    predicted_obs: np.ndarray
+    predicted_reward: float
+    endogenous_pred: np.ndarray
+    exogenous_pred: np.ndarray
+    regime_pred: np.ndarray
+    epistemic_uncertainty_total: float
+    endogenous_uncertainty: float
+    exogenous_uncertainty: float
+    regime_uncertainty: float
+    comparator_error: Optional[np.ndarray] = None
+
+
+@dataclass
+class CausalEFEDecision:
+    """Rich decision telemetry under Deep Active Inference & Conformal SPI."""
+    action: int
+    action_name: str
+    free_energy_objective: float
+    pragmatic_value: float
+    epistemic_value: float
+    epistemic_weight: float
+    empowerment_value: float
+    conformal_lcb: float
+    conformal_override: bool
+    factored_state: Optional[Dict[str, List[float]]] = None
+    timestamp: float = field(default_factory=time.time)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "action": int(self.action),
+            "action_name": str(self.action_name),
+            "free_energy_objective": round(float(self.free_energy_objective), 6),
+            "pragmatic_value": round(float(self.pragmatic_value), 6),
+            "epistemic_value": round(float(self.epistemic_value), 6),
+            "epistemic_weight": round(float(self.epistemic_weight), 6),
+            "empowerment_value": round(float(self.empowerment_value), 6),
+            "conformal_lcb": round(float(self.conformal_lcb), 6),
+            "conformal_override": bool(self.conformal_override),
+            "factored_state": self.factored_state or {},
+            "timestamp": round(float(self.timestamp), 4),
+        }
+
+

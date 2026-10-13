@@ -426,8 +426,11 @@ class Poseidon:
             "subsystems": [
                 "causal_memory_fabric",
                 "ensemble_world_model",
+                "factored_causal_world_model",
                 "epigenetic_morphogenesis",
                 "counterfactual_scm_engine",
+                "deep_active_inference_efe_planner",
+                "conformal_safe_policy_guard",
                 "autonomous_discovery_engine",
                 "independent_scientific_auditor",
             ],
@@ -435,6 +438,20 @@ class Poseidon:
                 "PROTOCELL", "LARVAL_FORAGER", "PUPAL_DIAPAUSE", "IMAGO_NAVIGATOR", "SENESCENT_CRYSTALLINE"
             ],
             "core_frozen": True,
+            "factored_causal_world_model": True,
+            "deep_active_inference_efe": True,
+            "conformal_safe_policy_improvement": True,
+        }
+
+    def nexus_omega_factored_state(self, obs=None, seed: int = 42):
+        agent = self.nexus_omega(seed=seed)
+        sample_obs = obs if obs is not None else [1.0, 0.9, 0.9, 0.8, 0.05, 0.1, 0.0, 0.0]
+        decision = agent.act(sample_obs)
+        last_dec = agent.get_last_decision()
+        return {
+            "action": decision,
+            "decision": last_dec.to_dict() if last_dec else None,
+            "factored_state": last_dec.factored_state if last_dec else None,
         }
 
     def nexus_omega_discovery(self, seed_base: int = 50000, num_seeds: int = 4, max_steps: int = 16):

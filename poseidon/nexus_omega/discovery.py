@@ -79,6 +79,33 @@ class AutonomousDiscoveryEngine:
                 alpha=self.alpha,
                 minimum_effect_size=self.min_effect_size,
             ),
+            HypothesisSpec(
+                hypothesis_id="hyp_factored_causal_invariance",
+                statement="Factored endogenous/exogenous decomposition significantly reduces multi-step forecast error and improves survival under storm pulse occlusion compared to monolithic predictors.",
+                null_hypothesis="Factored causal decomposition yields no survival advantage over monolithic prediction.",
+                independent_variable="Invariant Causal Mechanism (ICM) factored state decomposition",
+                dependent_variable="Cumulative POMDP reward",
+                alpha=self.alpha,
+                minimum_effect_size=self.min_effect_size,
+            ),
+            HypothesisSpec(
+                hypothesis_id="hyp_epistemic_active_inference_survival",
+                statement="Dynamic Expected Free Energy minimization achieves superior resource harvesting and lower cumulative risk than static heuristic exploration under fluctuating scarcity.",
+                null_hypothesis="Active inference EFE minimization yields no reward advantage over heuristic exploration.",
+                independent_variable="Deep Active Inference Expected Free Energy (EFE) planning",
+                dependent_variable="Cumulative POMDP reward",
+                alpha=self.alpha,
+                minimum_effect_size=self.min_effect_size,
+            ),
+            HypothesisSpec(
+                hypothesis_id="hyp_conformal_safety_guard_zero_catastrophe",
+                statement="Conformal return bounding prevents fatal starvation/exposure traps while preserving exploratory information gain.",
+                null_hypothesis="Conformal safety lower confidence bounding yields no reward advantage under hazard pulses.",
+                independent_variable="Conformal Safe Policy Improvement (SPI) lower confidence bounds",
+                dependent_variable="Cumulative POMDP reward",
+                alpha=self.alpha,
+                minimum_effect_size=self.min_effect_size,
+            ),
         ]
 
     def run_interventional_trial(
@@ -191,6 +218,50 @@ class AutonomousDiscoveryEngine:
                 if arm == "candidate":
                     if rng.rand() < 0.60:
                         action = int(rng.randint(0, 4))
+                next_obs, reward, done, _ = env.step(action)
+                agent.observe(next_obs, reward, done)
+                total_reward += reward
+                obs = next_obs
+                if done:
+                    break
+
+        elif hypothesis_id == "hyp_factored_causal_invariance":
+            # Candidate utilizes Invariant Causal Mechanism (ICM) factored decomposition.
+            # Baseline uses monolithic un-factored predictor.
+            agent = NexusOmegaAgent(use_causal_efe=(arm == "candidate"))
+            agent.reset()
+            for _ in range(self.max_steps):
+                action = agent.act(obs)
+                next_obs, reward, done, _ = env.step(action)
+                agent.observe(next_obs, reward, done)
+                total_reward += reward
+                obs = next_obs
+                if done:
+                    break
+
+        elif hypothesis_id == "hyp_epistemic_active_inference_survival":
+            # Candidate optimizes full variational Expected Free Energy.
+            # Baseline uses static uncalibrated heuristic.
+            agent = NexusOmegaAgent(use_causal_efe=(arm == "candidate"))
+            agent.reset()
+            for _ in range(self.max_steps):
+                action = agent.act(obs)
+                next_obs, reward, done, _ = env.step(action)
+                agent.observe(next_obs, reward, done)
+                total_reward += reward
+                obs = next_obs
+                if done:
+                    break
+
+        elif hypothesis_id == "hyp_conformal_safety_guard_zero_catastrophe":
+            # Candidate enforces Conformal Return Lower Bounds (safety_threshold = -1.20).
+            # Baseline disables conformal safety checks (safety_threshold = -999.0).
+            agent = NexusOmegaAgent(use_causal_efe=True)
+            if arm == "baseline":
+                agent.efe_planner.safety_threshold = -999.0
+            agent.reset()
+            for _ in range(self.max_steps):
+                action = agent.act(obs)
                 next_obs, reward, done, _ = env.step(action)
                 agent.observe(next_obs, reward, done)
                 total_reward += reward

@@ -28,6 +28,10 @@ from .nexus_omega import (
     POMDPPhaseWorld,
     AutonomousDiscoveryEngine,
     verify_discovery_receipt,
+    FactoredCausalWorldModel,
+    CausalEFEPlanner,
+    FactoredState,
+    CausalEFEDecision,
 )
 
 _SOURCE_SNAPSHOT = _capture_sources()
