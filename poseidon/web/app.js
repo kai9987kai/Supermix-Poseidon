@@ -398,6 +398,21 @@ async function pollTelemetry(){
         }
       }
     }
+
+    const hRes=await fetch('/api/nexus-omega/hierarchical-state');
+    if(hRes.ok){
+      const hData=await hRes.json();
+      const hd=hData.decision;
+      if(hd){
+        if($('#macroText')){
+          $('#macroText').textContent=`Macro Intent: ${hd.macro_intent?.toUpperCase()} | Commit Ticks: ${hd.macro_intent_remaining_ticks} | Micro Action: ${hd.micro_action_name}`;
+        }
+        if($('#diffusionText') && hd.imagined_trajectory){
+          const it=hd.imagined_trajectory;
+          $('#diffusionText').textContent=`Horizon H=${it.horizon} | Return: ${it.cumulative_reward>0?'+':''}${it.cumulative_reward} | Traj-LCB: ${it.conformal_trajectory_lcb} | Guidance Norm: ${it.score_guidance_norm}`;
+        }
+      }
+    }
   }catch{}
 }
 if($('#pollTelemetryBtn'))$('#pollTelemetryBtn').onclick=()=>pollTelemetry();

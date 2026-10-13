@@ -282,3 +282,71 @@ class CausalEFEDecision:
         }
 
 
+class MacroIntent(str, Enum):
+    FORAGE_EXPEDITION = "forage_expedition"         # Aggressive nutrient acquisition
+    DIAPAUSE_HIBERNATION = "diapause_hibernation"   # Metabolic depression during acute hazard
+    HABITAT_RELOCATION = "habitat_relocation"       # Spatial exploration to escape local scarcity
+    EMERGENCY_FORTIFICATION = "emergency_fortification" # Defensive shelter reinforcement
+
+
+@dataclass
+class ImaginedTrajectory:
+    """Score-guided counterfactual trajectory rollout over an H-step horizon."""
+    horizon: int
+    states: List[np.ndarray]              # Shape (H, d_obs)
+    actions: List[int]                   # Length H
+    rewards: List[float]                 # Length H
+    epistemic_uncertainties: List[float] # Length H
+    cumulative_reward: float
+    conformal_trajectory_lcb: float
+    score_guidance_norm: float
+    macro_intent: MacroIntent = MacroIntent.FORAGE_EXPEDITION
+    timestamp: float = field(default_factory=time.time)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "horizon": int(self.horizon),
+            "macro_intent": self.macro_intent.value if hasattr(self.macro_intent, "value") else str(self.macro_intent),
+            "states": [[round(float(x), 4) for x in s] for s in self.states],
+            "actions": [int(a) for a in self.actions],
+            "rewards": [round(float(r), 4) for r in self.rewards],
+            "epistemic_uncertainties": [round(float(u), 4) for u in self.epistemic_uncertainties],
+            "cumulative_reward": round(float(self.cumulative_reward), 4),
+            "conformal_trajectory_lcb": round(float(self.conformal_trajectory_lcb), 4),
+            "conformal_return_lcb": round(float(self.conformal_trajectory_lcb), 4),
+            "score_guidance_norm": round(float(self.score_guidance_norm), 4),
+            "timestamp": round(float(self.timestamp), 4),
+        }
+
+
+@dataclass
+class HierarchicalEFEDecision:
+    """Rich hierarchical decision across macro-intentional and micro-action levels."""
+    macro_intent: MacroIntent
+    macro_intent_remaining_ticks: int
+    micro_action: int
+    micro_action_name: str
+    macro_free_energy: float
+    micro_free_energy: float
+    conformal_lcb: float
+    conformal_override: bool
+    imagined_trajectory: Optional[ImaginedTrajectory] = None
+    factored_state: Optional[Dict[str, List[float]]] = None
+    timestamp: float = field(default_factory=time.time)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "macro_intent": self.macro_intent.value,
+            "macro_intent_remaining_ticks": int(self.macro_intent_remaining_ticks),
+            "micro_action": int(self.micro_action),
+            "micro_action_name": str(self.micro_action_name),
+            "macro_free_energy": round(float(self.macro_free_energy), 6),
+            "micro_free_energy": round(float(self.micro_free_energy), 6),
+            "conformal_lcb": round(float(self.conformal_lcb), 6),
+            "conformal_override": bool(self.conformal_override),
+            "imagined_trajectory": self.imagined_trajectory.to_dict() if self.imagined_trajectory else None,
+            "factored_state": self.factored_state or {},
+            "timestamp": round(float(self.timestamp), 4),
+        }
+
+

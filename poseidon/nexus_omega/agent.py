@@ -17,11 +17,15 @@ from poseidon.nexus_omega.contracts import (
     InterventionType,
     MemoryCarrierType,
     PredictionOutput,
+    MacroIntent,
+    ImaginedTrajectory,
+    HierarchicalEFEDecision,
 )
 from poseidon.nexus_omega.memory import CausalMemoryFabric
 from poseidon.nexus_omega.world_model import EnsembleWorldModel
 from poseidon.nexus_omega.causal_world_model import FactoredCausalWorldModel
 from poseidon.nexus_omega.causal_efe import CausalEFEPlanner
+from poseidon.nexus_omega.hierarchical_efe import HierarchicalEFEPlanner
 
 
 class NexusOmegaAgent:
@@ -34,6 +38,7 @@ class NexusOmegaAgent:
         n_actions: int = 4,
         uncertainty_penalty_lambda: float = 0.5,
         use_causal_efe: bool = True,
+        use_hierarchical_efe: bool = False,
         base_seed: int = 42,
     ):
         self.d_obs = d_obs
@@ -41,6 +46,7 @@ class NexusOmegaAgent:
         self.n_actions = n_actions
         self.lmbda = uncertainty_penalty_lambda
         self.use_causal_efe = use_causal_efe
+        self.use_hierarchical_efe = use_hierarchical_efe
 
         self.memory = CausalMemoryFabric(d_working=d_working, d_key=d_obs, d_value=d_obs)
         # Memory combined vector dimension: d_working + 1 (struct) + 1 (ep) = d_working + 2
@@ -64,6 +70,12 @@ class NexusOmegaAgent:
             n_actions=n_actions,
             base_epistemic_weight=uncertainty_penalty_lambda,
         )
+        self.hierarchical_planner = HierarchicalEFEPlanner(
+            world_model=self.factored_world_model,
+            n_actions=n_actions,
+            base_epistemic_weight=uncertainty_penalty_lambda,
+            base_seed=base_seed + 500,
+        )
 
         # Comparator projection: projects d_obs residual error into d_working memory delta
         rng = np.random.RandomState(base_seed + 99)
@@ -72,14 +84,17 @@ class NexusOmegaAgent:
         self.last_obs: Optional[np.ndarray] = None
         self.last_action: Optional[int] = None
         self.last_mem: Optional[np.ndarray] = None
-        self.last_decision: Optional[CausalEFEDecision] = None
+        self.last_decision: Optional[CausalEFEDecision | HierarchicalEFEDecision] = None
+        self.last_hierarchical_decision: Optional[HierarchicalEFEDecision] = None
 
     def reset(self) -> None:
         self.memory.reset()
+        self.hierarchical_planner.reset()
         self.last_obs = None
         self.last_action = None
         self.last_mem = None
         self.last_decision = None
+        self.last_hierarchical_decision = None
         self.world_model.last_prediction = None
         self.factored_world_model.last_prediction = None
         self.factored_world_model.z_regime = np.array([0.0, 1.0], dtype=np.float32)
@@ -97,6 +112,14 @@ class NexusOmegaAgent:
             # Default reactive heuristic: forage if obs_arr[0] (health) > 0.5, else shelter
             self.last_action = 0 if obs_arr[0] > 0.5 else 1
             return self.last_action
+
+        # Stage 10 Frontier: Hierarchical Multi-Scale Active Inference with Score Diffusion
+        if self.use_hierarchical_efe:
+            hier_dec = self.hierarchical_planner.plan(obs_arr, mem_vec)
+            self.last_hierarchical_decision = hier_dec
+            self.last_decision = hier_dec
+            self.last_action = hier_dec.micro_action
+            return hier_dec.micro_action
 
         # Primary Cognitive Path: Deep Active Inference with Conformal SPI
         if self.use_causal_efe:
@@ -171,8 +194,20 @@ class NexusOmegaAgent:
         """Ergonomic alias for observe_transition."""
         return self.observe_transition(next_obs, reward, done)
 
-    def get_last_decision(self) -> Optional[CausalEFEDecision]:
+    def get_last_decision(self) -> Optional[CausalEFEDecision | HierarchicalEFEDecision]:
         return self.last_decision
+
+    def get_last_hierarchical_decision(self) -> Optional[HierarchicalEFEDecision]:
+        return self.last_hierarchical_decision
+
+    def imagine_trajectory(
+        self,
+        intent: MacroIntent = MacroIntent.FORAGE_EXPEDITION,
+        horizon: int = 8,
+    ) -> ImaginedTrajectory:
+        obs = self.last_obs if self.last_obs is not None else np.zeros(self.d_obs, dtype=np.float32)
+        mem = self.last_mem if self.last_mem is not None else self.memory.get_combined_vector()
+        return self.hierarchical_planner.imaginer.imagine_trajectory(obs, mem, target_intent=intent, horizon=horizon)
 
     def get_factored_state(self) -> Optional[FactoredState]:
         if self.last_obs is None:

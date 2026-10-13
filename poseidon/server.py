@@ -118,6 +118,12 @@ def make_handler(runtime, port):
                 except Exception as error:
                     self.send_json(500, {"error": str(error), "type": type(error).__name__})
                 return
+            if path == "/api/nexus-omega/hierarchical-state":
+                try:
+                    self.send_json(200, runtime.nexus_omega_hierarchical_state())
+                except Exception as error:
+                    self.send_json(500, {"error": str(error), "type": type(error).__name__})
+                return
             if path in ("/", "/index.html", "/style.css", "/app.js"):
                 file = WEB/("index.html" if path in ("/", "/index.html") else path[1:])
             elif path.startswith("/artifacts/"):
@@ -252,6 +258,19 @@ def make_handler(runtime, port):
                     num_seeds = int(payload.get("num_seeds", 4))
                     max_steps = int(payload.get("max_steps", 16))
                     result = runtime.nexus_omega_discovery(seed_base=seed_base, num_seeds=num_seeds, max_steps=max_steps)
+                    self.send_json(200, result)
+                except (ValueError, TypeError) as error:
+                    self.send_json(400, {"error": str(error)})
+                except Exception as error:
+                    self.send_json(500, {"error": str(error), "type": type(error).__name__})
+                return
+            if path == "/api/nexus-omega/imagine":
+                try:
+                    intent = str(payload.get("intent", "forage_expedition"))
+                    horizon = int(payload.get("horizon", 8))
+                    obs = payload.get("obs")
+                    seed = int(payload.get("seed", 42))
+                    result = runtime.nexus_omega_imagine(obs=obs, intent=intent, horizon=horizon, seed=seed)
                     self.send_json(200, result)
                 except (ValueError, TypeError) as error:
                     self.send_json(400, {"error": str(error)})

@@ -32,6 +32,11 @@ from .nexus_omega import (
     CausalEFEPlanner,
     FactoredState,
     CausalEFEDecision,
+    MacroIntent,
+    ImaginedTrajectory,
+    HierarchicalEFEDecision,
+    TrajectoryDiffusionImaginer,
+    HierarchicalEFEPlanner,
 )
 
 _SOURCE_SNAPSHOT = _capture_sources()

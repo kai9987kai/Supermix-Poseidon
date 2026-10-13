@@ -106,6 +106,24 @@ class AutonomousDiscoveryEngine:
                 alpha=self.alpha,
                 minimum_effect_size=self.min_effect_size,
             ),
+            HypothesisSpec(
+                hypothesis_id="hyp_hierarchical_temporal_abstraction",
+                statement="Level-1 Macro-Intent temporal commitment options reduce policy thrashing and increase cumulative reward compared to single-step micro policies under non-stationary cycles.",
+                null_hypothesis="Hierarchical macro-intent temporal abstraction yields no survival advantage over single-step baseline heuristics.",
+                independent_variable="Hierarchical Multi-Time-Scale Active Inference (Hierarchical-EFE)",
+                dependent_variable="Cumulative POMDP reward",
+                alpha=self.alpha,
+                minimum_effect_size=self.min_effect_size,
+            ),
+            HypothesisSpec(
+                hypothesis_id="hyp_score_guided_diffusion_imagination",
+                statement="Score-guided trajectory diffusion imagination improves multi-step survival forecast accuracy and enables prospective hazard avoidance compared to greedy single-step policies.",
+                null_hypothesis="Trajectory diffusion score-guided imagination yields no survival advantage over reactive baseline heuristics.",
+                independent_variable="Score-guided counterfactual trajectory diffusion kernel",
+                dependent_variable="Cumulative POMDP reward",
+                alpha=self.alpha,
+                minimum_effect_size=self.min_effect_size,
+            ),
         ]
 
     def run_interventional_trial(
@@ -268,10 +286,45 @@ class AutonomousDiscoveryEngine:
                 obs = next_obs
                 if done:
                     break
+
+        elif hypothesis_id == "hyp_hierarchical_temporal_abstraction":
+            # Candidate executes Level-1 Macro-Intent hierarchical options with temporal commitment.
+            # Baseline uses reactive non-hierarchical single-step policy.
+            agent = NexusOmegaAgent(
+                use_hierarchical_efe=(arm == "candidate"),
+                use_causal_efe=(arm == "candidate"),
+            )
+            agent.reset()
+            for _ in range(self.max_steps):
+                action = agent.act(obs)
+                next_obs, reward, done, _ = env.step(action)
+                agent.observe(next_obs, reward, done)
+                total_reward += reward
+                obs = next_obs
+                if done:
+                    break
+
+        elif hypothesis_id == "hyp_score_guided_diffusion_imagination":
+            # Candidate executes score-guided counterfactual trajectory imagination.
+            # Baseline executes reactive un-imagined heuristic.
+            agent = NexusOmegaAgent(
+                use_hierarchical_efe=(arm == "candidate"),
+                use_causal_efe=(arm == "candidate"),
+            )
+            agent.reset()
+            for _ in range(self.max_steps):
+                action = agent.act(obs)
+                next_obs, reward, done, _ = env.step(action)
+                agent.observe(next_obs, reward, done)
+                total_reward += reward
+                obs = next_obs
+                if done:
+                    break
         else:
             raise ValueError(f"Unknown hypothesis: {hypothesis_id}")
 
         return float(total_reward)
+
 
     def test_hypothesis(
         self,

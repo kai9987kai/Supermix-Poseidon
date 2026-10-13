@@ -433,14 +433,21 @@ class Poseidon:
                 "conformal_safe_policy_guard",
                 "autonomous_discovery_engine",
                 "independent_scientific_auditor",
+                "hierarchical_efe_planner",
+                "score_guided_trajectory_diffusion",
             ],
             "developmental_stages": [
                 "PROTOCELL", "LARVAL_FORAGER", "PUPAL_DIAPAUSE", "IMAGO_NAVIGATOR", "SENESCENT_CRYSTALLINE"
+            ],
+            "macro_intents": [
+                "forage_expedition", "diapause_hibernation", "habitat_relocation", "emergency_fortification"
             ],
             "core_frozen": True,
             "factored_causal_world_model": True,
             "deep_active_inference_efe": True,
             "conformal_safe_policy_improvement": True,
+            "hierarchical_efe_planner": True,
+            "score_guided_trajectory_diffusion": True,
         }
 
     def nexus_omega_factored_state(self, obs=None, seed: int = 42):
@@ -453,6 +460,28 @@ class Poseidon:
             "decision": last_dec.to_dict() if last_dec else None,
             "factored_state": last_dec.factored_state if last_dec else None,
         }
+
+    def nexus_omega_hierarchical_state(self, obs=None, seed: int = 42):
+        from .nexus_omega import NexusOmegaAgent
+        agent = NexusOmegaAgent(use_hierarchical_efe=True, base_seed=seed)
+        sample_obs = obs if obs is not None else [1.0, 0.9, 0.9, 0.8, 0.05, 0.1, 0.0, 0.0]
+        micro_act = agent.act(sample_obs)
+        hier_dec = agent.get_last_hierarchical_decision()
+        return {
+            "micro_action": micro_act,
+            "macro_intent": hier_dec.macro_intent.value if hier_dec else "forage_expedition",
+            "decision": hier_dec.to_dict() if hier_dec else None,
+            "imagined_trajectory": hier_dec.imagined_trajectory.to_dict() if (hier_dec and hier_dec.imagined_trajectory) else None,
+        }
+
+    def nexus_omega_imagine(self, obs=None, intent="forage_expedition", horizon=8, seed: int = 42):
+        from .nexus_omega import NexusOmegaAgent, MacroIntent
+        agent = NexusOmegaAgent(use_hierarchical_efe=True, base_seed=seed)
+        sample_obs = obs if obs is not None else [1.0, 0.9, 0.9, 0.8, 0.05, 0.1, 0.0, 0.0]
+        agent.act(sample_obs)
+        target_macro = MacroIntent(intent) if intent in [m.value for m in MacroIntent] else MacroIntent.FORAGE_EXPEDITION
+        traj = agent.imagine_trajectory(intent=target_macro, horizon=horizon)
+        return traj.to_dict()
 
     def nexus_omega_discovery(self, seed_base: int = 50000, num_seeds: int = 4, max_steps: int = 16):
         from .nexus_omega import AutonomousDiscoveryEngine, verify_discovery_receipt

@@ -237,6 +237,33 @@ def test_nexus_omega_server_endpoints(server):
     assert "causal_regime" in fac_res["factored_state"]
     assert "free_energy_objective" in fac_res["decision"]
 
+    # 4. GET /api/nexus-omega/hierarchical-state
+    hier_res = json.load(urlopen(url + "/api/nexus-omega/hierarchical-state"))
+    assert "micro_action" in hier_res
+    assert "macro_intent" in hier_res
+    assert hier_res["micro_action"] in range(4)
+    assert hier_res["macro_intent"] in [
+        "forage_expedition",
+        "diapause_hibernation",
+        "habitat_relocation",
+        "emergency_fortification",
+    ]
+    assert "decision" in hier_res
+    assert "imagined_trajectory" in hier_res
+
+    # 5. POST /api/nexus-omega/imagine
+    imagine_payload = {
+        "intent": "forage_expedition",
+        "horizon": 6,
+        "seed": 42,
+    }
+    img_res = json.load(post(url + "/api/nexus-omega/imagine", imagine_payload))
+    assert img_res["horizon"] == 6
+    assert img_res["macro_intent"] == "forage_expedition"
+    assert len(img_res["states"]) == 6
+    assert len(img_res["actions"]) == 6
+    assert "conformal_return_lcb" in img_res
+
 
 
 

@@ -22,11 +22,16 @@ from poseidon.nexus_omega.contracts import (
     FactoredState,
     FactoredPredictionOutput,
     CausalEFEDecision,
+    MacroIntent,
+    ImaginedTrajectory,
+    HierarchicalEFEDecision,
 )
 from poseidon.nexus_omega.memory import CausalMemoryFabric
 from poseidon.nexus_omega.world_model import EnsembleWorldModel
 from poseidon.nexus_omega.causal_world_model import FactoredCausalWorldModel
 from poseidon.nexus_omega.causal_efe import CausalEFEPlanner
+from poseidon.nexus_omega.trajectory_diffusion import TrajectoryDiffusionImaginer
+from poseidon.nexus_omega.hierarchical_efe import HierarchicalEFEPlanner
 from poseidon.nexus_omega.agent import NexusOmegaAgent
 from poseidon.nexus_omega.benchmark import POMDPPhaseWorld
 from poseidon.nexus_omega.auditor import IndependentScientificAuditor
@@ -71,4 +76,9 @@ __all__ = [
     "CausalEFEDecision",
     "FactoredCausalWorldModel",
     "CausalEFEPlanner",
+    "MacroIntent",
+    "ImaginedTrajectory",
+    "HierarchicalEFEDecision",
+    "TrajectoryDiffusionImaginer",
+    "HierarchicalEFEPlanner",
 ]
