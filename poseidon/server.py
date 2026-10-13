@@ -93,6 +93,19 @@ def make_handler(runtime, port):
                 except Exception as error:
                     self.send_json(500, {"error": str(error), "type": type(error).__name__})
                 return
+            if path == "/api/adapter/status":
+                try:
+                    self.send_json(200, runtime.external_adapter_status())
+                except Exception as error:
+                    self.send_json(500, {"error": str(error), "type": type(error).__name__})
+                return
+            if path == "/api/telemetry/memory-influence":
+                try:
+                    bridge = runtime.external_adapter_bridge()
+                    self.send_json(200, bridge.latest_telemetry.to_dict())
+                except Exception as error:
+                    self.send_json(500, {"error": str(error), "type": type(error).__name__})
+                return
             if path in ("/", "/index.html", "/style.css", "/app.js"):
                 file = WEB/("index.html" if path in ("/", "/index.html") else path[1:])
             elif path.startswith("/artifacts/"):
@@ -173,12 +186,90 @@ def make_handler(runtime, port):
                 except RuntimeError as error:
                     self.send_json(409, {"error": str(error)})
                 return
-            if self.path not in ("/api/respond", "/api/remember", "/api/experiment", "/api/contrast-experiment", "/api/horizon-experiment", "/api/odyssey-experiment", "/api/helm-experiment", "/api/odysseus-experiment", "/api/mco-experiment", "/api/aura-experiment", "/api/tessera-experiment", "/api/mnemorph-experiment", "/api/metamorph-experiment", "/api/chimera-experiment", "/api/hyperion-experiment", "/api/titan-experiment", "/api/trident-experiment", "/api/cognitive-experiment", "/api/ecosystem-experiment", "/api/tessera/shield", "/api/poseidon-x-experiment"):
+            if path == "/api/adapter/handshake":
+                try:
+                    from .external_adapter import ExternalAdapterIdentity
+                    ident_data = payload.get("identity", {})
+                    identity = ExternalAdapterIdentity(
+                        adapter_id=str(ident_data.get("adapter_id", "external-sim")),
+                        units=str(ident_data.get("units", "SI_METRIC")),
+                        ticks_per_second=float(ident_data.get("ticks_per_second", 20.0)),
+                        coordinate_frame=str(ident_data.get("coordinate_frame", "FLU")),
+                        spatial_bounds=tuple(float(x) for x in ident_data.get("spatial_bounds", (100.0, 100.0, 20.0))),
+                        max_linear_velocity=float(ident_data.get("max_linear_velocity", 15.0)),
+                        sensor_latency_ms=float(ident_data.get("sensor_latency_ms", 50.0)),
+                    )
+                    bridge = runtime.external_adapter_bridge()
+                    handshake = bridge.negotiate_handshake(
+                        client_id=str(payload.get("client_id", "anonymous-client")),
+                        engine_name=str(payload.get("engine_name", "generic-engine")),
+                        identity=identity,
+                    )
+                    self.send_json(200, handshake.to_dict())
+                except (ValueError, TypeError) as error:
+                    self.send_json(400, {"error": str(error)})
+                except Exception as error:
+                    self.send_json(500, {"error": str(error), "type": type(error).__name__})
+                return
+            if path == "/api/adapter/cancel":
+                try:
+                    session_token = str(payload.get("session_token", ""))
+                    if not session_token:
+                        raise ValueError("session_token is required")
+                    bridge = runtime.external_adapter_bridge()
+                    cancelled = bridge.cancel_session(session_token)
+                    self.send_json(200, {"cancelled": cancelled, "session_token": session_token})
+                except (ValueError, TypeError) as error:
+                    self.send_json(400, {"error": str(error)})
+                except Exception as error:
+                    self.send_json(500, {"error": str(error), "type": type(error).__name__})
+                return
+            if path == "/api/adapter/verify-3d-replay":
+                try:
+                    from .external_adapter import Compact3DReplayVerifier
+                    receipt = Compact3DReplayVerifier.verify_replay(payload)
+                    self.send_json(200, receipt)
+                except (ValueError, TypeError) as error:
+                    self.send_json(400, {"error": str(error)})
+                except Exception as error:
+                    self.send_json(500, {"error": str(error), "type": type(error).__name__})
+                return
+            if self.path not in ("/api/adapter/tick", "/api/respond", "/api/remember", "/api/experiment", "/api/contrast-experiment", "/api/horizon-experiment", "/api/odyssey-experiment", "/api/helm-experiment", "/api/odysseus-experiment", "/api/mco-experiment", "/api/aura-experiment", "/api/tessera-experiment", "/api/mnemorph-experiment", "/api/metamorph-experiment", "/api/chimera-experiment", "/api/hyperion-experiment", "/api/titan-experiment", "/api/trident-experiment", "/api/cognitive-experiment", "/api/ecosystem-experiment", "/api/tessera/shield", "/api/poseidon-x-experiment"):
                 self.send_json(404, {"error": "Not found"}); return
             if not busy.acquire(blocking=False):
                 self.send_json(409, {"error": "Poseidon is processing another request. Try again shortly."}); return
             try:
-                if self.path == "/api/poseidon-x-experiment":
+                if self.path == "/api/adapter/tick":
+                    from .external_adapter import ExternalTickMessage
+                    bridge = runtime.external_adapter_bridge()
+                    token = str(payload.get("session_token", ""))
+                    if token in bridge.cancelled_sessions:
+                        self.send_json(409, {"error": f"Session {token} was cancelled."})
+                        return
+                    if token not in bridge.active_sessions:
+                        self.send_json(404, {"error": f"Unknown session token {token}."})
+                        return
+                    msg = ExternalTickMessage(
+                        session_token=token,
+                        tick=int(payload.get("tick", 0)),
+                        delta_time=float(payload.get("delta_time", 0.05)),
+                        observation_16d=[float(x) for x in payload.get("observation_16d", [])],
+                        position=tuple(float(x) for x in payload["position"]) if payload.get("position") is not None else None,
+                        velocity=tuple(float(x) for x in payload["velocity"]) if payload.get("velocity") is not None else None,
+                        reward=float(payload.get("reward", 0.0)),
+                        terminal=bool(payload.get("terminal", False)),
+                        vitals=dict(payload.get("vitals", {})),
+                    )
+                    controller_choice = payload.get("controller", "cognitive")
+                    if controller_choice == "poseidon_x":
+                        agent = runtime.poseidon_x()
+                    elif controller_choice == "hyper":
+                        agent = runtime.hyper_agent()
+                    else:
+                        agent = runtime.cognitive_agent()
+                    resp = bridge.process_tick(msg, agent)
+                    result = resp.to_dict()
+                elif self.path == "/api/poseidon-x-experiment":
                     assert_source_current()
                     episodes = payload.get("episodes", 2)
                     max_steps = payload.get("max_steps", 32)

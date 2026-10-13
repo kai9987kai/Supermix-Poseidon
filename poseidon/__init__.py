@@ -13,5 +13,15 @@ from .active_inference import ActiveInferenceConfig, ActiveInferenceEvaluator, H
 from .dream import DreamConfig, DreamConsolidator, DreamSummary
 from .metacognition import MetacognitionConfig, MetacognitiveMonitor, MetacognitiveState
 from .guardrails import FormalSafetyGuard, GuardrailAudit, InvariantResult
+from .information_seeking import EpistemicInformationProber, CandidateAdapterSession, RetentionAndAdaptationAuditor
+from .external_adapter import (
+    ExternalAdapterIdentity,
+    AdapterHandshake,
+    ExternalTickMessage,
+    MemoryInfluenceTelemetry,
+    ExternalActionResponse,
+    ExternalAdapterBridge,
+    Compact3DReplayVerifier,
+)
 
 _SOURCE_SNAPSHOT = _capture_sources()

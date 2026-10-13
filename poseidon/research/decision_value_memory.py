@@ -434,6 +434,10 @@ class DecisionValueMemory:
             mode=self.mode,
         )
 
+    def get_influence_deltas(self, current_obs: Sequence[float]) -> list[float]:
+        """Convenience method returning the admitted influence deltas across actions."""
+        return list(self.query(current_obs).gated_deltas)
+
     def state_dict(self) -> dict[str, Any]:
         return {
             "schema": DECISION_MEMORY_SCHEMA,

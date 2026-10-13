@@ -142,3 +142,55 @@ def test_ecosystem_and_memory_endpoints(server):
     assert len(thm_res["@graph"]) >= 4
 
 
+def test_external_adapter_server_endpoints(server):
+    url, _ = server
+    # 1. GET /api/adapter/status
+    stat_res = json.load(urlopen(url+"/api/adapter/status"))
+    assert stat_res["ready"] is True
+    assert stat_res["protocol_version"] == "poseidon-external-adapter-v1"
+    assert "SI_METRIC" in stat_res["supported_units"]
+
+    # 2. GET /api/telemetry/memory-influence
+    tel_res = json.load(urlopen(url+"/api/telemetry/memory-influence"))
+    assert "dv_gem_active" in tel_res
+    assert len(tel_res["dv_gem_deltas"]) == 6
+
+    # 3. POST /api/adapter/handshake
+    handshake_payload = {
+        "client_id": "test-suite-runner",
+        "engine_name": "pytest-sim",
+        "identity": {
+            "adapter_id": "sim-adapter-01",
+            "units": "SI_METRIC",
+            "ticks_per_second": 30.0,
+            "coordinate_frame": "FLU",
+            "spatial_bounds": [100.0, 100.0, 20.0],
+            "max_linear_velocity": 15.0,
+        },
+    }
+    hs_res = json.load(post(url+"/api/adapter/handshake", handshake_payload))
+    assert hs_res["accepted"] is True
+    assert hs_res["client_id"] == "test-suite-runner"
+    token = hs_res["session_token"]
+
+    # 4. POST /api/adapter/verify-3d-replay
+    replay_payload = {
+        "schema": "poseidon-3d-replay-v1",
+        "adapter_identity": {"adapter_id": "sim-adapter-01", "max_linear_velocity": 15.0},
+        "total_reward": 1.0,
+        "keyframes": [
+            {"tick": 0, "delta_time": 0.05, "position": [0.0, 0.0, 0.0], "action": 0, "reward": 1.0},
+        ],
+    }
+    rep_res = json.load(post(url+"/api/adapter/verify-3d-replay", replay_payload))
+    assert rep_res["verified"] is True
+    assert rep_res["transitions_verified"] == 1
+    assert len(rep_res["receipt_sha256"]) == 64
+
+    # 5. POST /api/adapter/cancel
+    cancel_res = json.load(post(url+"/api/adapter/cancel", {"session_token": token}))
+    assert cancel_res["cancelled"] is True
+    assert cancel_res["session_token"] == token
+
+
+

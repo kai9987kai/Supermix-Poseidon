@@ -29,6 +29,7 @@ def main():
         "poseidon-x-experiment", "verify-poseidon-x", "world-multivector",
         "nexus-omega-assay", "verify-nexus-omega",
         "nexus-omega-discovery", "verify-nexus-omega-discovery",
+        "verify-3d-replay",
     ])
     p.add_argument("prompt", nargs="?", default="")
     p.add_argument("--root", default=".")
@@ -771,6 +772,16 @@ def main():
             "ratified_laws_count": len(data["ratified_laws"]),
             "refutations_count": len(data["refutation_graveyard"]),
         }, indent=2, ensure_ascii=False))
+        return
+
+    if args.command == "verify-3d-replay":
+        from pathlib import Path
+        from .external_adapter import Compact3DReplayVerifier
+        if not args.prompt:
+            p.error("verify-3d-replay requires path to replay json file")
+        p_path = Path(args.prompt).resolve()
+        receipt = Compact3DReplayVerifier.verify_replay_file(p_path)
+        print(json.dumps(receipt, indent=2, ensure_ascii=False))
         return
 
     runtime = Poseidon(args.root, args.adapter, oracle_checkpoint=args.oracle_checkpoint)

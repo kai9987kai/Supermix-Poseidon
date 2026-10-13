@@ -37,6 +37,7 @@ class Poseidon:
         self._jobs = None
         self._jobs_lock = threading.Lock()
         self._tessera = None
+        self._external_adapter_bridge = None
         self._candidate_status_snapshots = {}
         self.memory_path = self.root/"outputs/memory.json"
 
@@ -392,6 +393,26 @@ class Poseidon:
         with self.lock:
             seeds = list(range(seed, seed + episodes))
             return run_poseidon_x_experiment(seeds=seeds, max_steps=max_steps)
+
+    def external_adapter_bridge(self):
+        if self._external_adapter_bridge is None:
+            from .external_adapter import ExternalAdapterBridge
+            self._external_adapter_bridge = ExternalAdapterBridge()
+        return self._external_adapter_bridge
+
+    def external_adapter_status(self):
+        from .external_adapter import SUPPORTED_COORDINATES, SUPPORTED_UNITS
+        bridge = self.external_adapter_bridge()
+        return {
+            "ready": True,
+            "version": "1.0.0",
+            "protocol_version": "poseidon-external-adapter-v1",
+            "supported_units": list(SUPPORTED_UNITS),
+            "supported_coordinates": list(SUPPORTED_COORDINATES),
+            "active_sessions_count": len(bridge.active_sessions),
+            "cancelled_sessions_count": len(bridge.cancelled_sessions),
+            "latest_telemetry": bridge.latest_telemetry.to_dict(),
+        }
 
     def mnemorph_status(self):
         relative = "outputs/mnemorph/RECEIPT.json"
@@ -1293,7 +1314,7 @@ class Poseidon:
             core_ready = active_core_path(self.root).is_file()
         except (ValueError, TypeError, OSError) as error:
             core_ready, core_error = False, str(error)
-        result = {"version": __version__, "name": "Supermix Poseidon", "language_ready": (self.root/"models/language/model.safetensors").exists(), "core_ready": core_ready, "atlas": self.atlas_status(), "contrast": self.contrast_status(), "horizon": self.horizon_status(), "odyssey": self.odyssey_status(), "helm": self.helm_status(), "odysseus": self.odysseus_status(), "mco": self.mco_status(), "aura": self.aura_status(), "tessera": self.tessera_status(), "mnemorph": self.mnemorph_status(), "metamorph": self.metamorph_status(), "chimera": self.chimera_status(), "hyperion": self.hyperion_status(), "titan": self.titan_status(), "trident": self.trident_status(), "hyper_agent": self.hyper_agent_status(), "ecosystem": self.ecosystem_status(), "poseidon_x": self.poseidon_x_status(), "reports": reports, "limits": "Experimental composite system. Controlled geometric media. Tool-assisted maths. Synthetic survival."} | source_status()
+        result = {"version": __version__, "name": "Supermix Poseidon", "language_ready": (self.root/"models/language/model.safetensors").exists(), "core_ready": core_ready, "atlas": self.atlas_status(), "contrast": self.contrast_status(), "horizon": self.horizon_status(), "odyssey": self.odyssey_status(), "helm": self.helm_status(), "odysseus": self.odysseus_status(), "mco": self.mco_status(), "aura": self.aura_status(), "tessera": self.tessera_status(), "mnemorph": self.mnemorph_status(), "metamorph": self.metamorph_status(), "chimera": self.chimera_status(), "hyperion": self.hyperion_status(), "titan": self.titan_status(), "trident": self.trident_status(), "hyper_agent": self.hyper_agent_status(), "ecosystem": self.ecosystem_status(), "poseidon_x": self.poseidon_x_status(), "external_adapter": self.external_adapter_status(), "reports": reports, "limits": "Experimental composite system. Controlled geometric media. Tool-assisted maths. Synthetic survival."} | source_status()
         if core_error:
             result["core_error"] = core_error
         return result
