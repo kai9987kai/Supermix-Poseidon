@@ -186,7 +186,7 @@ SEARCH_SPACE = [
     {
         "file": "poseidon/mnemosyne.py",
         "name": "lcb_z",
-        "pattern": r"(lcb_z:\s*float\s*=\s*)([0-9\.]+)",
+        "pattern": r"(\n    lcb_z:\s*float\s*=\s*)([0-9\.]+)",
         "min": 1.0, "max": 2.5, "type": "float", "fmt": "{:.2f}",
     },
 ]
