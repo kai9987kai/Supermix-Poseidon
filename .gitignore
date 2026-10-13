@@ -14,3 +14,4 @@ runs/**/*.jsonl
 runs/**/*.tmp
 *.tmp
 build/
+runs/search_oracle/
