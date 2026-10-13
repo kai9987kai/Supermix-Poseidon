@@ -61,10 +61,13 @@ class NexusOmegaAgent:
         self.last_action = None
         self.last_mem = None
 
-    def act(self, obs: np.ndarray, evaluate_planning: bool = True) -> int:
+    def act(self, obs: np.ndarray | Sequence[float], evaluate_planning: bool = True) -> int:
         """Selects action via uncertainty-penalized expected reward optimization."""
+        obs_arr = np.asarray(obs, dtype=np.float32)
+        if len(obs_arr) > self.d_obs:
+            obs_arr = obs_arr[:self.d_obs]
         mem_vec = self.memory.get_combined_vector()
-        self.last_obs = obs.copy()
+        self.last_obs = obs_arr.copy()
         self.last_mem = mem_vec.copy()
 
         # Extract phase belief from memory
@@ -72,13 +75,13 @@ class NexusOmegaAgent:
         has_memory = (np.linalg.norm(mem_vec[:self.d_working]) > 1e-4)
 
         if not evaluate_planning:
-            # Default reactive heuristic: forage if obs[0] (health) > 0.5, else shelter
-            return 0 if obs[0] > 0.5 else 1
+            # Default reactive heuristic: forage if obs_arr[0] (health) > 0.5, else shelter
+            return 0 if obs_arr[0] > 0.5 else 1
 
         best_action = 0
         best_score = -float("inf")
 
-        cue = float(obs[3])
+        cue = float(obs_arr[3])
         # Working memory dim 0 tracks the remaining storm duration
         remaining_storm_ticks = float(mem_vec[0]) if has_memory else 0.0
 
@@ -86,7 +89,7 @@ class NexusOmegaAgent:
         is_predicted_storm = (cue > 0.8) or (has_memory and remaining_storm_ticks > 0.1)
 
         for a in range(self.n_actions):
-            pred = self.world_model.predict(obs, mem_vec, a)
+            pred = self.world_model.predict(obs_arr, mem_vec, a)
             
             # Grounded reward estimation modulated by memory-derived storm belief
             if a == 0:  # Forage
@@ -106,13 +109,17 @@ class NexusOmegaAgent:
         self.last_action = best_action
         return best_action
 
-    def observe_transition(self, next_obs: np.ndarray, reward: float, done: bool) -> np.ndarray:
+    def observe_transition(self, next_obs: np.ndarray | Sequence[float], reward: float = 0.0, done: bool = False) -> np.ndarray:
         """Performs comparator update: computes residual e_t and updates causal memory."""
         if self.last_obs is None or self.last_action is None:
             return np.zeros(self.d_obs, dtype=np.float32)
 
+        next_arr = np.asarray(next_obs, dtype=np.float32)
+        if len(next_arr) > self.d_obs:
+            next_arr = next_arr[:self.d_obs]
+
         # 1. Compute realized prediction error
-        e_t = self.world_model.compute_comparator_residual(next_obs)
+        e_t = self.world_model.compute_comparator_residual(next_arr)
 
         # 2. Project comparator error into working memory update
         delta_mem = np.dot(self.W_comp, e_t)

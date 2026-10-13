@@ -616,6 +616,8 @@ See runs/language/report.json, data/language/SOURCE_CARD.md and the root model c
                        "prometheus": "synthetic-entropy-and-drive-heuristics",
                        "intermittent": "simulated-energy-state-and-compact-frame",
                        "nexus_search": "federated-associative-vector-lattice-indexing",
+                       "external_adapter": "typed-3d-simulation-telemetry-protocol",
+                       "nexus_omega": "causal-epigenetic-self-experimenting-discovery-agent",
                        "legacy_ensemble": "historical-unvalidated-not-loaded"},
     }
     write_json(output / "manifest.json", manifest)

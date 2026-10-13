@@ -106,6 +106,12 @@ def make_handler(runtime, port):
                 except Exception as error:
                     self.send_json(500, {"error": str(error), "type": type(error).__name__})
                 return
+            if path == "/api/nexus-omega/status":
+                try:
+                    self.send_json(200, runtime.nexus_omega_status())
+                except Exception as error:
+                    self.send_json(500, {"error": str(error), "type": type(error).__name__})
+                return
             if path in ("/", "/index.html", "/style.css", "/app.js"):
                 file = WEB/("index.html" if path in ("/", "/index.html") else path[1:])
             elif path.startswith("/artifacts/"):
@@ -234,6 +240,18 @@ def make_handler(runtime, port):
                 except Exception as error:
                     self.send_json(500, {"error": str(error), "type": type(error).__name__})
                 return
+            if path == "/api/nexus-omega/discover":
+                try:
+                    seed_base = int(payload.get("seed_base", 50000))
+                    num_seeds = int(payload.get("num_seeds", 4))
+                    max_steps = int(payload.get("max_steps", 16))
+                    result = runtime.nexus_omega_discovery(seed_base=seed_base, num_seeds=num_seeds, max_steps=max_steps)
+                    self.send_json(200, result)
+                except (ValueError, TypeError) as error:
+                    self.send_json(400, {"error": str(error)})
+                except Exception as error:
+                    self.send_json(500, {"error": str(error), "type": type(error).__name__})
+                return
             if self.path not in ("/api/adapter/tick", "/api/respond", "/api/remember", "/api/experiment", "/api/contrast-experiment", "/api/horizon-experiment", "/api/odyssey-experiment", "/api/helm-experiment", "/api/odysseus-experiment", "/api/mco-experiment", "/api/aura-experiment", "/api/tessera-experiment", "/api/mnemorph-experiment", "/api/metamorph-experiment", "/api/chimera-experiment", "/api/hyperion-experiment", "/api/titan-experiment", "/api/trident-experiment", "/api/cognitive-experiment", "/api/ecosystem-experiment", "/api/tessera/shield", "/api/poseidon-x-experiment"):
                 self.send_json(404, {"error": "Not found"}); return
             if not busy.acquire(blocking=False):
@@ -265,6 +283,8 @@ def make_handler(runtime, port):
                         agent = runtime.poseidon_x()
                     elif controller_choice == "hyper":
                         agent = runtime.hyper_agent()
+                    elif controller_choice == "nexus_omega":
+                        agent = runtime.nexus_omega()
                     else:
                         agent = runtime.cognitive_agent()
                     resp = bridge.process_tick(msg, agent)

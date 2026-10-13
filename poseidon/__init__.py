@@ -23,5 +23,11 @@ from .external_adapter import (
     ExternalAdapterBridge,
     Compact3DReplayVerifier,
 )
+from .nexus_omega import (
+    NexusOmegaAgent,
+    POMDPPhaseWorld,
+    AutonomousDiscoveryEngine,
+    verify_discovery_receipt,
+)
 
 _SOURCE_SNAPSHOT = _capture_sources()

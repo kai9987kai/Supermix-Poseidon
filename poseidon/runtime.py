@@ -414,6 +414,52 @@ class Poseidon:
             "latest_telemetry": bridge.latest_telemetry.to_dict(),
         }
 
+    def nexus_omega(self, seed: int = 42):
+        from .nexus_omega import NexusOmegaAgent
+        return NexusOmegaAgent(base_seed=seed)
+
+    def nexus_omega_status(self):
+        return {
+            "ready": True,
+            "version": "1.0.0",
+            "type": "causal_epigenetic_self_experimenting_autonomous_discovery_agent",
+            "subsystems": [
+                "causal_memory_fabric",
+                "ensemble_world_model",
+                "epigenetic_morphogenesis",
+                "counterfactual_scm_engine",
+                "autonomous_discovery_engine",
+                "independent_scientific_auditor",
+            ],
+            "developmental_stages": [
+                "PROTOCELL", "LARVAL_FORAGER", "PUPAL_DIAPAUSE", "IMAGO_NAVIGATOR", "SENESCENT_CRYSTALLINE"
+            ],
+            "core_frozen": True,
+        }
+
+    def nexus_omega_discovery(self, seed_base: int = 50000, num_seeds: int = 4, max_steps: int = 16):
+        from .nexus_omega import AutonomousDiscoveryEngine, verify_discovery_receipt
+        with self.lock:
+            engine = AutonomousDiscoveryEngine(max_steps=max_steps)
+            ledger = engine.run_discovery_cycle(seed_base=seed_base, num_seeds=num_seeds)
+            data = {
+                "ledger_id": ledger.ledger_id,
+                "timestamp": ledger.timestamp,
+                "ratified_laws": ledger.ratified_laws,
+                "refutation_graveyard": ledger.refutation_graveyard,
+                "ledger_sha256": ledger.ledger_sha256,
+            }
+            verified = verify_discovery_receipt(data)
+            return {
+                "verified": verified,
+                "ledger_id": ledger.ledger_id,
+                "timestamp": ledger.timestamp,
+                "ratified_laws_count": len(ledger.ratified_laws),
+                "refutations_count": len(ledger.refutation_graveyard),
+                "ledger_sha256": ledger.ledger_sha256,
+                "ratified_laws": ledger.ratified_laws,
+            }
+
     def mnemorph_status(self):
         relative = "outputs/mnemorph/RECEIPT.json"
         path = self.root / relative
@@ -1314,7 +1360,7 @@ class Poseidon:
             core_ready = active_core_path(self.root).is_file()
         except (ValueError, TypeError, OSError) as error:
             core_ready, core_error = False, str(error)
-        result = {"version": __version__, "name": "Supermix Poseidon", "language_ready": (self.root/"models/language/model.safetensors").exists(), "core_ready": core_ready, "atlas": self.atlas_status(), "contrast": self.contrast_status(), "horizon": self.horizon_status(), "odyssey": self.odyssey_status(), "helm": self.helm_status(), "odysseus": self.odysseus_status(), "mco": self.mco_status(), "aura": self.aura_status(), "tessera": self.tessera_status(), "mnemorph": self.mnemorph_status(), "metamorph": self.metamorph_status(), "chimera": self.chimera_status(), "hyperion": self.hyperion_status(), "titan": self.titan_status(), "trident": self.trident_status(), "hyper_agent": self.hyper_agent_status(), "ecosystem": self.ecosystem_status(), "poseidon_x": self.poseidon_x_status(), "external_adapter": self.external_adapter_status(), "reports": reports, "limits": "Experimental composite system. Controlled geometric media. Tool-assisted maths. Synthetic survival."} | source_status()
+        result = {"version": __version__, "name": "Supermix Poseidon", "language_ready": (self.root/"models/language/model.safetensors").exists(), "core_ready": core_ready, "atlas": self.atlas_status(), "contrast": self.contrast_status(), "horizon": self.horizon_status(), "odyssey": self.odyssey_status(), "helm": self.helm_status(), "odysseus": self.odysseus_status(), "mco": self.mco_status(), "aura": self.aura_status(), "tessera": self.tessera_status(), "mnemorph": self.mnemorph_status(), "metamorph": self.metamorph_status(), "chimera": self.chimera_status(), "hyperion": self.hyperion_status(), "titan": self.titan_status(), "trident": self.trident_status(), "hyper_agent": self.hyper_agent_status(), "ecosystem": self.ecosystem_status(), "poseidon_x": self.poseidon_x_status(), "external_adapter": self.external_adapter_status(), "nexus_omega": self.nexus_omega_status(), "reports": reports, "limits": "Experimental composite system. Controlled geometric media. Tool-assisted maths. Synthetic survival."} | source_status()
         if core_error:
             result["core_error"] = core_error
         return result
@@ -1353,10 +1399,14 @@ class Poseidon:
                 from .world_controls import rollout_with_decisions
                 _integer(max_steps, "max_steps", 1, 10000)
                 scarcity = _number(scarcity, "scarcity", .5, 4)
-                if planner not in ("policy", "mpc", "hybrid", "risk_aware", "uncertainty", "atlas", "contrast", "horizon", "odyssey", "helm", "odysseus", "aura", "metamorph", "chimera", "hyperion", "titan", "trident", "cognitive", "hyper", "poseidon_x"):
+                if planner not in ("policy", "mpc", "hybrid", "risk_aware", "uncertainty", "atlas", "contrast", "horizon", "odyssey", "helm", "odysseus", "aura", "metamorph", "chimera", "hyperion", "titan", "trident", "cognitive", "hyper", "poseidon_x", "nexus_omega"):
                     raise ValueError("Unknown survival planner.")
                 core = self.core()
-                if planner == "poseidon_x":
+                if planner == "nexus_omega":
+                    controller = self.nexus_omega(seed=seed)
+                    controller.reset()
+                    backend_desc = "Supermix Poseidon Nexus-Omega Causal Epigenetic Autonomous Agent in TidePool"
+                elif planner == "poseidon_x":
                     controller = self.poseidon_x()
                     controller.reset()
                     backend_desc = "Supermix Poseidon v5.0 Apex Multivector Autopoietic Cognitive Kernel in TidePool"

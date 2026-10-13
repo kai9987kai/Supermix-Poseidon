@@ -367,4 +367,34 @@ async function refreshStatus(){
   }catch{$('#connection').textContent='Offline · start the local server';}
   finally{statusInFlight=false;syncControls();}
 }
-drawIdle();refreshStatus();refreshJobs();setInterval(refreshStatus,15000);
+
+async function pollTelemetry(){
+  try{
+    const res=await fetch('/api/telemetry/memory-influence');
+    if(!res.ok)return;
+    const tel=await res.json();
+    if($('#dvGemStatus')){$('#dvGemStatus').textContent=tel.dv_gem_active?'ACTIVE':'INACTIVE';$('#dvGemStatus').style.background=tel.dv_gem_active?'#2563eb':'#64748b';$('#dvGemStatus').style.color='white';}
+    if($('#dvGemDeltas'))$('#dvGemDeltas').textContent=JSON.stringify(tel.dv_gem_deltas);
+    if($('#epistemicDriveText'))$('#epistemicDriveText').textContent=`Active Inference Drive: ${Number(tel.active_inference_drive).toFixed(3)} | Epistemic Reduction: ${Number(tel.epistemic_reduction).toFixed(3)}`;
+    if($('#overrideStatus')){$('#overrideStatus').textContent=tel.planner_override?'OVERRIDE':'NOMINAL';$('#overrideStatus').style.background=tel.planner_override?'#f59e0b':'#10b981';$('#overrideStatus').style.color='white';}
+    if($('#overrideText'))$('#overrideText').textContent=`Override: ${tel.planner_override} | Margin: +${Number(tel.override_margin).toFixed(4)} | Scope: ${tel.readiness_scope||'calibrated-stage6-core'}`;
+  }catch{}
+}
+if($('#pollTelemetryBtn'))$('#pollTelemetryBtn').onclick=()=>pollTelemetry();
+if($('#runDiscoveryBtn'))$('#runDiscoveryBtn').onclick=async()=>{
+  try{
+    if($('#discoveryStatus')){$('#discoveryStatus').textContent='RUNNING';$('#discoveryStatus').style.background='#8b5cf6';$('#discoveryStatus').style.color='white';}
+    if($('#discoveryText'))$('#discoveryText').textContent='Evaluating counterfactual interventions and abductive noise across 4 seeds...';
+    const res=await fetch('/api/nexus-omega/discover',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({seed_base:50000,num_seeds:4,max_steps:16})});
+    if(!res.ok)throw Error(res.statusText);
+    const data=await res.json();
+    if($('#discoveryStatus')){$('#discoveryStatus').textContent=data.verified?'VERIFIED':'COMPLETE';$('#discoveryStatus').style.background=data.verified?'#10b981':'#ef4444';$('#discoveryStatus').style.color='white';}
+    if($('#discoveryText'))$('#discoveryText').textContent=`Ratified Laws: ${data.ratified_laws_count} | Refutations: ${data.refutations_count} | SHA: ${data.ledger_sha256.slice(0,16)}...`;
+  }catch(err){
+    if($('#discoveryStatus')){$('#discoveryStatus').textContent='FAILED';$('#discoveryStatus').style.background='#ef4444';}
+    if($('#discoveryText'))$('#discoveryText').textContent='Discovery cycle failed: '+err.message;
+  }
+};
+
+drawIdle();refreshStatus();refreshJobs();pollTelemetry();setInterval(()=>{refreshStatus();pollTelemetry();},15000);
+

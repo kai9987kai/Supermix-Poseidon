@@ -173,7 +173,20 @@ def test_external_adapter_server_endpoints(server):
     assert hs_res["client_id"] == "test-suite-runner"
     token = hs_res["session_token"]
 
-    # 4. POST /api/adapter/verify-3d-replay
+    # 4. POST /api/adapter/tick with controller="nexus_omega"
+    tick_payload = {
+        "session_token": token,
+        "tick": 0,
+        "delta_time": 0.05,
+        "observation_16d": [0.5] * 16,
+        "controller": "nexus_omega",
+    }
+    tick_res = json.load(post(url+"/api/adapter/tick", tick_payload))
+    assert tick_res["tick"] == 0
+    assert "action" in tick_res
+    assert tick_res["action"] in range(4)
+
+    # 5. POST /api/adapter/verify-3d-replay
     replay_payload = {
         "schema": "poseidon-3d-replay-v1",
         "adapter_identity": {"adapter_id": "sim-adapter-01", "max_linear_velocity": 15.0},
@@ -187,10 +200,33 @@ def test_external_adapter_server_endpoints(server):
     assert rep_res["transitions_verified"] == 1
     assert len(rep_res["receipt_sha256"]) == 64
 
-    # 5. POST /api/adapter/cancel
+    # 6. POST /api/adapter/cancel
     cancel_res = json.load(post(url+"/api/adapter/cancel", {"session_token": token}))
     assert cancel_res["cancelled"] is True
     assert cancel_res["session_token"] == token
+
+
+def test_nexus_omega_server_endpoints(server):
+    url, _ = server
+    # 1. GET /api/nexus-omega/status
+    stat = json.load(urlopen(url + "/api/nexus-omega/status"))
+    assert stat["ready"] is True
+    assert stat["version"] == "1.0.0"
+    assert "causal_memory_fabric" in stat["subsystems"]
+    assert "PROTOCELL" in stat["developmental_stages"]
+
+    # 2. POST /api/nexus-omega/discover
+    disc_payload = {
+        "seed_base": 50000,
+        "num_seeds": 2,
+        "max_steps": 8,
+    }
+    disc_res = json.load(post(url + "/api/nexus-omega/discover", disc_payload))
+    assert disc_res["verified"] is True
+    assert "ledger_id" in disc_res
+    assert len(disc_res["ledger_sha256"]) == 64
+    assert disc_res["ratified_laws_count"] >= 0
+
 
 
 

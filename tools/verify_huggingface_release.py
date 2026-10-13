@@ -593,6 +593,7 @@ print("POSEIDON_RELEASE_SMOKE=" + json.dumps({
     "chimera_replays": chimera_replays,
     "hyperion_replays": hyperion_replays,
     "titan_replays": titan_replays,
+    "trident_replays": trident_replays,
 }, allow_nan=False, sort_keys=True))
 '''
 
