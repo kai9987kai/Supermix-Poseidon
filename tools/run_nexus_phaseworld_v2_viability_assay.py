@@ -135,6 +135,13 @@ def _run_episode(
             "health_shock_update": bool(agent.last_health_shock_update) if agent is not None else False,
             "regime_storm_ticks": float(agent.factored_world_model.z_regime[0]) if agent is not None else 0.0,
             "storm_duration_estimate": float(agent.v2_storm_duration_estimate) if profile == "nexus-phaseworld-v2" else None,
+            "storm_interval_estimate": (
+                float(agent.v2_storm_interval_estimate)
+                if profile == "nexus-phaseworld-v2" and agent.v2_storm_interval_estimate is not None
+                else None
+            ),
+            "hazard_guard_active": bool(agent.v2_hazard_guard_active) if agent is not None else False,
+            "hazard_guard_override": bool(agent.v2_hazard_guard_override) if agent is not None else False,
             "recovery_admission": bool(getattr(decision, "recovery_admission", False)),
             "guard_override": bool(getattr(decision, "conformal_override", False)),
         })
@@ -302,7 +309,7 @@ def run(
             },
             "version_change": "v2 adds +0.12 hydration to Rest before the unchanged -0.05 basal hydration drain; v1 remains untouched",
             "v2_prior_refinement": "corrects the inherited storm-shelter health gain and selects the higher-LCB action from shelter/rest when the safety guard overrides exploration",
-            "v2_shock_update": "pulse-relative storm duration is inferred from health residuals up to five ticks; low-energy forage is admitted only with no cue, memory or regime storm belief and a predicted vital-state recovery",
+            "v2_shock_update": "cold start waits in Rest for the first pulse; late health residuals extend pulse-relative storm duration up to eight ticks with a five-tick margin; shocks without a pulse latch into Rest until a new pulse anchors phase; the minimum of the last three pulse intervals caps the storm estimate at interval minus one; the active hazard guard selects Rest below resource margins or Shelter otherwise",
             "observation_contract": "same 8 float32 channels; channel 3 transient storm pulse and channel 4 episode progress",
             "action_contract": "same four actions: forage, shelter, explore, rest",
             "arms": list(arm_names),

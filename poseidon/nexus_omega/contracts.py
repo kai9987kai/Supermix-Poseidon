@@ -269,6 +269,7 @@ class CausalEFEDecision:
     timestamp: float = field(default_factory=time.time)
     action_scores: List[Dict[str, Any]] = field(default_factory=list)
     recovery_admission: bool = False
+    hazard_guard_override: bool = False
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -282,6 +283,7 @@ class CausalEFEDecision:
             "conformal_lcb": round(float(self.conformal_lcb), 6),
             "conformal_override": bool(self.conformal_override),
             "recovery_admission": bool(self.recovery_admission),
+            "hazard_guard_override": bool(self.hazard_guard_override),
             "factored_state": self.factored_state or {},
             "timestamp": round(float(self.timestamp), 4),
             "action_scores": self.action_scores,

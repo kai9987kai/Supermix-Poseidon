@@ -2,7 +2,8 @@
 
 **Date:** 14 October 2026  
 **Status:** Synthetic 64-step robustness study completed; exploratory, no controller promotion  
-**Receipts:** [32-step refinement](../../runs/nexus_omega/phaseworld_v2_viability_assay_refined_20261014.json), [64-step robustness replication](../../runs/nexus_omega/phaseworld_v2_robustness_h64_20261014.json), [128-step robustness extension](../../runs/nexus_omega/phaseworld_v2_robustness_h128_20261014.json), [five-tick stress run](../../runs/nexus_omega/phaseworld_v2_storm5_h128_20261014.json), [source-bound repeat](../../runs/nexus_omega/phaseworld_v2_storm5_h128_sourcebound_20261014.json)  
+
+**Receipts:** [32-step refinement](../../runs/nexus_omega/phaseworld_v2_viability_assay_refined_20261014.json), [64-step robustness replication](../../runs/nexus_omega/phaseworld_v2_robustness_h64_20261014.json), [128-step robustness extension](../../runs/nexus_omega/phaseworld_v2_robustness_h128_20261014.json), [five-tick stress run](../../runs/nexus_omega/phaseworld_v2_storm5_h128_20261014.json), [source-bound repeat](../../runs/nexus_omega/phaseworld_v2_storm5_h128_sourcebound_20261014.json), [eight-tick adaptive stress run](../../runs/nexus_omega/phaseworld_v2_storm8_h128_adaptive_20261014.json)
 **Runner:** [run_nexus_phaseworld_v2_viability_assay.py](../../tools/run_nexus_phaseworld_v2_viability_assay.py)
 
 ## Question
@@ -68,6 +69,10 @@ The stress run changed the storm schedule from 3 of every 6 actions to 5 of ever
 | Privileged oracle-state controller | 64/64 | 128.0 | 13.843 |
 
 The oracle chooses Rest during the simulator's hidden storm phase and Forage otherwise. It checks that this harsher environment admits a viable policy; its privileged information makes it an upper bound, not an agent baseline. The duration-matched pulse controller still fails when episodes begin partway through a storm before the first cue. In contrast, the NEXUS candidate completed all episodes and exceeded the oracle's reward, but its mean terminal health is only 0.294 and its minimum health is 0.20. This demonstrates performance inside the simulator, not a robust safety margin. The paired candidate-minus-v1-prior reward change was +26.635 for each initialization (95% environment-seed bootstrap intervals [26.424, 26.845] and [26.424, 26.843]); all 64 pairs favored the candidate on survival. Every one of 576 complete trajectories replayed exactly with zero failures. The source-bound repeat produced identical episode records and arm summaries, and its source hashes match the current files.
+
+### Eight-tick hidden-storm adaptive stress
+
+An eight-tick storm schedule (8 ticks storm out of 10-tick cycle, horizon 128, seeds 100201–100264, agent initializations 56001 and 56002) tested the adaptive hazard guard and pulse latch under severe environmental duress. The aligned NEXUS-Ω agent achieved 64/64 survival across both initializations (100% viability) with 0 replay failures across all 576 complete trajectories. In contrast, the legacy v1 prior survived 0/64 (survival delta +1.0, paired sign test p = 1.08e-19, 95% bootstrap CI [1.0, 1.0]). The paired reward delta was +3.232 (95% CI [3.070, 3.391]) for initialization 56001 and +3.180 (95% CI [3.030, 3.330]) for initialization 56002.
 
 ## Interpretation and limits
 

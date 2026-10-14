@@ -43,7 +43,9 @@ class NexusOmegaAgent:
     """Adaptive agent coordinating causal memory, world model, and comparator updates."""
 
     V2_DEFAULT_STORM_DURATION = 3.0
-    V2_MAX_STORM_DURATION = 5.0
+    V2_MAX_STORM_DURATION = 8.0
+    V2_SHOCK_DURATION_MARGIN = 5.0
+    V2_PULSE_INTERVAL_HISTORY = 3
 
     def __init__(
         self,
@@ -141,6 +143,13 @@ class NexusOmegaAgent:
         self.last_health_shock_update = False
         self.v2_storm_duration_estimate = self.V2_DEFAULT_STORM_DURATION
         self.v2_ticks_since_pulse: Optional[int] = None
+        self.v2_episode_tick = 0
+        self.v2_last_pulse_tick: Optional[int] = None
+        self.v2_pulse_intervals: List[int] = []
+        self.v2_storm_interval_estimate: Optional[float] = None
+        self.v2_waiting_for_pulse = dynamics_profile == "nexus-phaseworld-v2"
+        self.v2_hazard_guard_active = False
+        self.v2_hazard_guard_override = False
 
     def reset(self) -> None:
         self.memory.reset()
@@ -160,9 +169,55 @@ class NexusOmegaAgent:
         self.last_health_shock_update = False
         self.v2_storm_duration_estimate = self.V2_DEFAULT_STORM_DURATION
         self.v2_ticks_since_pulse = None
+        self.v2_episode_tick = 0
+        self.v2_last_pulse_tick = None
+        self.v2_pulse_intervals = []
+        self.v2_storm_interval_estimate = None
+        self.v2_waiting_for_pulse = self.dynamics_profile == "nexus-phaseworld-v2"
+        self.v2_hazard_guard_active = False
+        self.v2_hazard_guard_override = False
         self.world_model.last_prediction = None
         self.factored_world_model.last_prediction = None
         self.factored_world_model.z_regime = np.array([0.0, 1.0], dtype=np.float32)
+
+    def _apply_v2_phase_guard(
+        self,
+        obs: np.ndarray,
+        mem: np.ndarray,
+        proposed_action: int,
+    ) -> int:
+        """Apply a bounded, resource-aware response to a transient hazard cue."""
+        self.v2_hazard_guard_active = False
+        self.v2_hazard_guard_override = False
+        if self.dynamics_profile != "nexus-phaseworld-v2" or not self.use_causal_efe:
+            return int(proposed_action)
+
+        cue_active = len(obs) > 3 and float(obs[3]) > 0.8
+        pulse_belief = (
+            self.v2_waiting_for_pulse
+            or (
+                self.v2_ticks_since_pulse is not None
+                and self.v2_ticks_since_pulse < self.v2_storm_duration_estimate
+            )
+        )
+        regime = getattr(self.factored_world_model, "z_regime", np.zeros(1, dtype=np.float32))
+        memory_belief = len(mem) > 0 and float(mem[0]) > 0.1
+        regime_belief = len(regime) > 0 and float(regime[0]) > 0.1
+        if not (cue_active or pulse_belief or memory_belief or regime_belief):
+            return int(proposed_action)
+
+        self.v2_hazard_guard_active = True
+        if self.v2_waiting_for_pulse and not cue_active:
+            self.v2_hazard_guard_override = int(proposed_action) != 3
+            return 3
+        energy = float(obs[1]) if len(obs) > 1 else 1.0
+        hydration = float(obs[2]) if len(obs) > 2 else 1.0
+        # Rest is neutral for energy and replenishes hydration in v2. Shelter
+        # earns more during a storm but consumes reserves, so use it only with
+        # a high resource margin.
+        safe_action = 3 if hydration < 0.98 or energy < 0.75 else 1
+        self.v2_hazard_guard_override = int(proposed_action) != safe_action
+        return safe_action
 
     def act(self, obs: np.ndarray | Sequence[float], evaluate_planning: bool = True) -> int:
         """Selects action via Deep Active Inference (EFE) or heuristic optimization."""
@@ -170,8 +225,26 @@ class NexusOmegaAgent:
         if len(obs_arr) > self.d_obs:
             obs_arr = obs_arr[:self.d_obs]
         if self.dynamics_profile == "nexus-phaseworld-v2" and len(obs_arr) > 3:
+            current_tick = self.v2_episode_tick
+            self.v2_episode_tick += 1
             if float(obs_arr[3]) > 0.8:
+                if self.v2_last_pulse_tick is not None:
+                    pulse_interval = current_tick - self.v2_last_pulse_tick
+                    if pulse_interval > 0:
+                        self.v2_pulse_intervals.append(int(pulse_interval))
+                        self.v2_pulse_intervals = self.v2_pulse_intervals[-self.V2_PULSE_INTERVAL_HISTORY:]
+                        self.v2_storm_interval_estimate = float(min(self.v2_pulse_intervals))
+                        duration_cap = min(
+                            self.V2_MAX_STORM_DURATION,
+                            max(1.0, self.v2_storm_interval_estimate - 1.0),
+                        )
+                        self.v2_storm_duration_estimate = min(
+                            self.v2_storm_duration_estimate,
+                            duration_cap,
+                        )
+                self.v2_last_pulse_tick = current_tick
                 self.v2_ticks_since_pulse = 0
+                self.v2_waiting_for_pulse = False
             elif self.v2_ticks_since_pulse is not None:
                 self.v2_ticks_since_pulse += 1
         mem_vec = self.memory.get_combined_vector()
@@ -281,6 +354,9 @@ class NexusOmegaAgent:
         # Primary Cognitive Path: Deep Active Inference with Conformal SPI
         if self.use_causal_efe:
             decision = self.efe_planner.plan_action(obs_arr, mem_vec)
+            decision.action = self._apply_v2_phase_guard(obs_arr, mem_vec, decision.action)
+            decision.hazard_guard_override = self.v2_hazard_guard_override
+            decision.action_name = ("forage", "shelter", "explore", "rest")[decision.action]
             self.last_decision = decision
             self.last_action = decision.action
             return decision.action
@@ -336,14 +412,26 @@ class NexusOmegaAgent:
                 pulse_age = self.v2_ticks_since_pulse
                 if pulse_age is not None:
                     self.v2_storm_duration_estimate = min(
-                        self.V2_MAX_STORM_DURATION,
-                        max(self.v2_storm_duration_estimate, float(pulse_age + 2)),
+                        min(
+                            self.V2_MAX_STORM_DURATION,
+                            max(1.0, self.v2_storm_interval_estimate - 1.0)
+                            if self.v2_storm_interval_estimate is not None
+                            else self.V2_MAX_STORM_DURATION,
+                        ),
+                        max(
+                            self.v2_storm_duration_estimate,
+                            float(pulse_age + self.V2_SHOCK_DURATION_MARGIN),
+                        ),
                     )
                     remaining_ticks = max(
                         1.0,
                         self.v2_storm_duration_estimate - float(pulse_age + 1),
                     )
                 else:
+                    # A health shock without its pulse may be a storm already
+                    # in progress at reset. Stay in recovery mode until the
+                    # next pulse re-establishes the phase anchor.
+                    self.v2_waiting_for_pulse = True
                     remaining_ticks = self.V2_DEFAULT_STORM_DURATION
                 self.factored_world_model.z_regime[0] = max(
                     remaining_ticks,
