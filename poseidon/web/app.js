@@ -525,6 +525,34 @@ if($('#runDiscoveryBtn'))$('#runDiscoveryBtn').onclick=async()=>{
     if($('#discoveryText'))$('#discoveryText').textContent='Discovery cycle failed: '+err.message;
   }
 };
+if($('#runPrometheusCurriculumBtn'))$('#runPrometheusCurriculumBtn').onclick=async()=>{
+  try{
+    if($('#prometheusStatus')){$('#prometheusStatus').textContent='RUNNING CURRICULUM';$('#prometheusStatus').style.background='#8b5cf6';}
+    if($('#prometheusText'))$('#prometheusText').textContent='Executing 5-Phase Developmental Curriculum (Physics -> Interventions -> Raft Transfer)...';
+    const res=await fetch('/api/discovery-lab/curriculum',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({seed:42})});
+    if(!res.ok)throw Error(res.statusText);
+    const data=await res.json();
+    if($('#prometheusStatus')){$('#prometheusStatus').textContent=data.overall_status==='PASSED'?'ALL 5 PHASES PASSED':'FAILED';$('#prometheusStatus').style.background=data.overall_status==='PASSED'?'#10b981':'#ef4444';}
+    if($('#prometheusText'))$('#prometheusText').textContent=`Narrow: ${data.phases?.phase_5?.metrics?.narrow_river_strategy} | Wide: ${data.phases?.phase_5?.metrics?.wide_river_strategy} | Receipt: ${data.receipt_sha256?.slice(0,16)}...`;
+  }catch(err){
+    if($('#prometheusStatus')){$('#prometheusStatus').textContent='FAILED';$('#prometheusStatus').style.background='#ef4444';}
+    if($('#prometheusText'))$('#prometheusText').textContent='Curriculum failed: '+err.message;
+  }
+};
+if($('#synthesizeEnzymeBtn'))$('#synthesizeEnzymeBtn').onclick=async()=>{
+  try{
+    if($('#enzymeStatus')){$('#enzymeStatus').textContent='SYNTHESIZING';$('#enzymeStatus').style.background='#8b5cf6';}
+    if($('#enzymeText'))$('#enzymeText').textContent='Generating 3D active site triad and Michaelis-Menten kinetic parameters...';
+    const res=await fetch('/api/discovery-lab/enzyme/generate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({substrate:'lignocellulose',target_reaction:'cross_linking',temperature:298.15,ph:6.5})});
+    if(!res.ok)throw Error(res.statusText);
+    const data=await res.json();
+    if($('#enzymeStatus')){$('#enzymeStatus').textContent='CATALYZED';$('#enzymeStatus').style.background='#10b981';}
+    if($('#enzymeText'))$('#enzymeText').textContent=`ID: ${data.enzyme_id} | ${data.name} | ΔΔG‡: ${data.delta_delta_g_barrier_kcal} kcal/mol | Bond: ${data.cured_bond_strength} | Water: ${data.water_proof_rating}`;
+  }catch(err){
+    if($('#enzymeStatus')){$('#enzymeStatus').textContent='FAILED';$('#enzymeStatus').style.background='#ef4444';}
+    if($('#enzymeText'))$('#enzymeText').textContent='Synthesis failed: '+err.message;
+  }
+};
 
 drawIdle();refreshStatus();refreshJobs();pollTelemetry();setInterval(()=>{refreshStatus();pollTelemetry();},15000);
 

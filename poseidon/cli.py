@@ -30,6 +30,7 @@ def main():
         "nexus-omega-assay", "verify-nexus-omega",
         "nexus-omega-discovery", "verify-nexus-omega-discovery",
         "verify-3d-replay",
+        "discovery-lab",
     ])
     p.add_argument("prompt", nargs="?", default="")
     p.add_argument("--root", default=".")
@@ -782,6 +783,32 @@ def main():
         p_path = Path(args.prompt).resolve()
         receipt = Compact3DReplayVerifier.verify_replay_file(p_path)
         print(json.dumps(receipt, indent=2, ensure_ascii=False))
+        return
+
+    if args.command == "discovery-lab":
+        from .discovery_lab import (
+            RiverWorld,
+            DiscoveryCurriculumRunner,
+            MultimodalEnzymeGenerator,
+            DiscoveryEvaluator,
+        )
+        mode = args.prompt or "curriculum"
+        seed = args.seed if args.seed is not None else 42
+        if mode == "curriculum":
+            runner = DiscoveryCurriculumRunner(base_seed=seed)
+            print(json.dumps(runner.run_full_curriculum(), indent=2, ensure_ascii=False))
+        elif mode == "enzyme":
+            gen = MultimodalEnzymeGenerator(seed=seed)
+            enzyme = gen.generate_catalyst_for_substrate(substrate_type="lignocellulose")
+            print(json.dumps(enzyme.to_dict(), indent=2, ensure_ascii=False))
+        elif mode == "eval":
+            evaluator = DiscoveryEvaluator(bootstrap_reps=1000)
+            report = evaluator.evaluate_crossing_benchmark(seeds=(2001, 2002, 2003, 2004, 2005), river_width=3)
+            print(json.dumps(report, indent=2, ensure_ascii=False))
+        else:
+            env = RiverWorld(seed=seed, river_width=3)
+            obs, r, done, info = env.step(0)
+            print(json.dumps({"reward": r, "done": done, "info": info, "alive": env.agent.alive}, indent=2, ensure_ascii=False))
         return
 
     runtime = Poseidon(args.root, args.adapter, oracle_checkpoint=args.oracle_checkpoint)

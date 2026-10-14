@@ -136,6 +136,12 @@ def make_handler(runtime, port):
                 except Exception as error:
                     self.send_json(500, {"error": str(error), "type": type(error).__name__})
                 return
+            if path == "/api/discovery-lab/status":
+                try:
+                    self.send_json(200, runtime.discovery_lab_status())
+                except Exception as error:
+                    self.send_json(500, {"error": str(error), "type": type(error).__name__})
+                return
             if path in ("/", "/index.html", "/style.css", "/app.js"):
                 file = WEB/("index.html" if path in ("/", "/index.html") else path[1:])
             elif path.startswith("/artifacts/"):
@@ -318,6 +324,40 @@ def make_handler(runtime, port):
                     seed = int(payload.get("seed", 42))
                     result = runtime.nexus_omega_reason(obs=obs, seed=seed)
                     self.send_json(200, result)
+                except (ValueError, TypeError) as error:
+                    self.send_json(400, {"error": str(error)})
+                except Exception as error:
+                    self.send_json(500, {"error": str(error), "type": type(error).__name__})
+                return
+            if path == "/api/discovery-lab/step":
+                try:
+                    act = int(payload.get("action", 0))
+                    seed = int(payload.get("seed", 42))
+                    rw = int(payload.get("river_width", 3))
+                    res = runtime.discovery_lab_step(action=act, seed=seed, river_width=rw)
+                    self.send_json(200, res)
+                except (ValueError, TypeError) as error:
+                    self.send_json(400, {"error": str(error)})
+                except Exception as error:
+                    self.send_json(500, {"error": str(error), "type": type(error).__name__})
+                return
+            if path == "/api/discovery-lab/enzyme/generate":
+                try:
+                    substrate = str(payload.get("substrate", "lignocellulose"))
+                    shear = float(payload.get("target_shear_force", 300.0))
+                    seed = int(payload.get("seed", 42))
+                    res = runtime.discovery_lab_enzyme(substrate=substrate, target_shear=shear, seed=seed)
+                    self.send_json(200, res)
+                except (ValueError, TypeError) as error:
+                    self.send_json(400, {"error": str(error)})
+                except Exception as error:
+                    self.send_json(500, {"error": str(error), "type": type(error).__name__})
+                return
+            if path == "/api/discovery-lab/curriculum":
+                try:
+                    seed = int(payload.get("seed", 42))
+                    res = runtime.discovery_lab_curriculum(seed=seed)
+                    self.send_json(200, res)
                 except (ValueError, TypeError) as error:
                     self.send_json(400, {"error": str(error)})
                 except Exception as error:

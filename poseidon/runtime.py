@@ -593,6 +593,68 @@ class Poseidon:
                 "ratified_laws": ledger.ratified_laws,
             }
 
+    def discovery_lab(self, seed: int = 42, river_width: int = 3, max_steps: int = 100):
+        from .discovery_lab import RiverWorld
+        return RiverWorld(seed=seed, river_width=river_width, max_steps=max_steps)
+
+    def discovery_lab_status(self):
+        from .discovery_lab import (
+            DiscoverySkillLibrary,
+            DiscoveryCausalEngine,
+        )
+        lib = DiscoverySkillLibrary()
+        causal = DiscoveryCausalEngine()
+        return {
+            "ready": True,
+            "version": "1.0.0",
+            "project": "PROMETHEUS: Autonomous Cognitive Discovery Engine",
+            "subsystems": [
+                "river_world_simulation",
+                "object_physics_buoyancy",
+                "manipulation_action_space",
+                "observation_encoder",
+                "curiosity_controllability_engine",
+                "action_conditioned_dynamics_model",
+                "causal_intervention_engine",
+                "reusable_skill_library",
+                "hierarchical_skill_composer",
+                "multimodal_enzyme_generator",
+                "curriculum_runner",
+                "paired_evaluator",
+            ],
+            "certified_skills": [s.name for s in lib.skills.values() if s.status == "certified"],
+            "core_hypotheses": list(causal.hypotheses.keys()),
+            "enzyme_catalysts_supported": ["laccase_polyphenol_oxidase", "transglycosylase_cellulose_synthase", "peroxidase_bioadhesive"],
+        }
+
+    def discovery_lab_step(self, action: int = 0, seed: int = 42, river_width: int = 3):
+        env = self.discovery_lab(seed=seed, river_width=river_width)
+        obs, reward, done, info = env.step(action)
+        return {
+            "action_executed": info.get("action", str(action)),
+            "observation": [round(float(x), 4) for x in obs],
+            "reward": round(float(reward), 4),
+            "done": bool(done),
+            "state_hash": env.get_state_hash(),
+            "info": info,
+        }
+
+    def discovery_lab_enzyme(self, substrate: str = "lignocellulose", target_shear: float = 300.0, seed: int = 42):
+        from .discovery_lab import MultimodalEnzymeGenerator
+        gen = MultimodalEnzymeGenerator(seed=seed)
+        enzyme = gen.generate_catalyst_for_substrate(substrate_type=substrate, target_shear_force=target_shear)
+        return enzyme.to_dict()
+
+    def discovery_lab_curriculum(self, seed: int = 42):
+        from .discovery_lab import DiscoveryCurriculumRunner
+        runner = DiscoveryCurriculumRunner(base_seed=seed)
+        return runner.run_full_curriculum()
+
+    def discovery_lab_evaluate(self, seeds: tuple[int, ...] = (2001, 2002, 2003, 2004, 2005), river_width: int = 3):
+        from .discovery_lab import DiscoveryEvaluator
+        evaluator = DiscoveryEvaluator(bootstrap_reps=1000)
+        return evaluator.evaluate_crossing_benchmark(seeds=seeds, river_width=river_width)
+
     def mnemorph_status(self):
         relative = "outputs/mnemorph/RECEIPT.json"
         path = self.root / relative
