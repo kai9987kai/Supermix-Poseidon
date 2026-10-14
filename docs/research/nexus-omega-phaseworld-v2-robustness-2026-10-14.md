@@ -1,9 +1,9 @@
 # NEXUS-Ω phaseworld v2 viability and shock-recovery study
 
 **Date:** 14 October 2026  
-**Status:** Synthetic 64-step robustness study completed; exploratory, no controller promotion  
+**Status:** Synthetic 128-step stress study completed; exploratory, no controller promotion  
 
-**Receipts:** [32-step refinement](../../runs/nexus_omega/phaseworld_v2_viability_assay_refined_20261014.json), [64-step robustness replication](../../runs/nexus_omega/phaseworld_v2_robustness_h64_20261014.json), [128-step robustness extension](../../runs/nexus_omega/phaseworld_v2_robustness_h128_20261014.json), [five-tick stress run](../../runs/nexus_omega/phaseworld_v2_storm5_h128_20261014.json), [source-bound repeat](../../runs/nexus_omega/phaseworld_v2_storm5_h128_sourcebound_20261014.json), [eight-tick adaptive stress run](../../runs/nexus_omega/phaseworld_v2_storm8_h128_adaptive_20261014.json)
+**Receipts:** [32-step refinement](../../runs/nexus_omega/phaseworld_v2_viability_assay_refined_20261014.json), [64-step robustness replication](../../runs/nexus_omega/phaseworld_v2_robustness_h64_20261014.json), [128-step robustness extension](../../runs/nexus_omega/phaseworld_v2_robustness_h128_20261014.json), [five-tick stress run](../../runs/nexus_omega/phaseworld_v2_storm5_h128_20261014.json), [five-tick source-bound repeat](../../runs/nexus_omega/phaseworld_v2_storm5_h128_sourcebound_20261014.json), [eight-tick adaptive stress pilot](../../runs/nexus_omega/phaseworld_v2_storm8_h128_adaptive_20261014.json), [eight-tick phase-learning confirmation](../../runs/nexus_omega/phaseworld_v2_storm8_h128_phaselearn_20261014.json)
 **Runner:** [run_nexus_phaseworld_v2_viability_assay.py](../../tools/run_nexus_phaseworld_v2_viability_assay.py)
 
 ## Question
@@ -16,8 +16,9 @@ The first v2 run exposed two model/controller errors: the inherited prior predic
 
 - The v2 factored prior removes the inherited +0.05 Shelter health gain during storms and models Rest's +0.12 hydration recovery.
 - The safety planner keeps its original Shelter fallback by default. The v2 agent opts into a pair of fallback actions (Shelter, Rest) and selects the action with the higher model lower-confidence score.
-- The v2 agent tracks the number of steps since the transient pulse. A health residual at or below -0.25 beyond the expected storm tail increases its duration estimate up to five ticks and retains only the inferred remaining duration in the latent regime.
-- The guard admits Forage while health is threatened only when energy is below 0.50, hydration exceeds 0.25, cue/memory/regime all indicate calm, and the model predicts stable health plus energy recovery. The decision marks this `recovery_admission` explicitly.
+- The v2 agent starts in Rest until it observes a pulse anchor. It estimates the pulse period from observed recurrences and uses the minimum of the last three intervals to cap storm duration at `interval - 1` (up to eight ticks).
+- A health residual at or below -0.25 extends the pulse-relative storm estimate by five ticks. A shock without a pulse latches Rest until a new pulse anchors phase.
+- During a cue or inferred storm, a heuristic guard selects Rest below hydration 0.98 or energy 0.75, and Shelter otherwise. Calm Forage recovery remains screened by low energy, adequate hydration, no cue/memory/regime storm belief, and predicted vital-state recovery. Guard overrides and recovery admissions are logged separately.
 - The v1 profile does not use duration inference or calm-recovery admission.
 
 These are explicit structured heuristics. The neural residual ensemble remains randomly initialized; this is not a trained world model. The lower-confidence score is an uncalibrated heuristic and carries no conformal or safety guarantee.
@@ -34,6 +35,7 @@ Both runs used 64 environment seeds, two fixed agent initializations, seven arms
 | One-step shock update replication | 99301–99364 | 55201, 55202 | 64 | 448/448 |
 | One-step shock update extension | 99401–99464 | 55301, 55302 | 128 | 448/448 |
 | Pulse-age duration stress | 99701–99764 | 55601, 55602 | 128 | 576/576 |
+| Eight-tick phase-learning confirmation | 100501–100564 | 56201, 56202 | 128 | 576/576 |
 
 All blocks use fresh seed ranges except the source-bound repeat, which reran the identical 99701–99764 stress block and compared every stored episode. The first three receipts predate the current pulse-age estimator; their source hashes identify those earlier revisions. The final stress receipt binds the current agent, planner, decision contract, memory implementation, environments, and runner, and includes fixed-three-tick, duration-matched-five-tick, and privileged oracle controls.
 
@@ -70,12 +72,27 @@ The stress run changed the storm schedule from 3 of every 6 actions to 5 of ever
 
 The oracle chooses Rest during the simulator's hidden storm phase and Forage otherwise. It checks that this harsher environment admits a viable policy; its privileged information makes it an upper bound, not an agent baseline. The duration-matched pulse controller still fails when episodes begin partway through a storm before the first cue. In contrast, the NEXUS candidate completed all episodes and exceeded the oracle's reward, but its mean terminal health is only 0.294 and its minimum health is 0.20. This demonstrates performance inside the simulator, not a robust safety margin. The paired candidate-minus-v1-prior reward change was +26.635 for each initialization (95% environment-seed bootstrap intervals [26.424, 26.845] and [26.424, 26.843]); all 64 pairs favored the candidate on survival. Every one of 576 complete trajectories replayed exactly with zero failures. The source-bound repeat produced identical episode records and arm summaries, and its source hashes match the current files.
 
-### Eight-tick hidden-storm adaptive stress
+### Eight-tick hidden-storm adaptive stress (initial guard)
 
-An eight-tick storm schedule (8 ticks storm out of 10-tick cycle, horizon 128, seeds 100201–100264, agent initializations 56001 and 56002) tested the adaptive hazard guard and pulse latch under severe environmental duress. The aligned NEXUS-Ω agent achieved 64/64 survival across both initializations (100% viability) with 0 replay failures across all 576 complete trajectories. In contrast, the legacy v1 prior survived 0/64 (survival delta +1.0, paired sign test p = 1.08e-19, 95% bootstrap CI [1.0, 1.0]). The paired reward delta was +3.232 (95% CI [3.070, 3.391]) for initialization 56001 and +3.180 (95% CI [3.030, 3.330]) for initialization 56002.
+An eight-tick storm schedule (8 ticks storm out of 10-tick cycle, horizon 128, seeds 100201–100264, agent initializations 56001 and 56002) tested the first adaptive hazard guard. The aligned NEXUS-Ω agent achieved 64/64 survival across both initializations with 0 replay failures across all 576 complete trajectories. In contrast, the legacy v1 prior survived 0/64 (survival delta +1.0, paired sign test p = 1.08e-19, 95% bootstrap CI [1.0, 1.0]). The paired reward delta was +3.232 (95% CI [3.070, 3.391]) for initialization 56001 and +3.180 (95% CI [3.030, 3.330]) for initialization 56002. This version reached only 0.20 minimum health, which motivated the cold-start and pulse-period refinement below.
+
+### Eight-tick pulse-phase learning confirmation
+
+A fresh eight-of-ten storm block (128-step horizon, seeds 100501–100564, initializations 56201 and 56202) evaluated the revised phase learner. It waits in Rest for a pulse at cold start, estimates cycle interval from pulse recurrences, and extends storm duration from late health residuals. Both initializations estimated an eight-tick storm and ten-tick pulse interval in every episode.
+
+| Eight-tick phase-learning arm | Survival | Mean reward | Mean steps |
+|---|---:|---:|---:|
+| V2 NEXUS, aligned prior, init 56201 | 64/64 | 14.128 | 128.0 |
+| V2 NEXUS, aligned prior, init 56202 | 64/64 | 14.128 | 128.0 |
+| V2 NEXUS, v1 prior, each initialization | 0/64 | 2.287 | 17.4 |
+| Duration-matched eight-tick pulse trace | 28/64 | 4.940 | 57.7 |
+| Reactive cue-only | 0/64 | -2.547 | 4.0 |
+| Privileged oracle-state controller | 64/64 | 15.341 | 128.0 |
+
+Both aligned initializations had mean terminal health 0.60, energy 0.95, and hydration 0.930; minimum observed values were health 0.60, energy 0.90, and hydration 0.85. Each recorded 64 health-shock updates across 64 episodes. The guard activated on 6,602 of 8,192 transitions and overrode 6,595 planner actions per initialization, so this is a conservative hybrid controller rather than evidence of a learned optimal policy. Candidate-minus-v1-prior reward was +11.841 for each initialization (95% environment-seed bootstrap intervals [11.668, 12.012] and [11.666, 12.010]); all 64 pairs favored the candidate on survival. Its self-hash and all nine source hashes match; all 576 stored episodes replayed exactly. Receipt digest: `ec9914a0b72b0ed5bbdbdcf8d96b21d2a0a5cd41a3379e293538b3ee0408c7af`.
 
 ## Interpretation and limits
 
-The evidence now includes three separate mechanisms: a versioned sustainable environment, pulse-age inference from health prediction error, and a resource-recovery admission that is conditioned on the inferred storm state. The five-tick stress result suggests the second and third mechanisms address two distinct failures: hazard persistence and energy depletion from over-sheltering. Evidence remains bounded to one synthetic storm schedule, two fixed initializations, 64 seeds in the stress block, and a 128-step horizon. Health frequently falls to 0.20; longer storms, different intervals, observation noise, altered resource schedules, and adversarial changes remain untested.
+The evidence now includes a versioned sustainable environment, pulse-age inference from health prediction error, a cold-start phase anchor, interval-bounded duration estimates, and resource-aware Rest/Shelter selection. The five-tick and eight-tick schedules passed their measured blocks; the latest eight-tick block held minimum health at 0.60. Evidence remains bounded to fixed synthetic storm schedules, two fixed initializations, 64 seeds per main stress block, and a 128-step horizon. In-episode schedule changes, noisy or missed pulses, different resource schedules, and adversarial changes remain untested. The hazard guard overrides most planner actions and is an uncalibrated heuristic, not a safety guarantee or controller promotion.
 
 The assay does not establish real-world safety, biological memory, learned causal inference, or independent replication. It does not promote the v2 profile for deployment. The complete episode traces, source hashes, replay counts, and receipt digests are retained in the machine-readable receipts linked above.
