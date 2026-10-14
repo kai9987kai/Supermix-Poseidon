@@ -454,9 +454,49 @@ async function pollTelemetry(){
         $('#dreamText').textContent=`Replayed: ${dr.replayed_transitions} | Regret Red: ${Number(dr.mean_regret_mitigation).toFixed(3)} | Synaptic Pruning: ${(Number(dr.synaptic_pruning_ratio)*100).toFixed(1)}% | Hub Resilience: +${Number(dr.hub_resilience_gain).toFixed(3)}`;
       }
     }
+
+    const aRes=await fetch('/api/nexus-omega/apex-state');
+    if(aRes.ok){
+      const aData=await aRes.json();
+      if(aData.cognitive_monologue && $('#monologueText')){
+        const cm=aData.cognitive_monologue;
+        $('#monologueText').textContent=`Regime: ${cm.predicted_regime} | Hypotheses: ${cm.causal_hypotheses?.length||0} do(A) | Curiosity: +${Number(cm.epistemic_curiosity_gain).toFixed(4)}`;
+        if($('#thoughtChainText') && Array.isArray(cm.thought_chain)){
+          $('#thoughtChainText').textContent=cm.thought_chain.slice(0, 3).join(' ➔ ');
+        }
+        if($('#monologueStatus')){$('#monologueStatus').textContent='DELIBERATING';$('#monologueStatus').style.background='#6366f1';}
+      }
+      if(aData.nonstationary_phase && $('#phaseDriftText')){
+        const np=aData.nonstationary_phase;
+        $('#phaseDriftText').textContent=`T_est: ${Number(np.estimated_pulse_interval).toFixed(1)} | Confirmed: ${np.confirmed_pulse_interval?Number(np.confirmed_pulse_interval).toFixed(1):'none'} | Drift Vel: ${Number(np.frequency_drift_velocity)>=0?'+':''}${Number(np.frequency_drift_velocity).toFixed(3)} | Latch: ${np.phase_boundary_latch_active?'ACTIVE':'INACTIVE'}`;
+        if($('#phaseDriftStatus')){$('#phaseDriftStatus').textContent=np.phase_boundary_latch_active?'LATCHED':'RESONATING';$('#phaseDriftStatus').style.background=np.phase_boundary_latch_active?'#f59e0b':'#0ea5e9';}
+      }
+      if(aData.contrastive_memory && $('#contrastiveText')){
+        const cmem=aData.contrastive_memory;
+        $('#contrastiveText').textContent=`ΔQ: ${Number(cmem.counterfactual_advantage)>=0?'+':''}${Number(cmem.counterfactual_advantage).toFixed(3)} | Pred E(t+1): ${Number(cmem.predicted_vitality_energy).toFixed(2)} | Pred H(t+1): ${Number(cmem.predicted_vitality_hydration).toFixed(2)} | Deadband: ${cmem.within_deadband?'IN_DEADBAND':'DISCRIMINATED'}`;
+        if($('#contrastiveStatus')){$('#contrastiveStatus').textContent=cmem.guard_triggered?'VITALITY GUARD':'NOMINAL';$('#contrastiveStatus').style.background=cmem.guard_triggered?'#ef4444':'#10b981';}
+      }
+    }
   }catch{}
 }
 if($('#pollTelemetryBtn'))$('#pollTelemetryBtn').onclick=()=>pollTelemetry();
+if($('#triggerReasonBtn'))$('#triggerReasonBtn').onclick=async()=>{
+  try{
+    if($('#monologueStatus')){$('#monologueStatus').textContent='REASONING';$('#monologueStatus').style.background='#8b5cf6';}
+    if($('#thoughtChainText'))$('#thoughtChainText').textContent='Generating Ghost-in-the-Machine SCM counterfactual hypotheses…';
+    const res=await fetch('/api/nexus-omega/reason',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({seed:42})});
+    if(!res.ok)throw Error(res.statusText);
+    const cm=await res.json();
+    if($('#monologueStatus')){$('#monologueStatus').textContent='SYNTHESIZED';$('#monologueStatus').style.background='#10b981';}
+    if($('#monologueText'))$('#monologueText').textContent=`Regime: ${cm.predicted_regime} | Hypotheses: ${cm.causal_hypotheses?.length||0} do(A) | Curiosity: +${Number(cm.epistemic_curiosity_gain).toFixed(4)}`;
+    if($('#thoughtChainText') && Array.isArray(cm.thought_chain)){
+      $('#thoughtChainText').textContent=cm.thought_chain.join(' ➔ ');
+    }
+  }catch(err){
+    if($('#monologueStatus')){$('#monologueStatus').textContent='FAILED';$('#monologueStatus').style.background='#ef4444';}
+    if($('#thoughtChainText'))$('#thoughtChainText').textContent='Deliberation failed: '+err.message;
+  }
+};
 if($('#triggerDreamBtn'))$('#triggerDreamBtn').onclick=async()=>{
   try{
     if($('#dreamStatus')){$('#dreamStatus').textContent='REPLAYING';$('#dreamStatus').style.background='#8b5cf6';}

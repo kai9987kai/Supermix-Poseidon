@@ -1,10 +1,10 @@
-# NEXUS-Ω phaseworld v2 viability and shock-recovery study
+# NEXUS-Ω phaseworld viability, stress, and schedule-shift study
 
 **Date:** 14 October 2026  
-**Status:** Synthetic 128-step stress study completed; exploratory, no controller promotion  
+**Status:** Synthetic 128-step stress and schedule-shift studies completed; exploratory, no controller promotion
 
-**Receipts:** [32-step refinement](../../runs/nexus_omega/phaseworld_v2_viability_assay_refined_20261014.json), [64-step robustness replication](../../runs/nexus_omega/phaseworld_v2_robustness_h64_20261014.json), [128-step robustness extension](../../runs/nexus_omega/phaseworld_v2_robustness_h128_20261014.json), [five-tick stress run](../../runs/nexus_omega/phaseworld_v2_storm5_h128_20261014.json), [five-tick source-bound repeat](../../runs/nexus_omega/phaseworld_v2_storm5_h128_sourcebound_20261014.json), [eight-tick adaptive stress pilot](../../runs/nexus_omega/phaseworld_v2_storm8_h128_adaptive_20261014.json), [eight-tick phase-learning confirmation](../../runs/nexus_omega/phaseworld_v2_storm8_h128_phaselearn_20261014.json)
-**Runner:** [run_nexus_phaseworld_v2_viability_assay.py](../../tools/run_nexus_phaseworld_v2_viability_assay.py)
+**Receipts:** [32-step refinement](../../runs/nexus_omega/phaseworld_v2_viability_assay_refined_20261014.json), [64-step robustness replication](../../runs/nexus_omega/phaseworld_v2_robustness_h64_20261014.json), [128-step robustness extension](../../runs/nexus_omega/phaseworld_v2_robustness_h128_20261014.json), [five-tick stress run](../../runs/nexus_omega/phaseworld_v2_storm5_h128_20261014.json), [five-tick source-bound repeat](../../runs/nexus_omega/phaseworld_v2_storm5_h128_sourcebound_20261014.json), [eight-tick adaptive stress pilot](../../runs/nexus_omega/phaseworld_v2_storm8_h128_adaptive_20261014.json), [eight-tick phase-learning confirmation](../../runs/nexus_omega/phaseworld_v2_storm8_h128_phaselearn_20261014.json), [hidden interval-shift baseline](../../runs/nexus_omega/phaseworld_v3_interval_shift_h128_20261014.json), [two-pulse interval-shift comparison](../../runs/nexus_omega/phaseworld_v3_interval_shift_h128_twopulse_20261014.json), [severe-shift guard pilot](../../runs/nexus_omega/phaseworld_v3_severe_shift_confirmed_period_pilot_20261014.json), [boundary-latch confirmation](../../runs/nexus_omega/phaseworld_v3_severe_shift_boundary_latch_h128_20261014.json), [64-seed reserve-aware schedule-shift confirmation](../../runs/nexus_omega/phaseworld_v3_severe_shift_resource_guard_h128_20261014.json), [paired guard-threshold ablation with full-episode replay hashes](../../runs/nexus_omega/phaseworld_v3_guard_threshold_ablation_20261014.json)
+**Runners:** [v2 viability assay](../../tools/run_nexus_phaseworld_v2_viability_assay.py), [v3 schedule-shift assay](../../tools/run_nexus_phaseworld_v3_drift_assay.py), [paired guard-threshold ablation](../../tools/run_nexus_phaseworld_v3_guard_threshold_ablation.py)
 
 ## Question
 
@@ -16,9 +16,10 @@ The first v2 run exposed two model/controller errors: the inherited prior predic
 
 - The v2 factored prior removes the inherited +0.05 Shelter health gain during storms and models Rest's +0.12 hydration recovery.
 - The safety planner keeps its original Shelter fallback by default. The v2 agent opts into a pair of fallback actions (Shelter, Rest) and selects the action with the higher model lower-confidence score.
-- The v2 agent starts in Rest until it observes a pulse anchor. It estimates the pulse period from observed recurrences and uses the minimum of the last three intervals to cap storm duration at `interval - 1` (up to eight ticks).
+- The v2 agent starts in Rest until it observes a pulse anchor. A shorter observed pulse interval immediately lowers its provisional period estimate; two near-matching observations in either direction confirm the period before it can tighten the storm-duration window. The inferred storm duration is capped at `confirmed interval - 1` (up to eight ticks).
 - A health residual at or below -0.25 extends the pulse-relative storm estimate by five ticks. A shock without a pulse latches Rest until a new pulse anchors phase.
 - During a cue or inferred storm, a heuristic guard selects Rest below hydration 0.98 or energy 0.75, and Shelter otherwise. Calm Forage recovery remains screened by low energy, adequate hydration, no cue/memory/regime storm belief, and predicted vital-state recovery. Guard overrides and recovery admissions are logged separately.
+- If the expected next pulse is near or overdue but absent, a phase-boundary latch holds Rest until a new pulse reanchors the cycle, covering schedule shifts that begin late in an existing cycle.
 - The v1 profile does not use duration inference or calm-recovery admission.
 
 These are explicit structured heuristics. The neural residual ensemble remains randomly initialized; this is not a trained world model. The lower-confidence score is an uncalibrated heuristic and carries no conformal or safety guarantee.
@@ -27,7 +28,7 @@ The design follows portfolio lessons without importing upstream code: prediction
 
 ## Protocol
 
-Both runs used 64 environment seeds, two fixed agent initializations, seven arms, full action/reward/observation/vital traces, and exact deterministic replay of every recorded episode. For each environment seed, the v1 structured prior and v2-aligned prior shared the same agent initialization and environment seed. Controls were the legacy v1 trace-memory policy, v2 reactive cue-only policy, and v2 hand-coded three-tick pulse-memory policy. That pulse-memory policy is a viability positive control, not a learned policy.
+The original v1/v2 blocks used 64 environment seeds, two fixed agent initializations, full action/reward/observation/vital traces, and exact deterministic replay. The interval-shift assays use the same 64 environment seeds and two fixed agent initializations in both estimator versions. Controls include the v1 structured prior, fixed-duration trace policy, reactive cue policy, and privileged oracle. The trace is a hand-coded control; the oracle is a viability check, not a learned policy or baseline.
 
 | Run | Environment seeds | Agent initializations | Horizon | Replay |
 |---|---|---|---:|---:|
@@ -36,8 +37,11 @@ Both runs used 64 environment seeds, two fixed agent initializations, seven arms
 | One-step shock update extension | 99401–99464 | 55301, 55302 | 128 | 448/448 |
 | Pulse-age duration stress | 99701–99764 | 55601, 55602 | 128 | 576/576 |
 | Eight-tick phase-learning confirmation | 100501–100564 | 56201, 56202 | 128 | 576/576 |
+| Hidden 8-to-10 interval shift, original estimator | 100801–100864 | 56501, 56502 | 128 | 448/448 |
+| Same shift, two-pulse estimator | 100801–100864 | 56501, 56502 | 128 | 448/448 |
+| Severe 10x6-to-8x7 shift with boundary latch | 101201–101264 | 56801, 56802 | 128 | 448/448 |
 
-All blocks use fresh seed ranges except the source-bound repeat, which reran the identical 99701–99764 stress block and compared every stored episode. The first three receipts predate the current pulse-age estimator; their source hashes identify those earlier revisions. The final stress receipt binds the current agent, planner, decision contract, memory implementation, environments, and runner, and includes fixed-three-tick, duration-matched-five-tick, and privileged oracle controls.
+Blocks use fresh seed ranges except the source-bound repeat and the paired estimator comparison. The interval-shift pair reran the same 64 environment seeds and two agent initializations with both estimator versions. Earlier receipts retain hashes for their source revisions. Each receipt binds its agent, models, environment, and runner and records exact replay.
 
 ## Results
 
@@ -91,8 +95,37 @@ A fresh eight-of-ten storm block (128-step horizon, seeds 100501–100564, initi
 
 Both aligned initializations had mean terminal health 0.60, energy 0.95, and hydration 0.930; minimum observed values were health 0.60, energy 0.90, and hydration 0.85. Each recorded 64 health-shock updates across 64 episodes. The guard activated on 6,602 of 8,192 transitions and overrode 6,595 planner actions per initialization, so this is a conservative hybrid controller rather than evidence of a learned optimal policy. Candidate-minus-v1-prior reward was +11.841 for each initialization (95% environment-seed bootstrap intervals [11.668, 12.012] and [11.666, 12.010]); all 64 pairs favored the candidate on survival. Its self-hash and all nine source hashes match; all 576 stored episodes replayed exactly. Receipt digest: `ec9914a0b72b0ed5bbdbdcf8d96b21d2a0a5cd41a3379e293538b3ee0408c7af`.
 
+### Hidden cycle-length shift
+
+The versioned v3 environment changed the pulse interval once at step 64, from 8 to 10, while keeping storm duration at six steps. It preserved the current cycle's fractional phase, then generated observations under the new schedule. The original and revised estimators used the same 64 environment seeds (100801–100864) and the same two agent initializations (56501, 56502), with full trace replay in both blocks.
+
+| Hidden interval-shift arm | Survival | Mean total reward | Mean post-shift reward | Mean steps |
+|---|---:|---:|---:|---:|
+| V2 NEXUS, two-pulse estimator | 128/128 | 14.788 | 10.077 | 128.0 |
+| V2 NEXUS, v1 prior | 0/128 | 1.845 | 0.000 | 16.9 |
+| Fixed six-tick trace | 37/64 | 12.891 | 6.953 | 88.3 |
+| Privileged oracle | 64/64 | 21.089 | 12.289 | 128.0 |
+
+The first estimator block identified the new interval after 26.453 steps on average. Requiring two near-matching longer intervals reduced that lag to 16.453 (10 steps faster) with 100% estimate coverage. It immediately lowers its estimate on shorter intervals; the two-pulse rule applies only to upward changes. In this particular interval-increase assay, the candidate's actions and reward traces were identical between estimator versions: the period estimate changed faster, but this did not alter decisions. The phase-tracking improvement is measured; a policy benefit from it is not established. The candidate's minimum observed health was 0.20 despite complete survival. The revised receipt digest is `c1061ebd5148505fa4cc6f93f9e14c430eaf79e548e32fa2bb3256a36ff07e50`; its self-hash and source hashes match, and all 448 trajectories replayed exactly.
+
+### Joint interval and duration expansion
+
+A separate hidden shift at step 64 changed the schedule from a six-of-ten storm to a seven-of-eight storm. This couples higher hazard frequency with a longer storm, so it does not isolate either change. The candidate used provisional and confirmed period estimates plus the boundary latch. On 64 fresh environment seeds and two initializations, it completed 128/128 episodes; the duration-matched trace and v1-prior agent survived 0/64 and 0/128, while the privileged oracle survived 64/64.
+
+| Severe-shift arm | Survival | Mean reward | Mean post-shift reward | Mean terminal health |
+|---|---:|---:|---:|---:|
+| V2 NEXUS, reserve-aware thresholds (energy 0.80, hydration 0.40) | 128/128 | 15.941 | 3.720 | 0.600 |
+| V2 NEXUS, previous thresholds (energy 0.75, hydration 0.98) | 128/128 | 8.141 | 3.200 | 0.600 |
+| V2 NEXUS, v1 prior | 0/128 | 1.791 | 0.000 | 0.000 |
+| Fixed six-tick trace | 0/64 | 8.431 | -0.976 | 0.000 |
+| Privileged oracle | 64/64 | 18.245 | 6.000 | 1.000 |
+
+The paired ablation held environment seeds and both agent initializations fixed while changing only shelter resource thresholds. The reserve-aware threshold raised mean total reward by 7.800 points (95% environment-seed bootstrap CI 7.669–7.931) and mean post-shift reward by 0.520 (CI 0.408–0.638). Both profiles survived 128/128 episodes and made zero post-shift storm-forage actions. Minimum health stayed 0.60; minimum energy and hydration fell from 0.90/0.85 to 0.75/0.65. Guard overrides fell from 15,380 to 12,052 of 16,384 transitions (21.6% fewer), while the boundary latch count stayed at 1,510. The new interval estimate covered all episodes with mean lag 12.969 steps.
+
+The candidate receipt replayed 448/448 trajectories. The threshold ablation independently replayed 128/128 episodes for each profile by hashing complete observations and transitions. Source hashes and receipt self-hashes match. Candidate receipt digest: `729f9a786064029ecd75173856d97e9d85860883daed59d388edce5e7e6cfac3`; ablation receipt digest: `8687946cf829671f1cafb23b9969f8c07213772fff696dcd22cbb5139a374f1b`.
+
 ## Interpretation and limits
 
-The evidence now includes a versioned sustainable environment, pulse-age inference from health prediction error, a cold-start phase anchor, interval-bounded duration estimates, and resource-aware Rest/Shelter selection. The five-tick and eight-tick schedules passed their measured blocks; the latest eight-tick block held minimum health at 0.60. Evidence remains bounded to fixed synthetic storm schedules, two fixed initializations, 64 seeds per main stress block, and a 128-step horizon. In-episode schedule changes, noisy or missed pulses, different resource schedules, and adversarial changes remain untested. The hazard guard overrides most planner actions and is an uncalibrated heuristic, not a safety guarantee or controller promotion.
+The evidence now includes fixed-schedule stress, an interval increase, and one joint frequency/duration expansion. The reserve-aware guard recovered reward while preserving survival and zero storm forages on this block, at the cost of lower minimum energy and hydration. Evidence remains bounded to synthetic schedules, two fixed initializations, 64 seeds per main stress block, and 128 steps. Isolated duration-only changes, repeated or gradual regime changes, noisy or missed pulses, resource changes, and adversarial schedules remain untested. The thresholds are uncalibrated, not safety guarantees or controller promotion.
 
 The assay does not establish real-world safety, biological memory, learned causal inference, or independent replication. It does not promote the v2 profile for deployment. The complete episode traces, source hashes, replay counts, and receipt digests are retained in the machine-readable receipts linked above.

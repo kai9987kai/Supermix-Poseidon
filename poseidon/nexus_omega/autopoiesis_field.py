@@ -31,6 +31,15 @@ class AutopoiesisThermodynamicField:
         self.prev_entropy: float = 0.5
         self.prev_vitals: float = 0.8
 
+    def reset(self) -> None:
+        self.prev_entropy = 0.5
+        self.prev_vitals = 0.8
+
+    def update(self, *args, **kwargs) -> ThermodynamicState:
+        obs = kwargs.get("obs") if "obs" in kwargs else (args[0] if args else [1.0, 0.9, 0.9, 0.8])
+        epistemic = kwargs.get("epistemic_uncertainty", 0.05)
+        return self.evaluate_state(obs, epistemic_surprise=epistemic)
+
     def evaluate_state(
         self,
         observation: np.ndarray | Sequence[float],

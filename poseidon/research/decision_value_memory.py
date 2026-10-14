@@ -38,7 +38,7 @@ import math
 import random
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Any, Sequence
+from typing import Any, Callable, Sequence
 
 import torch
 import torch.nn as nn
@@ -48,6 +48,17 @@ from ..world import ACTIONS, N_ACTIONS, OBS_SIZE
 
 DECISION_MEMORY_MODES = ("intact", "similarity", "erased", "shifted", "donor", "baseline")
 DECISION_MEMORY_SCHEMA = "poseidon-decision-value-memory-v1"
+BELIEF_ENCODER_TYPES = ("gru-v1", "structured-cue-v1")
+SCORER_TARGET_TYPES = ("absolute-q-v1", "counterfactual-advantage-v1")
+STRUCTURED_CUE_BELIEF_FEATURES = (
+    "health", "energy", "hydration", "stamina", "exposure", "threat",
+    "food_visibility", "water_visibility", "shelter", "weather_severity",
+    "temperature", "daylight", "terrain_difficulty", "resource_scent",
+    "last_action_scaled", "progress",
+    "previous_action_rest", "previous_action_forage", "previous_action_drink",
+    "previous_action_shelter", "previous_action_explore", "previous_action_flee",
+    "previous_reward", "latched_regime_cue_signed",
+)
 
 
 @dataclass(frozen=True)
@@ -87,6 +98,8 @@ class DecisionValueMemoryConfig:
     mode: str = "intact"
     belief_dim: int = 32
     hidden_dim: int = 64
+    belief_encoder_type: str = "gru-v1"
+    scorer_target_type: str = "absolute-q-v1"
     horizons: tuple[int, ...] = (4, 8)
 
     def __post_init__(self):
@@ -96,6 +109,14 @@ class DecisionValueMemoryConfig:
             raise ValueError("capacity must be in [1, 10000]")
         if not 1 <= self.top_k <= self.capacity:
             raise ValueError("top_k must be in [1, capacity]")
+        if self.belief_encoder_type not in BELIEF_ENCODER_TYPES:
+            raise ValueError(f"belief_encoder_type must be one of {BELIEF_ENCODER_TYPES}")
+        if self.belief_encoder_type == "structured-cue-v1" and self.belief_dim != len(STRUCTURED_CUE_BELIEF_FEATURES):
+            raise ValueError(
+                f"structured-cue-v1 requires belief_dim={len(STRUCTURED_CUE_BELIEF_FEATURES)}"
+            )
+        if self.scorer_target_type not in SCORER_TARGET_TYPES:
+            raise ValueError(f"scorer_target_type must be one of {SCORER_TARGET_TYPES}")
         if not math.isfinite(self.admission_threshold) or self.admission_threshold < 0.0:
             raise ValueError("admission_threshold must be nonnegative finite")
         if not 0.0 < self.shrinkage_alpha <= 1.0:
@@ -150,6 +171,38 @@ class RecurrentBeliefEncoder(nn.Module):
         return self.cell(inp, hidden)
 
 
+class StructuredCueBeliefEncoder(nn.Module):
+    """Parameter-free, inspectable state: current input, prior action/reward, and a cue latch.
+
+    The signed latch is +1 for the early high-scent cue, -1 for the low-scent
+    cue, and 0 before either cue is observed. During the aliased window, noisy
+    neutral readings in [0.35, 0.65] preserve the last cue instead of changing it.
+    This encoder is specific to the documented 16-channel TidePool contract.
+    """
+
+    def __init__(self, obs_dim: int = OBS_SIZE, action_count: int = N_ACTIONS):
+        super().__init__()
+        if obs_dim != OBS_SIZE or action_count != N_ACTIONS:
+            raise ValueError("structured-cue-v1 is bound to the TidePool observation/action schema")
+        self.obs_dim = obs_dim
+        self.action_count = action_count
+        self.belief_dim = len(STRUCTURED_CUE_BELIEF_FEATURES)
+
+    def forward(self, obs: torch.Tensor, prev_action: int, prev_reward: float, hidden: torch.Tensor) -> torch.Tensor:
+        if obs.ndim != 2 or obs.shape[-1] != self.obs_dim or hidden.shape != (obs.shape[0], self.belief_dim):
+            raise ValueError("structured-cue-v1 received an incompatible observation or hidden state")
+        if not 0 <= int(prev_action) < self.action_count or not math.isfinite(float(prev_reward)):
+            raise ValueError("previous action/reward is outside the structured belief contract")
+        action = torch.full((obs.shape[0],), int(prev_action), dtype=torch.long, device=obs.device)
+        action_one_hot = F.one_hot(action, num_classes=self.action_count).to(dtype=obs.dtype)
+        cue_channel = obs[:, 13:14]
+        prior_latch = hidden[:, -1:]
+        high_cue = torch.where(cue_channel >= 0.65, torch.ones_like(cue_channel), prior_latch)
+        cue_latch = torch.where(cue_channel <= 0.35, -torch.ones_like(cue_channel), high_cue)
+        reward = torch.full((obs.shape[0], 1), float(prev_reward), dtype=obs.dtype, device=obs.device)
+        return torch.cat([obs, action_one_hot, reward, cue_latch], dim=-1)
+
+
 class DecisionValueScorer(nn.Module):
     """Neural Scorer predicting Q(s, a, m) vs Q(s, a, empty)."""
 
@@ -200,11 +253,14 @@ class DecisionValueMemory:
         self.records: list[EpisodicEntry] = []
         self.donor_records: list[EpisodicEntry] = []
 
-        self.belief_encoder = RecurrentBeliefEncoder(
-            obs_dim=OBS_SIZE,
-            action_count=N_ACTIONS,
-            belief_dim=self.config.belief_dim,
-        )
+        if self.config.belief_encoder_type == "structured-cue-v1":
+            self.belief_encoder = StructuredCueBeliefEncoder(obs_dim=OBS_SIZE, action_count=N_ACTIONS)
+        else:
+            self.belief_encoder = RecurrentBeliefEncoder(
+                obs_dim=OBS_SIZE,
+                action_count=N_ACTIONS,
+                belief_dim=self.config.belief_dim,
+            )
         self.scorer = DecisionValueScorer(
             obs_dim=OBS_SIZE,
             belief_dim=self.config.belief_dim,
@@ -362,7 +418,11 @@ class DecisionValueMemory:
                 query_vec = torch.cat([obs_t, act_one_hot, self.current_belief], dim=-1)
 
                 empty_mem_vec = torch.zeros(1, OBS_SIZE + N_ACTIONS + 1 + OBS_SIZE)
-                q_empty, sigma_empty = self.scorer(query_vec, empty_mem_vec)
+                if self.config.scorer_target_type == "counterfactual-advantage-v1":
+                    q_empty = torch.zeros(1, 1, dtype=query_vec.dtype)
+                    sigma_empty = torch.zeros_like(q_empty)
+                else:
+                    q_empty, sigma_empty = self.scorer(query_vec, empty_mem_vec)
 
                 if self.mode == "similarity":
                     best_match = candidate_pool[0]
@@ -462,12 +522,18 @@ class DecisionValueAgent:
         memory: DecisionValueMemory | None = None,
         mode: str = "intact",
         override_margin: float = 0.04,
+        influence_scale: float = 1.0,
     ):
         from ..core import CoreRuntime, active_core_path
         self.core = core or CoreRuntime(active_core_path())
         self.memory = memory or DecisionValueMemory(DecisionValueMemoryConfig(mode=mode))
         self.mode = mode
+        if not math.isfinite(override_margin) or override_margin < 0.0:
+            raise ValueError("override_margin must be a nonnegative finite value")
+        if not math.isfinite(influence_scale) or influence_scale < 0.0:
+            raise ValueError("influence_scale must be a nonnegative finite value")
         self.override_margin = override_margin
+        self.influence_scale = influence_scale
         self.memory.mode = self.mode
 
     def reset(self, mode: str | None = None) -> None:
@@ -485,7 +551,9 @@ class DecisionValueAgent:
                 "action": base_action,
                 "base_action": base_action,
                 "override": False,
+                "memory_override": False,
                 "margin": 0.0,
+                "influence_scale": self.influence_scale,
                 "admission_gate_open": False,
                 "mode": self.mode,
                 "decision_memory": None,
@@ -497,7 +565,9 @@ class DecisionValueAgent:
                 "action": base_action,
                 "base_action": base_action,
                 "override": False,
+                "memory_override": False,
                 "margin": 0.0,
+                "influence_scale": self.influence_scale,
                 "admission_gate_open": False,
                 "mode": self.mode,
                 "decision_memory": mem_decision.to_dict(),
@@ -512,7 +582,7 @@ class DecisionValueAgent:
         # Score modulation: normalized policy probabilities + gated_deltas
         base_probs = F.softmax(logits, dim=-1)
         deltas = torch.tensor(mem_decision.gated_deltas, dtype=torch.float32)
-        modulated_scores = base_probs + deltas
+        modulated_scores = base_probs + self.influence_scale * deltas
 
         best_action = int(modulated_scores.argmax().item())
         base_score = float(modulated_scores[base_action].item())
@@ -526,7 +596,9 @@ class DecisionValueAgent:
             "action": chosen_action,
             "base_action": base_action,
             "override": override,
+            "memory_override": override,
             "margin": margin,
+            "influence_scale": self.influence_scale,
             "admission_gate_open": mem_decision.admission_gate_open,
             "mode": self.mode,
             "decision_memory": mem_decision.to_dict(),
@@ -603,18 +675,149 @@ class DecisionValueAgent:
         }
 
 
+class ResourceGuardedDecisionValueAgent(DecisionValueAgent):
+    """Opt-in hybrid with an optional conservative sensor-confidence reserve."""
+
+    def __init__(
+        self,
+        *args: Any,
+        resource_guard_threshold: float = 0.40,
+        sensor_noise_std: float = 0.0,
+        confidence_z: float = 0.0,
+        predictive_resource_guard: bool = False,
+        resource_guard_floor: float = 0.15,
+        maximum_resource_drain: float = 0.10,
+        minimum_resource_yield: float = 0.12,
+        resource_balance_margin: float | None = None,
+        resource_balance_activation: float = 0.35,
+        **kwargs: Any,
+    ):
+        if not math.isfinite(resource_guard_threshold) or not 0.0 <= resource_guard_threshold <= 1.0:
+            raise ValueError("resource_guard_threshold must be finite and in [0, 1]")
+        if not math.isfinite(sensor_noise_std) or not 0.0 <= sensor_noise_std <= 0.5:
+            raise ValueError("sensor_noise_std must be finite and in [0, 0.5]")
+        if not math.isfinite(confidence_z) or confidence_z < 0.0:
+            raise ValueError("confidence_z must be a nonnegative finite value")
+        if not isinstance(predictive_resource_guard, bool):
+            raise ValueError("predictive_resource_guard must be Boolean")
+        if not math.isfinite(resource_guard_floor) or not 0.0 <= resource_guard_floor <= 1.0:
+            raise ValueError("resource_guard_floor must be finite and in [0, 1]")
+        if not math.isfinite(maximum_resource_drain) or not 0.0 <= maximum_resource_drain <= 1.0:
+            raise ValueError("maximum_resource_drain must be finite and in [0, 1]")
+        if not math.isfinite(minimum_resource_yield) or not 0.0 <= minimum_resource_yield <= 1.0:
+            raise ValueError("minimum_resource_yield must be finite and in [0, 1]")
+        if resource_balance_margin is not None and (
+            not math.isfinite(resource_balance_margin) or not 0.0 <= resource_balance_margin <= 1.0
+        ):
+            raise ValueError("resource_balance_margin must be None or finite in [0, 1]")
+        if not math.isfinite(resource_balance_activation) or not 0.0 <= resource_balance_activation <= 1.0:
+            raise ValueError("resource_balance_activation must be finite and in [0, 1]")
+        super().__init__(*args, **kwargs)
+        self.resource_guard_threshold = resource_guard_threshold
+        self.sensor_noise_std = sensor_noise_std
+        self.confidence_z = confidence_z
+        self.predictive_resource_guard = predictive_resource_guard
+        self.resource_guard_floor = resource_guard_floor
+        self.maximum_resource_drain = maximum_resource_drain
+        self.minimum_resource_yield = minimum_resource_yield
+        self.resource_balance_margin = resource_balance_margin
+        self.resource_balance_activation = resource_balance_activation
+
+    def act(self, observation: Sequence[float]) -> dict[str, Any]:
+        decision = super().act(observation)
+        candidate_action = int(decision["action"])
+        energy, hydration = float(observation[1]), float(observation[2])
+        uncertainty = self.confidence_z * self.sensor_noise_std
+        energy_lcb = max(0.0, energy - uncertainty)
+        hydration_lcb = max(0.0, hydration - uncertainty)
+        predicted_minimum: dict[int, float] = {}
+
+        def predicted_resources(action: int) -> tuple[float, float]:
+            energy_next = energy_lcb - self.maximum_resource_drain
+            hydration_next = hydration_lcb - self.maximum_resource_drain
+            if action == 1:
+                energy_next += self.minimum_resource_yield
+            elif action == 2:
+                hydration_next += self.minimum_resource_yield
+            return max(0.0, energy_next), max(0.0, hydration_next)
+
+        if self.predictive_resource_guard:
+            candidate_next = predicted_resources(candidate_action)
+            candidate_minimum = min(candidate_next)
+            predicted_minimum = {action: min(predicted_resources(action)) for action in (1, 2)}
+            lower_action = 1 if energy_lcb <= hydration_lcb else 2
+            balance_guard_active = (
+                self.resource_balance_margin is not None
+                and min(energy_lcb, hydration_lcb) <= self.resource_balance_activation
+            )
+            balance_ok = (
+                not balance_guard_active
+                or abs(energy_lcb - hydration_lcb) <= float(self.resource_balance_margin)
+                or candidate_action == lower_action
+            )
+            candidate_safe = (
+                candidate_minimum >= self.resource_guard_floor
+                and balance_ok
+            )
+            guard_triggered = self.mode != "baseline" and not candidate_safe
+            if guard_triggered:
+                best_value = max(predicted_minimum.values())
+                best_actions = [action for action, value in predicted_minimum.items() if value >= best_value - 1e-9]
+                if len(best_actions) == 1:
+                    guard_action = best_actions[0]
+                else:
+                    guard_action = lower_action
+            else:
+                guard_action = candidate_action
+            final_action = guard_action if guard_triggered else candidate_action
+        else:
+            candidate_minimum = float("nan")
+            candidate_safe = False
+            guard_triggered = (
+                self.mode != "baseline"
+                and min(energy_lcb, hydration_lcb) <= self.resource_guard_threshold
+            )
+            guard_action = 1 if energy_lcb <= hydration_lcb else 2
+            final_action = guard_action if guard_triggered else candidate_action
+        decision["memory_candidate_action"] = candidate_action
+        decision["action"] = final_action
+        decision["resource_guard_threshold"] = self.resource_guard_threshold
+        decision["resource_guard_sensor_noise_std"] = self.sensor_noise_std
+        decision["resource_guard_confidence_z"] = self.confidence_z
+        decision["resource_guard_energy_lcb"] = energy_lcb
+        decision["resource_guard_hydration_lcb"] = hydration_lcb
+        decision["predictive_resource_guard"] = self.predictive_resource_guard
+        decision["resource_guard_floor"] = self.resource_guard_floor
+        decision["resource_guard_balance_margin"] = self.resource_balance_margin
+        decision["resource_guard_balance_activation"] = self.resource_balance_activation
+        decision["resource_guard_candidate_predicted_minimum"] = candidate_minimum
+        decision["resource_guard_foraging_predicted_minimum"] = predicted_minimum.get(1)
+        decision["resource_guard_drinking_predicted_minimum"] = predicted_minimum.get(2)
+        decision["resource_guard_triggered"] = guard_triggered
+        decision["resource_guard_override"] = guard_triggered and final_action != candidate_action
+        decision["memory_override_executed"] = (
+            bool(decision.get("memory_override", False)) and final_action == candidate_action
+        )
+        decision["override"] = final_action != int(decision["base_action"])
+        return decision
+
+
 def fit_decision_value_memory(
     train_seeds: Sequence[int],
     config: DecisionValueMemoryConfig | None = None,
     updates: int = 400,
     lr: float = 0.003,
+    environment_factory: Callable[..., Any] | None = None,
 ) -> DecisionValueMemory:
-    """Trains DecisionValueMemory using cross-fitted synthetic branch labels."""
+    """Trains on cross-fitted branches from v1 or a caller-supplied world factory."""
     from .alias_world import ObservationAliasTidePool
     from ..core import CoreRuntime, active_core_path
 
     cfg = config or DecisionValueMemoryConfig()
     core = CoreRuntime(active_core_path())
+    # Keep the belief encoder fixed and identical across every fitted episode
+    # and at inference. The scorer is trained below; the encoder is not.
+    fitted_mem = DecisionValueMemory(cfg)
 
     # Collect branch transition data across training seeds
     queries = []
@@ -622,9 +825,13 @@ def fit_decision_value_memory(
     returns = []
 
     for seed in train_seeds:
-        env = ObservationAliasTidePool(seed=seed, max_steps=24, cue_horizon=4)
+        if environment_factory is None:
+            env = ObservationAliasTidePool(seed=seed, max_steps=24, cue_horizon=4)
+        else:
+            env = environment_factory(seed=seed, max_steps=24, cue_horizon=4)
         obs = env.reset()
-        mem = DecisionValueMemory(cfg)
+        mem = copy.deepcopy(fitted_mem)
+        mem.reset()
 
         cue_entries: list[EpisodicEntry] = []
         for t in range(24):
@@ -642,6 +849,8 @@ def fit_decision_value_memory(
             if t in (4, 8, 12) and not done and cue_entries:
                 best_cue = cue_entries[0]
                 snap = env.snapshot()
+                branch_examples: list[tuple[torch.Tensor, torch.Tensor, float]] = []
+                baseline_action = core.act(obs)
 
                 # Measure actual synthetic branch returns for each action (horizon 4)
                 for cand_act in range(N_ACTIONS):
@@ -671,25 +880,30 @@ def fit_decision_value_memory(
                         torch.tensor(best_cue.residual, dtype=torch.float32).reshape(1, -1),
                     ], dim=-1)
 
-                    queries.append(q_vec)
-                    memories.append(m_vec)
-                    returns.append(branch_r)
+                    branch_examples.append((q_vec, m_vec, branch_r))
 
                 env.restore(snap)
+                baseline_return = next(value for action, (_, _, value) in enumerate(branch_examples) if action == baseline_action)
+                for q_vec, m_vec, branch_return in branch_examples:
+                    queries.append(q_vec)
+                    memories.append(m_vec)
+                    if cfg.scorer_target_type == "counterfactual-advantage-v1":
+                        returns.append(branch_return - baseline_return)
+                    else:
+                        returns.append(branch_return)
 
             obs = next_obs
             if done:
                 break
 
     if not queries:
-        return DecisionValueMemory(cfg)
+        return fitted_mem
 
     # Train Scorer on collected counterfactual branches
     queries_tensor = torch.cat(queries, dim=0)
     memories_tensor = torch.cat(memories, dim=0)
     returns_tensor = torch.tensor(returns, dtype=torch.float32).reshape(-1, 1)
 
-    fitted_mem = DecisionValueMemory(cfg)
     optimizer = torch.optim.Adam(fitted_mem.scorer.parameters(), lr=lr)
 
     n_samples = queries_tensor.shape[0]
@@ -701,9 +915,14 @@ def fit_decision_value_memory(
         m_b = memories_tensor[idx]
         y_b = returns_tensor[idx]
 
-        # Memory dropout (p=0.5): mask memory to zeros so network learns Q(s, a, empty)
-        drop_mask = (torch.rand(batch_size, 1) < 0.5).float()
-        m_input = m_b * drop_mask
+        if cfg.scorer_target_type == "counterfactual-advantage-v1":
+            # The target is already paired against the frozen-core action.
+            # Randomly removing the memory here would erase the contrast signal.
+            m_input = m_b
+        else:
+            # Legacy objective: identical absolute-return targets with/without memory.
+            drop_mask = (torch.rand(batch_size, 1) < 0.5).float()
+            m_input = m_b * drop_mask
 
         optimizer.zero_grad()
         out1, out2 = fitted_mem.scorer.head1(torch.cat([q_b, m_input], dim=-1)), fitted_mem.scorer.head2(torch.cat([q_b, m_input], dim=-1))

@@ -15,7 +15,8 @@ from ..world import ACTIONS, OBSERVATION_NAMES, OBS_SIZE, WORLD_VERSION
 
 CONTRACT_VERSION = "poseidon-transition-contract-v1"
 ALIAS_WORLD_VERSION = "alias-tidepool-v1"
-SUPPORTED_WORLD_VERSIONS = (WORLD_VERSION, ALIAS_WORLD_VERSION)
+ALIAS_WORLD_V2_VERSION = "alias-tidepool-v2-resource-maintenance"
+SUPPORTED_WORLD_VERSIONS = (WORLD_VERSION, ALIAS_WORLD_VERSION, ALIAS_WORLD_V2_VERSION)
 
 
 @dataclass(frozen=True)
@@ -44,6 +45,12 @@ def tidepool_contract() -> EnvironmentContract:
 
 def alias_tidepool_contract() -> EnvironmentContract:
     contract = EnvironmentContract(CONTRACT_VERSION, ALIAS_WORLD_VERSION, OBSERVATION_NAMES, ACTIONS)
+    contract.validate()
+    return contract
+
+
+def alias_tidepool_v2_contract() -> EnvironmentContract:
+    contract = EnvironmentContract(CONTRACT_VERSION, ALIAS_WORLD_V2_VERSION, OBSERVATION_NAMES, ACTIONS)
     contract.validate()
     return contract
 

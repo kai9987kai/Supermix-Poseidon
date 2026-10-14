@@ -441,6 +441,10 @@ class Poseidon:
                 "ltl_safety_shield",
                 "autopoiesis_thermodynamic_field",
                 "morpheus_dream_engine",
+                "nonstationary_phase_field_resonator",
+                "contrastive_causal_memory_fabric",
+                "metacognitive_reasoning_engine",
+                "nexus_apex_engine",
             ],
             "developmental_stages": [
                 "PROTOCELL", "LARVAL_FORAGER", "PUPAL_DIAPAUSE", "IMAGO_NAVIGATOR", "SENESCENT_CRYSTALLINE"
@@ -455,8 +459,12 @@ class Poseidon:
             "hierarchical_efe_planner": True,
             "score_guided_trajectory_diffusion": True,
             "nexus_ultima": True,
+            "nexus_apex": True,
             "quantum_causal_holonomy": True,
             "bioharmonic_spectral_resonator": True,
+            "nonstationary_phase_field": True,
+            "contrastive_causal_memory": True,
+            "metacognitive_reasoning": True,
             "metamorphic_bytecode_weaver": True,
             "autopoiesis_thermodynamic_field": True,
             "morpheus_dream_engine": True,
@@ -510,6 +518,38 @@ class Poseidon:
             "active_opcode": ultima_dec.active_opcode.to_dict() if (ultima_dec and ultima_dec.active_opcode) else None,
             "dream_receipt": ultima_dec.dream_consolidation.to_dict() if (ultima_dec and ultima_dec.dream_consolidation) else None,
         }
+
+    def nexus_omega_apex_state(self, obs=None, seed: int = 42):
+        from .nexus_omega import NexusOmegaAgent
+        agent = NexusOmegaAgent(use_hierarchical_efe=True, use_ultima_engine=True, use_apex_engine=True, base_seed=seed)
+        sample_obs = obs if obs is not None else [1.0, 0.9, 0.9, 0.8, 0.05, 0.1, 0.0, 0.0]
+        act = agent.act_apex(sample_obs)
+        apex_dec = agent.last_apex_decision
+        return {
+            "action": act,
+            "decision": apex_dec.to_dict() if apex_dec else None,
+            "quantum_state": apex_dec.quantum_state.to_dict() if (apex_dec and apex_dec.quantum_state) else None,
+            "nonstationary_phase": apex_dec.nonstationary_phase if apex_dec else None,
+            "contrastive_memory": apex_dec.contrastive_memory if apex_dec else None,
+            "cognitive_monologue": apex_dec.cognitive_monologue.to_dict() if (apex_dec and apex_dec.cognitive_monologue) else None,
+            "thermodynamic_state": apex_dec.thermodynamic_state.to_dict() if (apex_dec and apex_dec.thermodynamic_state) else None,
+            "active_opcode": apex_dec.active_opcode.to_dict() if (apex_dec and apex_dec.active_opcode) else None,
+            "dream_receipt": apex_dec.dream_receipt.to_dict() if (apex_dec and apex_dec.dream_receipt) else None,
+            "arbitration_source": apex_dec.arbitration_source if apex_dec else "quantum_tunneling",
+        }
+
+    def nexus_omega_reason(self, obs=None, seed: int = 42):
+        import numpy as np
+        from .nexus_omega import NexusOmegaAgent
+        agent = NexusOmegaAgent(use_hierarchical_efe=True, use_ultima_engine=True, use_apex_engine=True, base_seed=seed)
+        sample_obs = obs if obs is not None else [1.0, 0.9, 0.9, 0.8, 0.05, 0.1, 0.0, 0.0]
+        agent.act_apex(sample_obs)
+        apex_dec = agent.last_apex_decision
+        if apex_dec and apex_dec.cognitive_monologue:
+            return apex_dec.cognitive_monologue.to_dict()
+        from .nexus_omega.reasoning import ApexReasoningEngine
+        engine = ApexReasoningEngine(seed=seed)
+        return engine.deliberate(np.asarray(sample_obs, dtype=np.float32)).to_dict()
 
     def nexus_omega_dream(self, num_rollouts: int = 4, seed: int = 42):
         from .nexus_omega import NexusOmegaAgent

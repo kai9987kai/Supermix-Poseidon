@@ -47,6 +47,13 @@ class QuantumCausalKernel:
         self.accumulated_berry_phase: float = 0.0
         self.time_step: int = 0
 
+    def reset(self) -> None:
+        init_amp = 1.0 / math.sqrt(self.dim)
+        self.psi = np.array([complex(init_amp, 0.0) for _ in range(self.dim)], dtype=complex)
+        self.prev_psi = self.psi.copy()
+        self.accumulated_berry_phase = 0.0
+        self.time_step = 0
+
     def construct_hamiltonian(self, free_energies: Sequence[float]) -> np.ndarray:
         """Constructs 4x4 Hermitian Hamiltonian from Expected Free Energies & tunneling couplings."""
         H = np.zeros((self.dim, self.dim), dtype=complex)

@@ -1,12 +1,16 @@
 # Poseidon Decision-Value-Gated Episodic Memory (DV-GEM)
 
 **Date:** 12 October 2026  
-**Status:** Completed Flagship Mechanism Implementation & Pilot Evaluation  
+**Status:** Prototype implemented; v2 guarded pilot shows benefit over erased memory and frozen core, but fails the fresh resource-margin gate and remains unpromoted
 **Artifact Directory:** `outputs/decision-memory-pilot-730000000/`  
 **Protocol Digest:** `51787879b9ed7d61318fbf4c2df785b15ccc54a7037f125d225fb7bcc9f82ee1`  
 **Test Suite Verification:** 739 / 739 passed (100%)  
 
 ---
+
+> **Retrospective correction (14 October 2026):** The original `alias-tidepool-v1` pilot cannot establish memory benefit. Its resource dynamics make survival impossible over the 24-step horizon: both resources drain, and the mismatched action cannot replenish either one. All arms therefore reached the same floor, so the zero-survival endpoint was non-discriminating. The learned `intact` DV-GEM arm opened its gate but recorded zero action overrides. The similarity control recorded eight overrides in scarcity and none in the other conditions; all arms still died. The intact arm matched baseline reward in the ID and noise conditions, and its utility remains unproven. A versioned maintenance world and a controlled cue-retention assay are documented in the [v2 memory-value study](alias-world-v2-memory-value-2026-10-14.md). That study evaluates an explicit one-bit rule, not the trained DV-GEM scorer.
+
+Claims below describing the v1 setup and its historical pilot are retained as a record. Read the correction above as the current interpretation.
 
 ## 1. Executive Summary
 
@@ -138,10 +142,12 @@ Adhering strictly to the `EnvironmentContract` (`alias-tidepool-v1`):
 | | `baseline` | 0.00 | 0.615625 | 0.0 |
 
 ### Key Findings
-1. **Selective Gating Validated:** The admission gate opened on 7.12 steps per episode in `intact`, while remaining closed on 0.0 steps in `baseline` and `erased`. Similarity retrieval opened unconditionally on all 14 post-cue steps.
+1. **Gate activity recorded, utility not validated:** The admission gate opened on 7.12 steps per episode in `intact`, while remaining closed on 0.0 steps in `baseline` and `erased`. The intact arm produced no action overrides. Similarity retrieval opened on all 14 post-cue steps and produced eight overrides across the 16 scarcity episodes.
 2. **Replay Verification:** All 16 evaluation seeds across all arms and conditions replayed with 100% deterministic bit-for-bit reward and survival agreement (`verify_decision_memory_receipt == True`).
 3. **Fail-Closed Promotion:** Because bootstrap reward lower bounds over the frozen baseline did not cross the strictly positive margin in `id_alias` ($[0.0, 0.0]$), the model was **not promoted** to active default (`promoted: false`).
 4. **Immutability Preserved:** `runs/tidal_dagger/core.pt` remained untouched throughout the experiment.
+
+The pilot therefore verifies deterministic execution and fail-closed promotion behavior, not decision-value prediction or controller improvement. The all-zero survival outcome is explained by the v1 world design and must not be treated as evidence that memory has no possible benefit.
 
 ---
 

@@ -26,6 +26,7 @@ from poseidon.nexus_omega.contracts import (
     ThermodynamicState,
     DreamConsolidationReceipt,
     UltimaDecision,
+    ApexDecision,
 )
 from poseidon.nexus_omega.memory import CausalMemoryFabric
 from poseidon.nexus_omega.world_model import EnsembleWorldModel
@@ -37,6 +38,7 @@ from poseidon.nexus_omega.quantum_causal import QuantumCausalKernel
 from poseidon.nexus_omega.bytecode_weaver import MetamorphicBytecodeWeaver
 from poseidon.nexus_omega.autopoiesis_field import AutopoiesisThermodynamicField
 from poseidon.nexus_omega.morpheus_dream import MorpheusDreamEngine
+from poseidon.nexus_omega.apex import NexusApexEngine
 
 
 class NexusOmegaAgent:
@@ -46,6 +48,8 @@ class NexusOmegaAgent:
     V2_MAX_STORM_DURATION = 8.0
     V2_SHOCK_DURATION_MARGIN = 5.0
     V2_PULSE_INTERVAL_HISTORY = 3
+    V2_SHELTER_MIN_ENERGY = 0.80
+    V2_SHELTER_MIN_HYDRATION = 0.40
 
     def __init__(
         self,
@@ -56,6 +60,7 @@ class NexusOmegaAgent:
         use_causal_efe: bool = True,
         use_hierarchical_efe: bool = False,
         use_ultima_engine: bool = False,
+        use_apex_engine: bool = False,
         base_seed: int = 42,
         residual_adapter_path: Optional[str] = None,
         exposure_index: Optional[int] = None,
@@ -69,9 +74,10 @@ class NexusOmegaAgent:
         self.d_working = d_working
         self.n_actions = n_actions
         self.lmbda = uncertainty_penalty_lambda
-        self.use_causal_efe = use_causal_efe or use_ultima_engine
-        self.use_hierarchical_efe = use_hierarchical_efe or use_ultima_engine
+        self.use_causal_efe = use_causal_efe or use_ultima_engine or use_apex_engine
+        self.use_hierarchical_efe = use_hierarchical_efe or use_ultima_engine or use_apex_engine
         self.use_ultima_engine = use_ultima_engine
+        self.use_apex_engine = use_apex_engine
         self.dynamics_profile = dynamics_profile
 
         self.memory = CausalMemoryFabric(d_working=d_working, d_key=d_obs, d_value=d_obs)
@@ -124,8 +130,10 @@ class NexusOmegaAgent:
         self.bytecode_weaver = MetamorphicBytecodeWeaver(world_model=self.factored_world_model)
         self.autopoiesis_field = AutopoiesisThermodynamicField(base_curiosity_temp=uncertainty_penalty_lambda)
         self.dream_engine = MorpheusDreamEngine()
+        self.apex_engine = NexusApexEngine(seed=base_seed)
 
         self.last_ultima_decision: Optional[UltimaDecision] = None
+        self.last_apex_decision: Optional[ApexDecision] = None
         self.active_opcode_sequence: List[int] = []
         self.active_opcode: Optional[SynthesizedOpcode] = None
         self.high_regret_buffer: List[Dict[str, Any]] = []
@@ -147,21 +155,27 @@ class NexusOmegaAgent:
         self.v2_last_pulse_tick: Optional[int] = None
         self.v2_pulse_intervals: List[int] = []
         self.v2_storm_interval_estimate: Optional[float] = None
+        self.v2_confirmed_storm_interval: Optional[float] = None
+        self.v2_interval_change_candidate: Optional[float] = None
+        self.v2_interval_change_streak = 0
         self.v2_waiting_for_pulse = dynamics_profile == "nexus-phaseworld-v2"
         self.v2_hazard_guard_active = False
         self.v2_hazard_guard_override = False
+        self.v2_phase_boundary_latch_active = False
 
     def reset(self) -> None:
         self.memory.reset()
         self.hierarchical_planner.reset()
         self.spectral_resonator = BioharmonicResonator()
         self.quantum_kernel = QuantumCausalKernel(tunneling_rate=0.18)
+        self.apex_engine.reset()
         self.last_obs = None
         self.last_action = None
         self.last_mem = None
         self.last_decision = None
         self.last_hierarchical_decision = None
         self.last_ultima_decision = None
+        self.last_apex_decision = None
         self.active_opcode_sequence = []
         self.active_opcode = None
         self.high_regret_buffer = []
@@ -173,9 +187,13 @@ class NexusOmegaAgent:
         self.v2_last_pulse_tick = None
         self.v2_pulse_intervals = []
         self.v2_storm_interval_estimate = None
+        self.v2_confirmed_storm_interval = None
+        self.v2_interval_change_candidate = None
+        self.v2_interval_change_streak = 0
         self.v2_waiting_for_pulse = self.dynamics_profile == "nexus-phaseworld-v2"
         self.v2_hazard_guard_active = False
         self.v2_hazard_guard_override = False
+        self.v2_phase_boundary_latch_active = False
         self.world_model.last_prediction = None
         self.factored_world_model.last_prediction = None
         self.factored_world_model.z_regime = np.array([0.0, 1.0], dtype=np.float32)
@@ -189,10 +207,26 @@ class NexusOmegaAgent:
         """Apply a bounded, resource-aware response to a transient hazard cue."""
         self.v2_hazard_guard_active = False
         self.v2_hazard_guard_override = False
+        self.v2_phase_boundary_latch_active = False
         if self.dynamics_profile != "nexus-phaseworld-v2" or not self.use_causal_efe:
             return int(proposed_action)
 
         cue_active = len(obs) > 3 and float(obs[3]) > 0.8
+        expected_interval = (
+            self.v2_confirmed_storm_interval
+            if self.v2_confirmed_storm_interval is not None
+            else self.v2_storm_interval_estimate
+        )
+        if (
+            not cue_active
+            and self.v2_ticks_since_pulse is not None
+            and expected_interval is not None
+            and self.v2_ticks_since_pulse >= max(1.0, expected_interval - 1.0)
+        ):
+            # The cue's absence near the predicted next-pulse boundary is
+            # evidence of a schedule shift or missed pulse, not proof of calm.
+            self.v2_waiting_for_pulse = True
+            self.v2_phase_boundary_latch_active = True
         pulse_belief = (
             self.v2_waiting_for_pulse
             or (
@@ -213,14 +247,67 @@ class NexusOmegaAgent:
         energy = float(obs[1]) if len(obs) > 1 else 1.0
         hydration = float(obs[2]) if len(obs) > 2 else 1.0
         # Rest is neutral for energy and replenishes hydration in v2. Shelter
-        # earns more during a storm but consumes reserves, so use it only with
-        # a high resource margin.
-        safe_action = 3 if hydration < 0.98 or energy < 0.75 else 1
+        # earns more during a storm but consumes reserves, so admit it only
+        # while both resource reserves remain above the empirically screened
+        # v2 thresholds.
+        safe_action = (
+            1
+            if energy >= self.V2_SHELTER_MIN_ENERGY
+            and hydration >= self.V2_SHELTER_MIN_HYDRATION
+            else 3
+        )
         self.v2_hazard_guard_override = int(proposed_action) != safe_action
         return safe_action
 
+    def _update_v2_pulse_interval(self, observed_interval: int) -> None:
+        """Track provisional period changes without shrinking hazard memory early."""
+        observed_interval = int(observed_interval)
+        self.v2_pulse_intervals.append(observed_interval)
+        self.v2_pulse_intervals = self.v2_pulse_intervals[-self.V2_PULSE_INTERVAL_HISTORY:]
+
+        if self.v2_storm_interval_estimate is None:
+            self.v2_storm_interval_estimate = float(observed_interval)
+            self.v2_interval_change_candidate = float(observed_interval)
+            self.v2_interval_change_streak = 1
+            return
+
+        estimate = float(self.v2_storm_interval_estimate)
+        candidate = self.v2_interval_change_candidate
+        if observed_interval < estimate:
+            # Shorter pulse spacing is a hazard-frequency increase: reflect it
+            # immediately, but require another compatible interval before it
+            # can shorten the independent storm-duration safety window.
+            self.v2_storm_interval_estimate = float(observed_interval)
+            self.v2_interval_change_candidate = float(observed_interval)
+            self.v2_interval_change_streak = 1
+        elif observed_interval == estimate and candidate is None:
+            # A confirmed stable period does not need a new confirmation run.
+            self.v2_interval_change_streak = 0
+        elif candidate is not None and abs(observed_interval - candidate) <= 1:
+            self.v2_interval_change_candidate = float(
+                round((observed_interval + candidate) / 2.0)
+            )
+            self.v2_interval_change_streak += 1
+        elif observed_interval > estimate or abs(observed_interval - estimate) <= 1:
+            self.v2_interval_change_candidate = float(observed_interval)
+            self.v2_interval_change_streak = 1
+        else:
+            # A longer period is only admitted after a second near-matching
+            # observation; a boundary-crossing interval may be partial.
+            self.v2_interval_change_candidate = float(observed_interval)
+            self.v2_interval_change_streak = 1
+
+        if self.v2_interval_change_streak >= 2 and self.v2_interval_change_candidate is not None:
+            confirmed = float(self.v2_interval_change_candidate)
+            self.v2_storm_interval_estimate = confirmed
+            self.v2_confirmed_storm_interval = confirmed
+            self.v2_interval_change_candidate = None
+            self.v2_interval_change_streak = 0
+
     def act(self, obs: np.ndarray | Sequence[float], evaluate_planning: bool = True) -> int:
         """Selects action via Deep Active Inference (EFE) or heuristic optimization."""
+        if self.use_apex_engine:
+            return self.act_apex(obs)
         obs_arr = np.asarray(obs, dtype=np.float32)
         if len(obs_arr) > self.d_obs:
             obs_arr = obs_arr[:self.d_obs]
@@ -231,17 +318,16 @@ class NexusOmegaAgent:
                 if self.v2_last_pulse_tick is not None:
                     pulse_interval = current_tick - self.v2_last_pulse_tick
                     if pulse_interval > 0:
-                        self.v2_pulse_intervals.append(int(pulse_interval))
-                        self.v2_pulse_intervals = self.v2_pulse_intervals[-self.V2_PULSE_INTERVAL_HISTORY:]
-                        self.v2_storm_interval_estimate = float(min(self.v2_pulse_intervals))
-                        duration_cap = min(
-                            self.V2_MAX_STORM_DURATION,
-                            max(1.0, self.v2_storm_interval_estimate - 1.0),
-                        )
-                        self.v2_storm_duration_estimate = min(
-                            self.v2_storm_duration_estimate,
-                            duration_cap,
-                        )
+                        self._update_v2_pulse_interval(pulse_interval)
+                        if self.v2_confirmed_storm_interval is not None:
+                            duration_cap = min(
+                                self.V2_MAX_STORM_DURATION,
+                                max(1.0, self.v2_confirmed_storm_interval - 1.0),
+                            )
+                            self.v2_storm_duration_estimate = min(
+                                self.v2_storm_duration_estimate,
+                                duration_cap,
+                            )
                 self.v2_last_pulse_tick = current_tick
                 self.v2_ticks_since_pulse = 0
                 self.v2_waiting_for_pulse = False
@@ -411,13 +497,14 @@ class NexusOmegaAgent:
                 # it outlasts the cue-relative duration currently expected.
                 pulse_age = self.v2_ticks_since_pulse
                 if pulse_age is not None:
+                    duration_cap = min(
+                        self.V2_MAX_STORM_DURATION,
+                        max(1.0, self.v2_confirmed_storm_interval - 1.0)
+                        if self.v2_confirmed_storm_interval is not None
+                        else self.V2_MAX_STORM_DURATION,
+                    )
                     self.v2_storm_duration_estimate = min(
-                        min(
-                            self.V2_MAX_STORM_DURATION,
-                            max(1.0, self.v2_storm_interval_estimate - 1.0)
-                            if self.v2_storm_interval_estimate is not None
-                            else self.V2_MAX_STORM_DURATION,
-                        ),
+                        duration_cap,
                         max(
                             self.v2_storm_duration_estimate,
                             float(pulse_age + self.V2_SHOCK_DURATION_MARGIN),
@@ -525,3 +612,39 @@ class NexusOmegaAgent:
     def apply_intervention(self, spec: InterventionSpec) -> None:
         """Applies causal intervention operator directly to memory fabric."""
         self.memory.apply_intervention(spec)
+
+    def act_apex(self, obs: np.ndarray | Sequence[float]) -> int:
+        """Selects action via Stage 12 NEXUS-APEX master cognitive engine."""
+        obs_arr = np.asarray(obs, dtype=np.float32)
+        orig = self.use_apex_engine
+        self.use_apex_engine = False
+        try:
+            base_act = self.act(obs_arr, evaluate_planning=True)
+        finally:
+            self.use_apex_engine = orig
+        base_decision = self.last_hierarchical_decision
+        apex_decision = self.apex_engine.decide(
+            obs=obs_arr,
+            base_decision=base_decision,
+            last_action=self.last_action,
+            last_reward=float(obs_arr[2]) if len(obs_arr) > 2 else 0.0,
+        )
+        self.last_apex_decision = apex_decision
+        self.last_action = apex_decision.final_action
+        return apex_decision.final_action
+
+    def plan(self, obs: np.ndarray | Sequence[float]) -> Dict[str, Any]:
+        """Provides a decision dictionary compatible with world_controls.RecordingController."""
+        if self.use_apex_engine:
+            self.act_apex(obs)
+            if self.last_apex_decision is not None:
+                return self.last_apex_decision.to_dict()
+        action = self.act(obs)
+        if self.last_decision is not None and hasattr(self.last_decision, "to_dict"):
+            return self.last_decision.to_dict()
+        return {"action": action}
+
+    def get_apex_telemetry(self, obs: np.ndarray | Sequence[float]) -> ApexDecision:
+        if self.last_apex_decision is None:
+            self.act_apex(obs)
+        return self.last_apex_decision

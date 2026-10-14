@@ -49,6 +49,16 @@ from .nexus_omega import (
     LTLSafetyShield,
     AutopoiesisThermodynamicField,
     MorpheusDreamEngine,
+    CognitiveMonologue,
+    ApexDecision,
+    NonstationaryPhaseFieldResonator,
+    NonstationaryPhaseState,
+    ContrastiveCausalMemoryFabric,
+    ContrastiveMemoryDecision,
+    ApexReasoningEngine,
+    NexusApexEngine,
+    POMDPPhaseWorldV2,
+    POMDPPhaseWorldV3,
 )
 
 _SOURCE_SNAPSHOT = _capture_sources()

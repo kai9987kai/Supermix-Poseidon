@@ -104,5 +104,32 @@ __all__ = [
     "LTLSafetyShield",
     "AutopoiesisThermodynamicField",
     "MorpheusDreamEngine",
+    "CognitiveMonologue",
+    "ApexDecision",
+    "NonstationaryPhaseFieldResonator",
+    "NonstationaryPhaseState",
+    "ContrastiveCausalMemoryFabric",
+    "ContrastiveMemoryDecision",
+    "ApexReasoningEngine",
+    "NexusApexEngine",
+    "POMDPPhaseWorldV2",
+    "POMDPPhaseWorldV3",
 ]
+
+from poseidon.nexus_omega.phase_field import (
+    NonstationaryPhaseFieldResonator,
+    NonstationaryPhaseState,
+)
+from poseidon.nexus_omega.contrastive_memory import (
+    ContrastiveCausalMemoryFabric,
+    ContrastiveMemoryDecision,
+)
+from poseidon.nexus_omega.reasoning import ApexReasoningEngine
+from poseidon.nexus_omega.apex import NexusApexEngine
+from poseidon.nexus_omega.benchmark_v2 import POMDPPhaseWorldV2
+from poseidon.nexus_omega.benchmark_v3 import POMDPPhaseWorldV3
+from poseidon.nexus_omega.contracts import (
+    CognitiveMonologue,
+    ApexDecision,
+)
 

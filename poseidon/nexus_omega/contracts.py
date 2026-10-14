@@ -616,5 +616,66 @@ class UltimaDecision:
             "timestamp": round(float(self.timestamp), 4),
         }
 
+# ============================================================================
+# STAGE 12: POSEIDON NEXUS-APEX (OMNI-ADAPTIVE METAMORPHIC PHASE-FIELD ARCHITECTURE)
+# ============================================================================
+
+@dataclass
+class CognitiveMonologue:
+    """Metacognitive internal dialogue and structural causal DAG reasoning."""
+    thought_chain: List[str]
+    causal_hypotheses: List[Dict[str, Any]]
+    epistemic_curiosity_gain: float
+    associative_lattice_matches: List[str]
+    somatic_proprioception: Dict[str, float]
+    predicted_regime: str
+    timestamp: float = field(default_factory=time.time)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "thought_chain": self.thought_chain,
+            "causal_hypotheses": self.causal_hypotheses,
+            "epistemic_curiosity_gain": round(float(self.epistemic_curiosity_gain), 5),
+            "associative_lattice_matches": self.associative_lattice_matches,
+            "somatic_proprioception": {k: round(float(v), 4) for k, v in self.somatic_proprioception.items()},
+            "predicted_regime": self.predicted_regime,
+            "timestamp": round(float(self.timestamp), 4),
+        }
 
 
+@dataclass
+class ApexDecision:
+    """The unified Stage 12 omni-adaptive decision spanning quantum, nonstationary phase-field, contrastive memory, and metacognitive planes."""
+    quantum_state: QuantumCausalState
+    nonstationary_phase: Dict[str, Any]
+    contrastive_memory: Dict[str, Any]
+    cognitive_monologue: CognitiveMonologue
+    thermodynamic_state: ThermodynamicState
+    hierarchical_decision: HierarchicalEFEDecision
+    active_opcode: Optional[SynthesizedOpcode] = None
+    dream_receipt: Optional[DreamConsolidationReceipt] = None
+    final_action: int = 0
+    final_action_name: str = "forage"
+    arbitration_source: str = "quantum_tunneling"
+    timestamp: float = field(default_factory=time.time)
+
+    @property
+    def action(self) -> int:
+        return self.final_action
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "quantum_state": self.quantum_state.to_dict(),
+            "nonstationary_phase": self.nonstationary_phase,
+            "contrastive_memory": self.contrastive_memory,
+            "cognitive_monologue": self.cognitive_monologue.to_dict(),
+            "thermodynamic_state": self.thermodynamic_state.to_dict(),
+            "hierarchical_decision": self.hierarchical_decision.to_dict(),
+            "active_opcode": self.active_opcode.to_dict() if self.active_opcode else None,
+            "dream_receipt": self.dream_receipt.to_dict() if self.dream_receipt else None,
+            "final_action": int(self.final_action),
+            "action": int(self.final_action),
+            "final_action_name": str(self.final_action_name),
+            "arbitration_source": str(self.arbitration_source),
+            "timestamp": round(float(self.timestamp), 4),
+        }
