@@ -38,6 +38,7 @@ class Poseidon:
         self._jobs_lock = threading.Lock()
         self._tessera = None
         self._external_adapter_bridge = None
+        self._omni_reasoner = None
         self._candidate_status_snapshots = {}
         self.memory_path = self.root/"outputs/memory.json"
 
@@ -1555,10 +1556,29 @@ class Poseidon:
             core_ready = active_core_path(self.root).is_file()
         except (ValueError, TypeError, OSError) as error:
             core_ready, core_error = False, str(error)
-        result = {"version": __version__, "name": "Supermix Poseidon", "language_ready": (self.root/"models/language/model.safetensors").exists(), "core_ready": core_ready, "atlas": self.atlas_status(), "contrast": self.contrast_status(), "horizon": self.horizon_status(), "odyssey": self.odyssey_status(), "helm": self.helm_status(), "odysseus": self.odysseus_status(), "mco": self.mco_status(), "aura": self.aura_status(), "tessera": self.tessera_status(), "mnemorph": self.mnemorph_status(), "metamorph": self.metamorph_status(), "chimera": self.chimera_status(), "hyperion": self.hyperion_status(), "titan": self.titan_status(), "trident": self.trident_status(), "hyper_agent": self.hyper_agent_status(), "ecosystem": self.ecosystem_status(), "poseidon_x": self.poseidon_x_status(), "external_adapter": self.external_adapter_status(), "nexus_omega": self.nexus_omega_status(), "reports": reports, "limits": "Experimental composite system. Controlled geometric media. Tool-assisted maths. Synthetic survival."} | source_status()
+        result = {"version": __version__, "name": "Supermix Poseidon", "language_ready": (self.root/"models/language/model.safetensors").exists(), "core_ready": core_ready, "atlas": self.atlas_status(), "contrast": self.contrast_status(), "horizon": self.horizon_status(), "odyssey": self.odyssey_status(), "helm": self.helm_status(), "odysseus": self.odysseus_status(), "mco": self.mco_status(), "aura": self.aura_status(), "tessera": self.tessera_status(), "mnemorph": self.mnemorph_status(), "metamorph": self.metamorph_status(), "chimera": self.chimera_status(), "hyperion": self.hyperion_status(), "titan": self.titan_status(), "trident": self.trident_status(), "hyper_agent": self.hyper_agent_status(), "ecosystem": self.ecosystem_status(), "poseidon_x": self.poseidon_x_status(), "external_adapter": self.external_adapter_status(), "nexus_omega": self.nexus_omega_status(), "discovery_lab": self.discovery_lab_status(), "omni_reasoner": self.omni_reasoner_status(), "reports": reports, "limits": "Experimental composite system. Controlled geometric media. Tool-assisted maths. Synthetic survival."} | source_status()
         if core_error:
             result["core_error"] = core_error
         return result
+
+    def omni_reasoner_status(self):
+        return {
+            "ready": True,
+            "version": "stage-14-omni-reasoner-v1",
+            "prover": "Tessera LTL Bounded Model Checker",
+            "deliberation": "GhostInTheMachine Cognitive Monologue",
+            "intents": ["physical_discovery", "biocatalytic_synthesis", "formal_verification", "clifford_geometric", "causal_superposition", "general_hyper_reasoning"],
+        }
+
+    def reason(self, prompt, seed=42, max_new_tokens=512):
+        if not isinstance(prompt, str) or not 1 <= len(prompt.strip()) <= 16000:
+            raise ValueError("Prompt must contain 1–16000 characters.")
+        with self.lock:
+            from .omni_reasoner import OmniReasoner
+            if self._omni_reasoner is None:
+                self._omni_reasoner = OmniReasoner(seed=seed)
+            res = self._omni_reasoner.reason(prompt.strip(), seed=seed, language_runtime=self.language, max_new_tokens=max_new_tokens)
+            return res.to_dict()
 
     def _memory(self):
         from .memory import MemoryBank
@@ -1580,6 +1600,8 @@ class Poseidon:
         if type(seed) is not int or not 0 <= seed < 2**63:
             raise ValueError("Seed must be a nonnegative integer below 2^63.")
         with self.lock:
+            if mode == "reason":
+                return self.reason(prompt, seed=seed, max_new_tokens=max_new_tokens or 512)
             if mode == "math" or (mode == "chat" and extract_math(prompt)):
                 return solve(extract_math(prompt) or prompt)
             if mode in ("image", "video", "mesh"):

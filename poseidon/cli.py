@@ -31,6 +31,7 @@ def main():
         "nexus-omega-discovery", "verify-nexus-omega-discovery",
         "verify-3d-replay",
         "discovery-lab",
+        "reason",
     ])
     p.add_argument("prompt", nargs="?", default="")
     p.add_argument("--root", default=".")

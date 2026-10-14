@@ -142,6 +142,12 @@ def make_handler(runtime, port):
                 except Exception as error:
                     self.send_json(500, {"error": str(error), "type": type(error).__name__})
                 return
+            if path == "/api/reasoning-status":
+                try:
+                    self.send_json(200, runtime.omni_reasoner_status())
+                except Exception as error:
+                    self.send_json(500, {"error": str(error), "type": type(error).__name__})
+                return
             if path in ("/", "/index.html", "/style.css", "/app.js"):
                 file = WEB/("index.html" if path in ("/", "/index.html") else path[1:])
             elif path.startswith("/artifacts/"):
@@ -357,6 +363,18 @@ def make_handler(runtime, port):
                 try:
                     seed = int(payload.get("seed", 42))
                     res = runtime.discovery_lab_curriculum(seed=seed)
+                    self.send_json(200, res)
+                except (ValueError, TypeError) as error:
+                    self.send_json(400, {"error": str(error)})
+                except Exception as error:
+                    self.send_json(500, {"error": str(error), "type": type(error).__name__})
+                return
+            if path == "/api/reason":
+                try:
+                    prompt = payload.get("prompt", "")
+                    seed = int(payload.get("seed", 42))
+                    max_new_tokens = int(payload.get("max_new_tokens", 512))
+                    res = runtime.reason(prompt, seed=seed, max_new_tokens=max_new_tokens)
                     self.send_json(200, res)
                 except (ValueError, TypeError) as error:
                     self.send_json(400, {"error": str(error)})
