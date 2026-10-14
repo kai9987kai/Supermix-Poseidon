@@ -629,9 +629,13 @@ class NexusOmegaAgent:
             last_action=self.last_action,
             last_reward=float(obs_arr[2]) if len(obs_arr) > 2 else 0.0,
         )
+        final_act = apex_decision.final_action
+        if self.dynamics_profile == "nexus-phaseworld-v2":
+            mem_vec = self.last_mem if self.last_mem is not None else self.memory.get_combined_vector()
+            final_act = self._apply_v2_phase_guard(obs_arr, mem_vec, final_act)
         self.last_apex_decision = apex_decision
-        self.last_action = apex_decision.final_action
-        return apex_decision.final_action
+        self.last_action = final_act
+        return final_act
 
     def plan(self, obs: np.ndarray | Sequence[float]) -> Dict[str, Any]:
         """Provides a decision dictionary compatible with world_controls.RecordingController."""
@@ -644,7 +648,7 @@ class NexusOmegaAgent:
             return self.last_decision.to_dict()
         return {"action": action}
 
-    def get_apex_telemetry(self, obs: np.ndarray | Sequence[float]) -> ApexDecision:
-        if self.last_apex_decision is None:
+    def get_apex_telemetry(self, obs: Optional[np.ndarray | Sequence[float]] = None) -> Optional[ApexDecision]:
+        if self.last_apex_decision is None and obs is not None:
             self.act_apex(obs)
         return self.last_apex_decision
