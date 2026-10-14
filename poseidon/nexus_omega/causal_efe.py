@@ -36,12 +36,27 @@ class CausalEFEPlanner:
         base_epistemic_weight: float = 0.50,
         conformal_confidence_quantile: float = 1.96,
         safety_threshold: float = -1.20,
+        exposure_index: Optional[int] = None,
+        safety_fallback_actions: Optional[Sequence[int]] = None,
     ):
         self.world_model = world_model
         self.n_actions = n_actions
         self.base_epistemic_weight = base_epistemic_weight
         self.conformal_quantile = conformal_confidence_quantile
         self.safety_threshold = safety_threshold
+        if exposure_index is not None and (type(exposure_index) is not int or exposure_index < 0):
+            raise ValueError("exposure_index must be a non-negative integer or None")
+        self.exposure_index = exposure_index
+        if safety_fallback_actions is not None:
+            fallback_actions = tuple(safety_fallback_actions)
+            if not fallback_actions or any(
+                type(action) is not int or not 0 <= action < n_actions
+                for action in fallback_actions
+            ):
+                raise ValueError("safety_fallback_actions must contain valid action indices")
+            self.safety_fallback_actions: Optional[Tuple[int, ...]] = fallback_actions
+        else:
+            self.safety_fallback_actions = None
 
         # Target homeostatic vital prior: health=1.0, energy=0.9, hydration=0.9, stamina=0.9
         self.s_target = np.array([1.0, 0.90, 0.90, 0.90], dtype=np.float32)
@@ -131,6 +146,10 @@ class CausalEFEPlanner:
                 "epistemic": epistemic,
                 "empowerment": empowerment,
                 "lcb": lcb,
+                "predicted_reward": float(pred.predicted_reward),
+                "predicted_endogenous": [float(x) for x in pred.endogenous_pred],
+                "predicted_exogenous": [float(x) for x in pred.exogenous_pred],
+                "epistemic_uncertainty": float(pred.epistemic_uncertainty_total),
             })
 
             if efe > best_efe:
@@ -142,14 +161,23 @@ class CausalEFEPlanner:
                 best_empowerment = empowerment
                 best_lcb = lcb
 
+        objective_action = best_action
+
         # Conformal Safe Policy Improvement Guard:
         # If best action is an exploratory/foraging action with high risk (LCB < safety_threshold),
         # and health/exposure is threatened, override to safe shelter (action 1) or rest (action 3).
         conformal_override = False
-        is_threatened = (obs_arr[0] < 0.6) or (obs_arr[4] > 0.5)  # low health or high exposure
+        has_high_exposure = (
+            self.exposure_index is not None
+            and self.exposure_index < len(obs_arr)
+            and float(obs_arr[self.exposure_index]) > 0.5
+        )
+        is_threatened = (obs_arr[0] < 0.6) or has_high_exposure
         if best_lcb < self.safety_threshold and is_threatened and best_action in (0, 2):
-            # Fallback to shelter if available, else rest
-            fallback_action = 1 if self.n_actions > 1 else 0
+            # Keep the v1 shelter fallback unless a profile supplies alternatives.
+            # Among configured viable actions, select the strongest model LCB.
+            fallback_actions = self.safety_fallback_actions or ((1,) if self.n_actions > 1 else (0,))
+            fallback_action = max(fallback_actions, key=lambda action: action_scores[action]["lcb"])
             best_action = fallback_action
             conformal_override = True
             fallback_data = action_scores[fallback_action]
@@ -182,6 +210,14 @@ class CausalEFEPlanner:
             conformal_lcb=best_lcb,
             conformal_override=conformal_override,
             factored_state=factored_dict,
+            action_scores=[
+                {
+                    **score,
+                    "selected_by_objective": score["action"] == objective_action,
+                    "selected_after_guard": score["action"] == best_action,
+                }
+                for score in action_scores
+            ],
         )
 
         self.last_decision = decision

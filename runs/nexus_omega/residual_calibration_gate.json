@@ -1,0 +1,1169 @@
+{
+  "created_utc": "2026-10-13T22:42:34.390199+00:00",
+  "limits": [
+    "The ensemble is randomly initialized and not trained or artifact-bound to a released checkpoint.",
+    "Inference is conditional on eight fixed model initializations and the named synthetic POMDP.",
+    "Admission is a forecast metric gate only; it does not establish policy benefit or real-world calibration.",
+    "The candidate is never activated by this script, even if admitted; runtime integration requires a separate review and fresh evaluation.",
+    "Receipt hashes bind the recorded bytes but do not prove the assay executed as recorded."
+  ],
+  "model_binding": {
+    "calibration_action_counts_by_model_seed": {
+      "81001": [
+        112,
+        99,
+        103,
+        107
+      ],
+      "81002": [
+        112,
+        99,
+        103,
+        107
+      ],
+      "81003": [
+        112,
+        99,
+        103,
+        107
+      ],
+      "81004": [
+        112,
+        99,
+        103,
+        107
+      ],
+      "81005": [
+        112,
+        99,
+        103,
+        107
+      ],
+      "81006": [
+        112,
+        99,
+        103,
+        107
+      ],
+      "81007": [
+        112,
+        99,
+        103,
+        107
+      ],
+      "81008": [
+        112,
+        99,
+        103,
+        107
+      ]
+    },
+    "correction_offsets_by_model_seed_action_observation": {
+      "81001": [
+        [
+          -0.1094542019335287,
+          -0.1219739669800869,
+          0.009169598679623688,
+          -0.0732571226627832,
+          0.036755173974337856,
+          -0.007046430478502381,
+          0.0017835108531504115,
+          -0.18925424681219738
+        ],
+        [
+          -0.0016934397545727816,
+          0.019411535726653203,
+          0.011555822246303454,
+          0.08898820544854603,
+          0.03364103412575493,
+          0.011145431855858087,
+          0.0009902863001281564,
+          -0.012082522165233379
+        ],
+        [
+          -0.009401306509971619,
+          0.003403294361332088,
+          -0.003603746092796914,
+          -0.08064580865926999,
+          0.03345826990875298,
+          -0.009420371357053722,
+          -0.005383565073642988,
+          -0.013894800829714688
+        ],
+        [
+          -0.006957006231646671,
+          -0.0013398806625437513,
+          0.0073149802041388,
+          0.03794087843905409,
+          0.0332579115192432,
+          0.013033822049913388,
+          0.015833475607217217,
+          -0.032641476955891494
+        ]
+      ],
+      "81002": [
+        [
+          -0.11483905238232442,
+          -0.11682674095832876,
+          -0.003146606158614836,
+          -0.07435319321216736,
+          0.039210828295576254,
+          -0.02007800452120786,
+          -0.00030385741878749935,
+          -0.19815640371026738
+        ],
+        [
+          -0.013211007220576507,
+          0.023500532664433874,
+          -0.008472371070335319,
+          0.09280017572999702,
+          0.03394913689158104,
+          0.005236333563883855,
+          -0.008503648295770447,
+          -0.024973390322893557
+        ],
+        [
+          -0.003294298660407946,
+          0.0013885288273246543,
+          -0.0029008880537907573,
+          -0.08296611957774482,
+          0.029439913279894578,
+          -0.027709126134529638,
+          -0.025398370169568807,
+          -0.019696795123909573
+        ],
+        [
+          -0.00992222631646094,
+          -0.002879307231056356,
+          -0.011927532362882222,
+          0.021751918029112177,
+          0.03095996617252512,
+          -0.0015220030665965578,
+          0.003147755570072685,
+          -0.02271739316660319
+        ]
+      ],
+      "81003": [
+        [
+          -0.11416232652430024,
+          -0.0998038173254047,
+          -0.005304966766353975,
+          -0.06062804943849187,
+          0.02608320094753123,
+          -0.013299619426626512,
+          0.0036379779199445955,
+          -0.17798467091441644
+        ],
+        [
+          -0.00942872961362203,
+          0.02674758088107061,
+          0.0010844086005230046,
+          0.0933676353521481,
+          0.028463707760569047,
+          0.009407769285396418,
+          -0.011095714971724183,
+          -0.013430692794652787
+        ],
+        [
+          0.003999246844967592,
+          0.011222020080946023,
+          -0.00013232170558960464,
+          -0.07063564239444213,
+          0.02686007526359584,
+          -0.015927248417390783,
+          -0.015245588926951067,
+          -0.011083035505189135
+        ],
+        [
+          0.00515115247151562,
+          0.009260772753541714,
+          0.002723063298753489,
+          0.04203798332313216,
+          0.03345794021369559,
+          0.009667617895816688,
+          0.00720862990086648,
+          -0.01583131165113126
+        ]
+      ],
+      "81004": [
+        [
+          -0.11737419771296638,
+          -0.10651983919420413,
+          0.008837957808282214,
+          -0.06590770349924112,
+          0.025550427405895398,
+          -0.017498609976168415,
+          0.004097280022636239,
+          -0.16910861019277945
+        ],
+        [
+          -0.003616869299098699,
+          0.023786375167393924,
+          -0.00028576474649141185,
+          0.08728148855949955,
+          0.03367715257487784,
+          0.015694717283365363,
+          -0.00262266009968983,
+          -0.013041958043227123
+        ],
+        [
+          -0.002333557287466179,
+          0.0028978277323315443,
+          -0.010525694695635916,
+          -0.08885100967985707,
+          0.025553369225518218,
+          -0.013109463034197688,
+          -0.009651849362818361,
+          -0.007585223934848259
+        ],
+        [
+          0.005310661742620379,
+          -0.0034979040795397537,
+          -0.002798918982811063,
+          0.029141225155756297,
+          0.032361190523473526,
+          0.007163327324794928,
+          0.010558788127238128,
+          -0.009056053707532794
+        ]
+      ],
+      "81005": [
+        [
+          -0.130238368442016,
+          -0.12269398743020636,
+          -0.009602458702699693,
+          -0.07532282206557284,
+          0.02702769745207791,
+          -0.008273754453577047,
+          0.009723066687001847,
+          -0.17836217728670892
+        ],
+        [
+          -0.01175081157925153,
+          0.012984709005163174,
+          -0.0112789254776682,
+          0.08548353830470164,
+          0.028157696226668177,
+          0.02147466719701458,
+          0.005243193911449664,
+          -0.007337894170448616
+        ],
+        [
+          -0.014529421636201804,
+          -0.005867598487914187,
+          -0.011554851911021676,
+          -0.0769232725460383,
+          0.01858823871221936,
+          -0.004646418683142718,
+          -0.006662362610618358,
+          -0.007384817100245024
+        ],
+        [
+          -0.011172034194536298,
+          -0.006197880988366136,
+          -0.007221862081890908,
+          0.02298018831486197,
+          0.029127163938181388,
+          0.016808676967510483,
+          0.016935871871665367,
+          -0.01922179565321062
+        ]
+      ],
+      "81006": [
+        [
+          -0.12506852950900793,
+          -0.10295201265918356,
+          -0.002115415573436113,
+          -0.08361200632355446,
+          0.02507806112823476,
+          -0.005922799419360152,
+          0.0054608971336814905,
+          -0.18805490585925458
+        ],
+        [
+          -0.01146738472008946,
+          0.026925099467990373,
+          0.004312570409077877,
+          0.07519592322951396,
+          0.033526795109583424,
+          0.025456963362456817,
+          -0.005755399472459109,
+          -0.03171966529705308
+        ],
+        [
+          -0.00999930009101201,
+          0.009086126118030363,
+          0.005932752101781578,
+          -0.09531543087875426,
+          0.029242989103065678,
+          -0.006244807076460718,
+          -0.01148971233537276,
+          -0.02108270697548841
+        ],
+        [
+          0.005135774890953135,
+          0.003977026477038304,
+          0.004742192574472071,
+          0.012222443315507594,
+          0.030725731387099026,
+          0.020604017965966687,
+          0.008119921974424887,
+          -0.03236992999249808
+        ]
+      ],
+      "81007": [
+        [
+          -0.12217616502727781,
+          -0.10835577866860799,
+          0.0042699547505305425,
+          -0.056100556309112495,
+          0.03663186546015952,
+          0.0007836794663619782,
+          0.006233393773852315,
+          -0.18153880350915383
+        ],
+        [
+          -0.030302226844460073,
+          0.03026009795039591,
+          0.0007101122621797173,
+          0.10064771633294342,
+          0.034437010883156094,
+          0.02549024087409524,
+          0.0009021225915704337,
+          -0.017113776115531273
+        ],
+        [
+          -0.011501158325417527,
+          0.015243217927738301,
+          0.002883980556326746,
+          -0.07103686122633732,
+          0.04176055974534993,
+          -0.010887354260985287,
+          -0.011280620323711084,
+          -0.007494203810336648
+        ],
+        [
+          -0.00426588868983438,
+          0.0032236518286098944,
+          0.0034200432144592856,
+          0.047944202251341626,
+          0.03911937798033947,
+          0.017946981950053755,
+          0.010143995083415354,
+          -0.027369134171613466
+        ]
+      ],
+      "81008": [
+        [
+          -0.12294567482812065,
+          -0.1115493068604597,
+          -0.009784250237446822,
+          -0.0812610917325206,
+          0.03099580690676313,
+          -0.001734045750838829,
+          0.002609782329013147,
+          -0.1936495817582389
+        ],
+        [
+          -0.015388531967847034,
+          0.014948721034358245,
+          -0.023409832889835048,
+          0.09514018669660525,
+          0.0287551773980147,
+          0.010891641295547927,
+          -0.004534011860791126,
+          -0.028579437474936548
+        ],
+        [
+          -0.0047899405065092064,
+          0.003104056692817836,
+          -0.018923365375370663,
+          -0.1015274025256394,
+          0.03722975657601814,
+          -0.013517182613937726,
+          -0.015695248706462946,
+          -0.024005245028551923
+        ],
+        [
+          -0.009225636163604594,
+          -0.00010869178538010499,
+          -0.00493624124014489,
+          0.02560363104007635,
+          0.030997990376520554,
+          0.0069772569102531075,
+          0.009298788154104433,
+          -0.03322563466624679
+        ]
+      ]
+    },
+    "model_weight_sha256_by_initialization_seed": {
+      "81001": "f8d36ce518c405d3d0b6f2e5ca81b14e38c6064a0fedb98888906125ea426ad6",
+      "81002": "66f5ad2ade6c47be9cde2df550d76074f4c4d153c105f95d997bae880e7a6fe2",
+      "81003": "f9f72eda49024e7aab11310c2675309079e4b4002470775860d932db1a966f2a",
+      "81004": "38d9280b0e8d56515f2de21045a0a7136efbb2bb5670741394987705e5f257d0",
+      "81005": "ed7d292a973bd76f6c89464dff1edc23f52414278edb3b09243cdb1af03e005f",
+      "81006": "783fcd104328a41450bf3cb7ded2a532b2bda0788183bba2c145c4d5ad5e3918",
+      "81007": "e89fe2ad86f87974f4a6ef4a1b89f80d44e4f69292a4aee844f9146e20b29959",
+      "81008": "b404630b1b57267a1be31feaf10c552ea3a60c775b3c7d2bacb4ab222185dae2"
+    }
+  },
+  "protocol": {
+    "action_schedule": "open-loop action=(tick + environment_seed mod 4) mod 4",
+    "bootstrap_replicates": 20000,
+    "calibration_environment_seeds": [
+      72001,
+      72002,
+      72003,
+      72004,
+      72005,
+      72006,
+      72007,
+      72008,
+      72009,
+      72010,
+      72011,
+      72012,
+      72013,
+      72014,
+      72015,
+      72016,
+      72017,
+      72018,
+      72019,
+      72020,
+      72021,
+      72022,
+      72023,
+      72024
+    ],
+    "correction": "per-model-initialization, per-action mean next-observation residual across calibration partition",
+    "episode_horizon": 32,
+    "fixed_model_initialization_seeds": [
+      81001,
+      81002,
+      81003,
+      81004,
+      81005,
+      81006,
+      81007,
+      81008
+    ],
+    "guardrail": "95% environment-seed cluster-bootstrap lower bound on all-channel MAE reduction > -0.002",
+    "holdout_opened_once_after_selection": true,
+    "primary_gate": "95% environment-seed cluster-bootstrap lower bound on vital MAE reduction > 0.001; exact two-sided sign test p < 0.05",
+    "selection": "one global shrinkage chosen by minimum mean vital MAE on disjoint selection partition; lower shrinkage wins ties",
+    "selection_environment_seeds": [
+      72101,
+      72102,
+      72103,
+      72104,
+      72105,
+      72106,
+      72107,
+      72108,
+      72109,
+      72110,
+      72111,
+      72112,
+      72113,
+      72114,
+      72115,
+      72116
+    ],
+    "shrinkage_candidates": [
+      0.0,
+      0.25,
+      0.5,
+      0.75,
+      1.0
+    ],
+    "untouched_holdout_environment_seeds": [
+      72201,
+      72202,
+      72203,
+      72204,
+      72205,
+      72206,
+      72207,
+      72208,
+      72209,
+      72210,
+      72211,
+      72212,
+      72213,
+      72214,
+      72215,
+      72216,
+      72217,
+      72218,
+      72219,
+      72220,
+      72221,
+      72222,
+      72223,
+      72224,
+      72225,
+      72226,
+      72227,
+      72228,
+      72229,
+      72230,
+      72231,
+      72232,
+      72233,
+      72234,
+      72235,
+      72236,
+      72237,
+      72238,
+      72239,
+      72240,
+      72241,
+      72242,
+      72243,
+      72244,
+      72245,
+      72246,
+      72247,
+      72248,
+      72249,
+      72250,
+      72251,
+      72252,
+      72253,
+      72254,
+      72255,
+      72256,
+      72257,
+      72258,
+      72259,
+      72260,
+      72261,
+      72262,
+      72263,
+      72264
+    ]
+  },
+  "receipt_sha256": "bd08ce11a7eb4af999585b42ea2deee5f40002ecc12bd9facc9906948ae3b1f5",
+  "runtime": {
+    "numpy": "2.4.3",
+    "python": "3.12.10"
+  },
+  "schema": "poseidon-nexus-residual-calibration-gate-v1",
+  "selection": {
+    "candidate_vital_mae": {
+      "0.0": 0.03276015166750568,
+      "0.25": 0.031724861500586704,
+      "0.5": 0.031534342495155514,
+      "0.75": 0.032002925070691045,
+      "1.0": 0.032945617542284575
+    },
+    "selected_shrinkage": 0.5
+  },
+  "source_sha256": {
+    "assay": "e585ec63e5baeca9dd0bae3595143b94730379a60ff160c9380c385fd1db0cc8",
+    "benchmark": "fccf35ec51e48e06ff9635883a7c99574ab8e061d5f4a35222a9f344e7e4c592",
+    "causal_world_model": "45fb142c80ddb4561c23f08376392954861dd9cf602eab0eb6b7e480b3064ab1"
+  },
+  "untouched_holdout": {
+    "admitted": false,
+    "all_channel_mae_reduction": 7.971965593290935e-05,
+    "all_channel_mae_reduction_95pct_ci": [
+      -0.00035911916153160317,
+      0.0005306368751049729
+    ],
+    "candidate_mean_all_channel_mae": 0.08316178765947224,
+    "candidate_mean_vital_mae": 0.030868842130696458,
+    "environment_seed_rows": [
+      {
+        "all_channel_mae_reduction": -0.0005360084293721812,
+        "candidate_all_channel_mae": 0.0856472602002265,
+        "candidate_vital_mae": 0.02741258119741434,
+        "environment_seed": 72201,
+        "raw_all_channel_mae": 0.08511125177085432,
+        "raw_vital_mae": 0.02477495548858618,
+        "vital_mae_reduction": -0.0026376257088281604
+      },
+      {
+        "all_channel_mae_reduction": 9.035233760021355e-05,
+        "candidate_all_channel_mae": 0.08882691826204653,
+        "candidate_vital_mae": 0.02901607874721495,
+        "environment_seed": 72202,
+        "raw_all_channel_mae": 0.08891727059964674,
+        "raw_vital_mae": 0.02601354896194405,
+        "vital_mae_reduction": -0.0030025297852709007
+      },
+      {
+        "all_channel_mae_reduction": 0.003559331035150118,
+        "candidate_all_channel_mae": 0.08099947793347773,
+        "candidate_vital_mae": 0.029469297641206517,
+        "environment_seed": 72203,
+        "raw_all_channel_mae": 0.08455880896862784,
+        "raw_vital_mae": 0.03140802731461547,
+        "vital_mae_reduction": 0.0019387296734089537
+      },
+      {
+        "all_channel_mae_reduction": 0.001072246891303641,
+        "candidate_all_channel_mae": 0.08508223390974917,
+        "candidate_vital_mae": 0.031100703073924575,
+        "environment_seed": 72204,
+        "raw_all_channel_mae": 0.08615448080105281,
+        "raw_vital_mae": 0.03309090503071453,
+        "vital_mae_reduction": 0.0019902019567899568
+      },
+      {
+        "all_channel_mae_reduction": -0.0009092669877577564,
+        "candidate_all_channel_mae": 0.08651516742137802,
+        "candidate_vital_mae": 0.03185123622739877,
+        "environment_seed": 72205,
+        "raw_all_channel_mae": 0.08560590043362026,
+        "raw_vital_mae": 0.0340451323975382,
+        "vital_mae_reduction": 0.002193896170139431
+      },
+      {
+        "all_channel_mae_reduction": 0.001687355635457355,
+        "candidate_all_channel_mae": 0.0833463727682077,
+        "candidate_vital_mae": 0.02925384495094782,
+        "environment_seed": 72206,
+        "raw_all_channel_mae": 0.08503372840366505,
+        "raw_vital_mae": 0.03127284062405428,
+        "vital_mae_reduction": 0.002018995673106455
+      },
+      {
+        "all_channel_mae_reduction": 0.002367105692099178,
+        "candidate_all_channel_mae": 0.07867106287591025,
+        "candidate_vital_mae": 0.029463497381458526,
+        "environment_seed": 72207,
+        "raw_all_channel_mae": 0.08103816856800942,
+        "raw_vital_mae": 0.03140612936544197,
+        "vital_mae_reduction": 0.001942631983983447
+      },
+      {
+        "all_channel_mae_reduction": -0.0011736420700036165,
+        "candidate_all_channel_mae": 0.08255169842606205,
+        "candidate_vital_mae": 0.03485067927998736,
+        "environment_seed": 72208,
+        "raw_all_channel_mae": 0.08137805635605844,
+        "raw_vital_mae": 0.03721481070509375,
+        "vital_mae_reduction": 0.002364131425106386
+      },
+      {
+        "all_channel_mae_reduction": -0.0020086760204278548,
+        "candidate_all_channel_mae": 0.07952506399747089,
+        "candidate_vital_mae": 0.02757584814485923,
+        "environment_seed": 72209,
+        "raw_all_channel_mae": 0.07751638797704304,
+        "raw_vital_mae": 0.028445019436097056,
+        "vital_mae_reduction": 0.0008691712912378274
+      },
+      {
+        "all_channel_mae_reduction": 0.0009523820103369968,
+        "candidate_all_channel_mae": 0.0861184961385635,
+        "candidate_vital_mae": 0.029012794975546038,
+        "environment_seed": 72210,
+        "raw_all_channel_mae": 0.0870708781489005,
+        "raw_vital_mae": 0.026010087877511977,
+        "vital_mae_reduction": -0.0030027070980340603
+      },
+      {
+        "all_channel_mae_reduction": 5.3447401656095406e-05,
+        "candidate_all_channel_mae": 0.095506940734179,
+        "candidate_vital_mae": 0.031877963558773134,
+        "environment_seed": 72211,
+        "raw_all_channel_mae": 0.09556038813583509,
+        "raw_vital_mae": 0.028494959564081258,
+        "vital_mae_reduction": -0.0033830039946918765
+      },
+      {
+        "all_channel_mae_reduction": 0.0022908467506065067,
+        "candidate_all_channel_mae": 0.08259486718179293,
+        "candidate_vital_mae": 0.03312728138831158,
+        "environment_seed": 72212,
+        "raw_all_channel_mae": 0.08488571393239944,
+        "raw_vital_mae": 0.03516231095179533,
+        "vital_mae_reduction": 0.0020350295634837534
+      },
+      {
+        "all_channel_mae_reduction": -0.0010285272368820847,
+        "candidate_all_channel_mae": 0.08302743851351004,
+        "candidate_vital_mae": 0.030675314112862742,
+        "environment_seed": 72213,
+        "raw_all_channel_mae": 0.08199891127662795,
+        "raw_vital_mae": 0.03320667872540071,
+        "vital_mae_reduction": 0.002531364612537966
+      },
+      {
+        "all_channel_mae_reduction": -0.0023240487275357075,
+        "candidate_all_channel_mae": 0.08361374509123948,
+        "candidate_vital_mae": 0.029171797363223922,
+        "environment_seed": 72214,
+        "raw_all_channel_mae": 0.08128969636370377,
+        "raw_vital_mae": 0.028345115350406777,
+        "vital_mae_reduction": -0.0008266820128171454
+      },
+      {
+        "all_channel_mae_reduction": 0.0014033123125499758,
+        "candidate_all_channel_mae": 0.07825177653614465,
+        "candidate_vital_mae": 0.02946688154966374,
+        "environment_seed": 72215,
+        "raw_all_channel_mae": 0.07965508884869463,
+        "raw_vital_mae": 0.0314051302805267,
+        "vital_mae_reduction": 0.001938248730862964
+      },
+      {
+        "all_channel_mae_reduction": -0.0015482811682015901,
+        "candidate_all_channel_mae": 0.07724794660822094,
+        "candidate_vital_mae": 0.033224862301744845,
+        "environment_seed": 72216,
+        "raw_all_channel_mae": 0.07569966544001935,
+        "raw_vital_mae": 0.03393917605899333,
+        "vital_mae_reduction": 0.0007143137572484873
+      },
+      {
+        "all_channel_mae_reduction": -0.0012254069357258562,
+        "candidate_all_channel_mae": 0.07667577495324569,
+        "candidate_vital_mae": 0.027580697144057868,
+        "environment_seed": 72217,
+        "raw_all_channel_mae": 0.07545036801751984,
+        "raw_vital_mae": 0.02844363936773417,
+        "vital_mae_reduction": 0.0008629422236763017
+      },
+      {
+        "all_channel_mae_reduction": -0.003029669945710328,
+        "candidate_all_channel_mae": 0.08426861163949623,
+        "candidate_vital_mae": 0.02918021422543018,
+        "environment_seed": 72218,
+        "raw_all_channel_mae": 0.0812389416937859,
+        "raw_vital_mae": 0.028353813306845645,
+        "vital_mae_reduction": -0.0008264009185845363
+      },
+      {
+        "all_channel_mae_reduction": -0.001086310239073629,
+        "candidate_all_channel_mae": 0.08215537804755613,
+        "candidate_vital_mae": 0.03470876271969152,
+        "environment_seed": 72219,
+        "raw_all_channel_mae": 0.0810690678084825,
+        "raw_vital_mae": 0.03712688892040509,
+        "vital_mae_reduction": 0.0024181262007135704
+      },
+      {
+        "all_channel_mae_reduction": 0.0022461711614841923,
+        "candidate_all_channel_mae": 0.08029572432262425,
+        "candidate_vital_mae": 0.031093295980544812,
+        "environment_seed": 72220,
+        "raw_all_channel_mae": 0.08254189548410844,
+        "raw_vital_mae": 0.0330894687486922,
+        "vital_mae_reduction": 0.0019961727681473904
+      },
+      {
+        "all_channel_mae_reduction": -0.0017489504246722964,
+        "candidate_all_channel_mae": 0.08798873954388542,
+        "candidate_vital_mae": 0.03067406241395204,
+        "environment_seed": 72221,
+        "raw_all_channel_mae": 0.08623978911921312,
+        "raw_vital_mae": 0.03320893982648462,
+        "vital_mae_reduction": 0.0025348774125325754
+      },
+      {
+        "all_channel_mae_reduction": 0.002935918162454282,
+        "candidate_all_channel_mae": 0.07902919115527562,
+        "candidate_vital_mae": 0.02925657575350132,
+        "environment_seed": 72222,
+        "raw_all_channel_mae": 0.0819651093177299,
+        "raw_vital_mae": 0.03127305474546221,
+        "vital_mae_reduction": 0.002016478991960887
+      },
+      {
+        "all_channel_mae_reduction": -0.0015235302295553699,
+        "candidate_all_channel_mae": 0.0862079576981361,
+        "candidate_vital_mae": 0.03384223880359156,
+        "environment_seed": 72223,
+        "raw_all_channel_mae": 0.08468442746858074,
+        "raw_vital_mae": 0.03461927644821117,
+        "vital_mae_reduction": 0.000777037644619609
+      },
+      {
+        "all_channel_mae_reduction": -0.0010236159576378356,
+        "candidate_all_channel_mae": 0.09134494271488067,
+        "candidate_vital_mae": 0.03502527402029144,
+        "environment_seed": 72224,
+        "raw_all_channel_mae": 0.09032132675724283,
+        "raw_vital_mae": 0.035731360113473665,
+        "vital_mae_reduction": 0.0007060860931822274
+      },
+      {
+        "all_channel_mae_reduction": 0.0032132874612142703,
+        "candidate_all_channel_mae": 0.08436816537717842,
+        "candidate_vital_mae": 0.027697419673731717,
+        "environment_seed": 72225,
+        "raw_all_channel_mae": 0.08758145283839269,
+        "raw_vital_mae": 0.029759977168093123,
+        "vital_mae_reduction": 0.0020625574943614056
+      },
+      {
+        "all_channel_mae_reduction": 0.0006733664778588444,
+        "candidate_all_channel_mae": 0.09376545366658892,
+        "candidate_vital_mae": 0.029014763754442074,
+        "environment_seed": 72226,
+        "raw_all_channel_mae": 0.09443882014444777,
+        "raw_vital_mae": 0.02601287261479431,
+        "vital_mae_reduction": -0.003001891139647765
+      },
+      {
+        "all_channel_mae_reduction": 0.0018108306990339967,
+        "candidate_all_channel_mae": 0.0722481756902326,
+        "candidate_vital_mae": 0.03198767697597721,
+        "environment_seed": 72227,
+        "raw_all_channel_mae": 0.0740590063892666,
+        "raw_vital_mae": 0.033988118703876226,
+        "vital_mae_reduction": 0.0020004417278990175
+      },
+      {
+        "all_channel_mae_reduction": 0.0009784210141287747,
+        "candidate_all_channel_mae": 0.08198720528517069,
+        "candidate_vital_mae": 0.03312718911573649,
+        "environment_seed": 72228,
+        "raw_all_channel_mae": 0.08296562629929946,
+        "raw_vital_mae": 0.035159762089069076,
+        "vital_mae_reduction": 0.0020325729733325845
+      },
+      {
+        "all_channel_mae_reduction": -0.003017433524133334,
+        "candidate_all_channel_mae": 0.07692892029912754,
+        "candidate_vital_mae": 0.027577488906814725,
+        "environment_seed": 72229,
+        "raw_all_channel_mae": 0.0739114867749942,
+        "raw_vital_mae": 0.028443803041503117,
+        "vital_mae_reduction": 0.0008663141346883924
+      },
+      {
+        "all_channel_mae_reduction": -0.0005368945063757846,
+        "candidate_all_channel_mae": 0.07783817995708589,
+        "candidate_vital_mae": 0.032316819709367575,
+        "environment_seed": 72230,
+        "raw_all_channel_mae": 0.0773012854507101,
+        "raw_vital_mae": 0.034810782459680924,
+        "vital_mae_reduction": 0.0024939627503133485
+      },
+      {
+        "all_channel_mae_reduction": 0.0012534416078671395,
+        "candidate_all_channel_mae": 0.07657002526919246,
+        "candidate_vital_mae": 0.03199503384778365,
+        "environment_seed": 72231,
+        "raw_all_channel_mae": 0.0778234668770596,
+        "raw_vital_mae": 0.03399649453127668,
+        "vital_mae_reduction": 0.0020014606834930296
+      },
+      {
+        "all_channel_mae_reduction": -0.00047997157725121475,
+        "candidate_all_channel_mae": 0.07947696637498809,
+        "candidate_vital_mae": 0.03485626076548762,
+        "environment_seed": 72232,
+        "raw_all_channel_mae": 0.07899699479773688,
+        "raw_vital_mae": 0.0372162776009039,
+        "vital_mae_reduction": 0.0023600168354162843
+      },
+      {
+        "all_channel_mae_reduction": -0.0019041050663999998,
+        "candidate_all_channel_mae": 0.07759536038009217,
+        "candidate_vital_mae": 0.027574784915792835,
+        "environment_seed": 72233,
+        "raw_all_channel_mae": 0.07569125531369217,
+        "raw_vital_mae": 0.028442347690791146,
+        "vital_mae_reduction": 0.0008675627749983109
+      },
+      {
+        "all_channel_mae_reduction": -0.002455055090415159,
+        "candidate_all_channel_mae": 0.08678714241432117,
+        "candidate_vital_mae": 0.029175147809388048,
+        "environment_seed": 72234,
+        "raw_all_channel_mae": 0.08433208732390601,
+        "raw_vital_mae": 0.02834828865952383,
+        "vital_mae_reduction": -0.0008268591498642175
+      },
+      {
+        "all_channel_mae_reduction": 0.0011950942486855243,
+        "candidate_all_channel_mae": 0.07871231308181408,
+        "candidate_vital_mae": 0.02945779831453651,
+        "environment_seed": 72235,
+        "raw_all_channel_mae": 0.0799074073304996,
+        "raw_vital_mae": 0.03140370551220797,
+        "vital_mae_reduction": 0.0019459071976714593
+      },
+      {
+        "all_channel_mae_reduction": -0.0006900370119226201,
+        "candidate_all_channel_mae": 0.07924130463644058,
+        "candidate_vital_mae": 0.03485854601924835,
+        "environment_seed": 72236,
+        "raw_all_channel_mae": 0.07855126762451796,
+        "raw_vital_mae": 0.03722051853037556,
+        "vital_mae_reduction": 0.002361972511127207
+      },
+      {
+        "all_channel_mae_reduction": 0.0003190382016244053,
+        "candidate_all_channel_mae": 0.0833113741454922,
+        "candidate_vital_mae": 0.030686877000158545,
+        "environment_seed": 72237,
+        "raw_all_channel_mae": 0.0836304123471166,
+        "raw_vital_mae": 0.033212938094948186,
+        "vital_mae_reduction": 0.002526061094789641
+      },
+      {
+        "all_channel_mae_reduction": 0.00034223387981938136,
+        "candidate_all_channel_mae": 0.08888813355812972,
+        "candidate_vital_mae": 0.029018512182128774,
+        "environment_seed": 72238,
+        "raw_all_channel_mae": 0.0892303674379491,
+        "raw_vital_mae": 0.02602045631243123,
+        "vital_mae_reduction": -0.0029980558696975426
+      },
+      {
+        "all_channel_mae_reduction": -0.001968539039123196,
+        "candidate_all_channel_mae": 0.08898983117168491,
+        "candidate_vital_mae": 0.033833599889586424,
+        "environment_seed": 72239,
+        "raw_all_channel_mae": 0.08702129213256171,
+        "raw_vital_mae": 0.03462056163916714,
+        "vital_mae_reduction": 0.0007869617495807127
+      },
+      {
+        "all_channel_mae_reduction": 0.00037215503629695057,
+        "candidate_all_channel_mae": 0.08938130764389365,
+        "candidate_vital_mae": 0.033037075069026006,
+        "environment_seed": 72240,
+        "raw_all_channel_mae": 0.0897534626801906,
+        "raw_vital_mae": 0.029280339773648825,
+        "vital_mae_reduction": -0.0037567352953771817
+      },
+      {
+        "all_channel_mae_reduction": -0.001142528030557019,
+        "candidate_all_channel_mae": 0.08410224192999148,
+        "candidate_vital_mae": 0.030677395934351037,
+        "environment_seed": 72241,
+        "raw_all_channel_mae": 0.08295971389943446,
+        "raw_vital_mae": 0.03320862834564953,
+        "vital_mae_reduction": 0.0025312324112984896
+      },
+      {
+        "all_channel_mae_reduction": 8.524333965649611e-05,
+        "candidate_all_channel_mae": 0.0899814934623075,
+        "candidate_vital_mae": 0.0333324077688671,
+        "environment_seed": 72242,
+        "raw_all_channel_mae": 0.09006673680196399,
+        "raw_vital_mae": 0.034067671197590244,
+        "vital_mae_reduction": 0.0007352634287231402
+      },
+      {
+        "all_channel_mae_reduction": -0.001609267612078788,
+        "candidate_all_channel_mae": 0.08422815741959756,
+        "candidate_vital_mae": 0.03383295602037953,
+        "environment_seed": 72243,
+        "raw_all_channel_mae": 0.08261888980751877,
+        "raw_vital_mae": 0.034616752719254386,
+        "vital_mae_reduction": 0.0007837966988748571
+      },
+      {
+        "all_channel_mae_reduction": 0.0016866642105668322,
+        "candidate_all_channel_mae": 0.08149613277308862,
+        "candidate_vital_mae": 0.031100944102493804,
+        "environment_seed": 72244,
+        "raw_all_channel_mae": 0.08318279698365545,
+        "raw_vital_mae": 0.03309238358747726,
+        "vital_mae_reduction": 0.001991439484983454
+      },
+      {
+        "all_channel_mae_reduction": 0.004489033172717816,
+        "candidate_all_channel_mae": 0.08406002324388201,
+        "candidate_vital_mae": 0.0276837684481695,
+        "environment_seed": 72245,
+        "raw_all_channel_mae": 0.08854905641659983,
+        "raw_vital_mae": 0.02974878530949354,
+        "vital_mae_reduction": 0.0020650168613240427
+      },
+      {
+        "all_channel_mae_reduction": -0.002847550116571257,
+        "candidate_all_channel_mae": 0.0848259546787668,
+        "candidate_vital_mae": 0.029167379372150998,
+        "environment_seed": 72246,
+        "raw_all_channel_mae": 0.08197840456219554,
+        "raw_vital_mae": 0.028341306229170492,
+        "vital_mae_reduction": -0.000826073142980506
+      },
+      {
+        "all_channel_mae_reduction": 0.00033017442136787367,
+        "candidate_all_channel_mae": 0.08504801704453593,
+        "candidate_vital_mae": 0.03382028541472486,
+        "environment_seed": 72247,
+        "raw_all_channel_mae": 0.08537819146590381,
+        "raw_vital_mae": 0.034609798069868705,
+        "vital_mae_reduction": 0.000789512655143848
+      },
+      {
+        "all_channel_mae_reduction": 0.00010644041596225007,
+        "candidate_all_channel_mae": 0.08689560174065786,
+        "candidate_vital_mae": 0.03303150094904976,
+        "environment_seed": 72248,
+        "raw_all_channel_mae": 0.08700204215662011,
+        "raw_vital_mae": 0.029278958550630473,
+        "vital_mae_reduction": -0.003752542398419288
+      },
+      {
+        "all_channel_mae_reduction": 0.003825182242108441,
+        "candidate_all_channel_mae": 0.08269378660955877,
+        "candidate_vital_mae": 0.02768609723594615,
+        "environment_seed": 72249,
+        "raw_all_channel_mae": 0.08651896885166721,
+        "raw_vital_mae": 0.029755176006195448,
+        "vital_mae_reduction": 0.002069078770249297
+      },
+      {
+        "all_channel_mae_reduction": 0.0008683327940458008,
+        "candidate_all_channel_mae": 0.08534070478983222,
+        "candidate_vital_mae": 0.029258487200757195,
+        "environment_seed": 72250,
+        "raw_all_channel_mae": 0.08620903758387802,
+        "raw_vital_mae": 0.0312766099969546,
+        "vital_mae_reduction": 0.002018122796197404
+      },
+      {
+        "all_channel_mae_reduction": -0.002746507718549007,
+        "candidate_all_channel_mae": 0.08757084269555045,
+        "candidate_vital_mae": 0.03336432532066501,
+        "environment_seed": 72251,
+        "raw_all_channel_mae": 0.08482433497700144,
+        "raw_vital_mae": 0.034127717449419746,
+        "vital_mae_reduction": 0.0007633921287547377
+      },
+      {
+        "all_channel_mae_reduction": 0.0005741953286645812,
+        "candidate_all_channel_mae": 0.08213180786817927,
+        "candidate_vital_mae": 0.031099032225076706,
+        "environment_seed": 72252,
+        "raw_all_channel_mae": 0.08270600319684385,
+        "raw_vital_mae": 0.033089708829042955,
+        "vital_mae_reduction": 0.001990676603966249
+      },
+      {
+        "all_channel_mae_reduction": 0.0003030196637238969,
+        "candidate_all_channel_mae": 0.08236497634813363,
+        "candidate_vital_mae": 0.031855401875880644,
+        "environment_seed": 72253,
+        "raw_all_channel_mae": 0.08266799601185752,
+        "raw_vital_mae": 0.03404435155486378,
+        "vital_mae_reduction": 0.002188949678983136
+      },
+      {
+        "all_channel_mae_reduction": -0.0008630374617329128,
+        "candidate_all_channel_mae": 0.08102120471116511,
+        "candidate_vital_mae": 0.03232582615673765,
+        "environment_seed": 72254,
+        "raw_all_channel_mae": 0.0801581672494322,
+        "raw_vital_mae": 0.034821098414158765,
+        "vital_mae_reduction": 0.002495272257421112
+      },
+      {
+        "all_channel_mae_reduction": 0.0013203901444125837,
+        "candidate_all_channel_mae": 0.07906051040270291,
+        "candidate_vital_mae": 0.029464030312574163,
+        "environment_seed": 72255,
+        "raw_all_channel_mae": 0.0803809005471155,
+        "raw_vital_mae": 0.03140502581717791,
+        "vital_mae_reduction": 0.0019409955046037486
+      },
+      {
+        "all_channel_mae_reduction": -0.0019116442817034701,
+        "candidate_all_channel_mae": 0.07937900262424742,
+        "candidate_vital_mae": 0.03321543826849384,
+        "environment_seed": 72256,
+        "raw_all_channel_mae": 0.07746735834254395,
+        "raw_vital_mae": 0.03393640410304215,
+        "vital_mae_reduction": 0.0007209658345483094
+      },
+      {
+        "all_channel_mae_reduction": 0.0009671191589668005,
+        "candidate_all_channel_mae": 0.08171906136797841,
+        "candidate_vital_mae": 0.027402950405709746,
+        "environment_seed": 72257,
+        "raw_all_channel_mae": 0.08268618052694521,
+        "raw_vital_mae": 0.024768764017305024,
+        "vital_mae_reduction": -0.0026341863884047217
+      },
+      {
+        "all_channel_mae_reduction": 0.0016482817380700232,
+        "candidate_all_channel_mae": 0.07853130123312549,
+        "candidate_vital_mae": 0.025710328014339687,
+        "environment_seed": 72258,
+        "raw_all_channel_mae": 0.08017958297119551,
+        "raw_vital_mae": 0.02763304602060663,
+        "vital_mae_reduction": 0.0019227180062669422
+      },
+      {
+        "all_channel_mae_reduction": -0.001716936975251368,
+        "candidate_all_channel_mae": 0.08169226087890766,
+        "candidate_vital_mae": 0.0347138750601896,
+        "environment_seed": 72259,
+        "raw_all_channel_mae": 0.07997532390365629,
+        "raw_vital_mae": 0.03713173383437175,
+        "vital_mae_reduction": 0.002417858774182151
+      },
+      {
+        "all_channel_mae_reduction": -0.002333051207439582,
+        "candidate_all_channel_mae": 0.08207042268519879,
+        "candidate_vital_mae": 0.03321651747218327,
+        "environment_seed": 72260,
+        "raw_all_channel_mae": 0.07973737147775921,
+        "raw_vital_mae": 0.033939237227605196,
+        "vital_mae_reduction": 0.0007227197554219231
+      },
+      {
+        "all_channel_mae_reduction": 0.0005538303553408452,
+        "candidate_all_channel_mae": 0.0858591110033543,
+        "candidate_vital_mae": 0.027408077973952852,
+        "environment_seed": 72261,
+        "raw_all_channel_mae": 0.08641294135869515,
+        "raw_vital_mae": 0.02477361841980989,
+        "vital_mae_reduction": -0.002634459554142963
+      },
+      {
+        "all_channel_mae_reduction": 0.00029573697875170946,
+        "candidate_all_channel_mae": 0.08939790569349496,
+        "candidate_vital_mae": 0.029011413234233542,
+        "environment_seed": 72262,
+        "raw_all_channel_mae": 0.08969364267224667,
+        "raw_vital_mae": 0.02600891859167152,
+        "vital_mae_reduction": -0.0030024946425620223
+      },
+      {
+        "all_channel_mae_reduction": 0.0025255822239010767,
+        "candidate_all_channel_mae": 0.07871665874107842,
+        "candidate_vital_mae": 0.0319945025757393,
+        "environment_seed": 72263,
+        "raw_all_channel_mae": 0.08124224096497949,
+        "raw_vital_mae": 0.03399067598262003,
+        "vital_mae_reduction": 0.0019961734068807344
+      },
+      {
+        "all_channel_mae_reduction": 0.00209498736628215,
+        "candidate_all_channel_mae": 0.08258458463617437,
+        "candidate_vital_mae": 0.031106178117101913,
+        "environment_seed": 72264,
+        "raw_all_channel_mae": 0.08467957200245652,
+        "raw_vital_mae": 0.03309551032953987,
+        "vital_mae_reduction": 0.001989332212437956
+      }
+    ],
+    "raw_mean_all_channel_mae": 0.08324150731540514,
+    "raw_mean_vital_mae": 0.031637193666186274,
+    "runtime_activated": false,
+    "vital_exact_sign_test_two_sided": {
+      "n_nonzero": 64,
+      "p_value": 2.436457216293327e-05,
+      "positive": 49
+    },
+    "vital_mae_reduction": 0.000768351535489816,
+    "vital_mae_reduction_95pct_ci": [
+      0.00027724032612026176,
+      0.0012270441132401803
+    ]
+  }
+}

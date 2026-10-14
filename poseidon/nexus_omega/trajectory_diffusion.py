@@ -1,22 +1,20 @@
-"""PROJECT NEXUS-Ω: Guided Counterfactual Trajectory Diffusion Kernel.
+"""PROJECT NEXUS-Ω: Matched raw and heuristic-guided rollout comparison.
 
-Implements score-based trajectory imagination over multi-step horizons,
-combining Invariant Causal Mechanism (ICM) dynamics scores with homeostatic
-vital guidance and multi-step conformal risk bounds.
+The included factored predictor is an experimental, untrained initialized
+ensemble. Its disagreement penalty is diagnostic and is not calibrated.
 """
 from __future__ import annotations
 
 import math
-import time
 from typing import Dict, List, Optional, Sequence, Tuple
 import numpy as np
 
-from .contracts import FactoredState, ImaginedTrajectory, MacroIntent
+from .contracts import ImaginedTrajectory, MacroIntent
 from .causal_world_model import FactoredCausalWorldModel
 
 
 class TrajectoryDiffusionImaginer:
-    """Generates and refines coherent counterfactual multi-step trajectory rollouts."""
+    """Generates paired rollouts with identical initial state and action sequence."""
 
     def __init__(
         self,
@@ -29,12 +27,15 @@ class TrajectoryDiffusionImaginer:
     ):
         self.world_model = world_model
         self.default_horizon = default_horizon
+        # Kept for constructor compatibility; this deterministic paired method
+        # does not perform diffusion steps or consume random draws.
         self.diffusion_steps = diffusion_steps
+        self.base_seed = base_seed  # Retained as constructor metadata; rollout is deterministic.
         self.guidance_scale = guidance_scale
         self.conformal_quantile = conformal_quantile
-        self.rng = np.random.RandomState(base_seed)
 
-        # Homeostatic target vector: health=1.0, energy=0.9, hydration=0.9, exposure=0.0
+        # Targets only named vital channels. Other observation slots are not
+        # adjusted without an explicit observation-schema contract.
         self.s_homeo_target = np.array([1.0, 0.90, 0.90, 0.0], dtype=np.float32)
 
     def _intent_to_action_prior(self, intent: MacroIntent) -> np.ndarray:
@@ -57,10 +58,8 @@ class TrajectoryDiffusionImaginer:
         for i in range(min(3, len(state))):
             diff = self.s_homeo_target[i] - state[i]
             grad[i] = diff * (2.0 if i == 0 else 1.0)
-        # Exogenous exposure (index 4 in 8-D obs, or index 0 in s_exo)
-        if len(state) > 4:
-            # Penalize exposure (index 4)
-            grad[4] = -1.5 * max(0.0, state[4] - 0.2)
+        # Do not infer semantics for exogenous observation slots by position:
+        # index 4 is episode progress in the canonical POMDP, not exposure.
         return grad
 
     def imagine_trajectory(
@@ -70,7 +69,7 @@ class TrajectoryDiffusionImaginer:
         target_intent: MacroIntent = MacroIntent.FORAGE_EXPEDITION,
         horizon: Optional[int] = None,
     ) -> ImaginedTrajectory:
-        """Synthesizes score-guided counterfactual rollout over horizon H."""
+        """Compares an unmodified model rollout with its heuristic-guided counterpart."""
         H = horizon or self.default_horizon
         obs_curr = np.asarray(current_obs, dtype=np.float32)[:self.world_model.d_obs]
         mem_curr = np.asarray(current_mem, dtype=np.float32)
@@ -89,58 +88,95 @@ class TrajectoryDiffusionImaginer:
             action_seq = [int(np.argmax(action_prior)) for _ in range(H)]
 
         # 2. Sequential multi-step rollout using Factored Causal World Model
-        states: List[np.ndarray] = [obs_curr.copy()]
-        rewards: List[float] = []
-        epistemic_vars: List[float] = []
+        guided_states: List[np.ndarray] = []
+        guided_rewards: List[float] = []
+        guided_epistemic_vars: List[float] = []
+        raw_states: List[np.ndarray] = []
+        raw_rewards: List[float] = []
+        raw_epistemic_vars: List[float] = []
+        direct_adjustments: List[np.ndarray] = []
+        branch_deltas: List[np.ndarray] = []
+        branch_divergence: List[float] = []
 
-        s_t = obs_curr.copy()
+        guided_state = obs_curr.copy()
+        raw_state = obs_curr.copy()
         mem_t = mem_curr.copy()
 
         total_guidance_norm = 0.0
+        previous_prediction = self.world_model.last_prediction
+        previous_action = self.world_model.last_action
+        try:
+            for t in range(H):
+                act = action_seq[t]
+                # Both branches start from the same observed state and receive
+                # the same action. Each then propagates its own successor state.
+                raw_pred = self.world_model.predict_factored(raw_state, mem_t, act)
+                guided_pred = self.world_model.predict_factored(guided_state, mem_t, act)
 
-        for t in range(H):
-            act = action_seq[t]
-            pred = self.world_model.predict_factored(s_t, mem_t, act)
+                raw_next = raw_pred.predicted_obs.copy()
+                guidance_vec = self.compute_homeostatic_guidance(guided_pred.predicted_obs)
+                total_guidance_norm += float(np.linalg.norm(guidance_vec))
 
-            # Score-guided diffusion update on predicted state
-            guidance_vec = self.compute_homeostatic_guidance(pred.predicted_obs)
-            total_guidance_norm += float(np.linalg.norm(guidance_vec))
+                alpha = 0.05 * self.guidance_scale
+                direct_adjustment = alpha * guidance_vec
+                guided_next = guided_pred.predicted_obs + direct_adjustment
 
-            # Apply reverse diffusion score adjustment:
-            # s_{t+1} = s_pred + alpha * guidance
-            alpha = 0.05 * self.guidance_scale
-            refined_next_obs = pred.predicted_obs + alpha * guidance_vec
+                # Clip vitals to physically valid ranges [0, 1]
+                guided_next[0] = max(0.0, min(1.0, guided_next[0]))
+                guided_next[1] = max(0.0, min(1.0, guided_next[1]))
+                guided_next[2] = max(0.0, min(1.0, guided_next[2]))
 
-            # Clip vitals to physically valid ranges [0, 1]
-            refined_next_obs[0] = max(0.0, min(1.0, refined_next_obs[0]))
-            refined_next_obs[1] = max(0.0, min(1.0, refined_next_obs[1]))
-            refined_next_obs[2] = max(0.0, min(1.0, refined_next_obs[2]))
+                raw_states.append(raw_next.copy())
+                raw_rewards.append(float(raw_pred.predicted_reward))
+                raw_epistemic_vars.append(float(raw_pred.epistemic_uncertainty_total))
+                guided_states.append(guided_next.copy())
+                guided_rewards.append(float(guided_pred.predicted_reward))
+                guided_epistemic_vars.append(float(guided_pred.epistemic_uncertainty_total))
+                direct_adjustments.append(direct_adjustment.copy())
+                branch_delta = guided_next - raw_next
+                branch_deltas.append(branch_delta.copy())
+                branch_divergence.append(float(np.linalg.norm(branch_delta)))
 
-            states.append(refined_next_obs.copy())
-            rewards.append(float(pred.predicted_reward))
-            epistemic_vars.append(float(pred.epistemic_uncertainty_total))
+                raw_state = raw_next
+                guided_state = guided_next
+                # Advance working memory decay
+                if len(mem_t) > 0:
+                    mem_t[0] = max(0.0, float(mem_t[0]) - 1.0)
+        finally:
+            # Imagined branches must not overwrite the agent's factual
+            # action-conditioned prediction cache used by transition feedback.
+            self.world_model.last_prediction = previous_prediction
+            self.world_model.last_action = previous_action
 
-            s_t = refined_next_obs.copy()
-            # Advance working memory decay
-            if len(mem_t) > 0:
-                mem_t[0] = max(0.0, float(mem_t[0]) - 1.0)
+        cumulative_r = float(np.sum(guided_rewards))
 
-        cumulative_r = float(np.sum(rewards))
-
-        # 3. Compute multi-step Conformal Lower Confidence Bound
-        total_epistemic_sigma = math.sqrt(max(1e-6, float(np.sum(epistemic_vars))))
+        # Diagnostic uncertainty penalties; neither branch is calibrated.
+        total_epistemic_sigma = math.sqrt(max(1e-6, float(np.sum(guided_epistemic_vars))))
         conformal_lcb = cumulative_r - self.conformal_quantile * total_epistemic_sigma
+        raw_cumulative_r = float(np.sum(raw_rewards))
+        raw_total_sigma = math.sqrt(max(1e-6, float(np.sum(raw_epistemic_vars))))
+        raw_return_penalty = raw_cumulative_r - self.conformal_quantile * raw_total_sigma
 
         return ImaginedTrajectory(
             horizon=H,
             macro_intent=target_intent,
-            states=states[1:],  # H predicted future states
+            states=guided_states,
             actions=action_seq,
-            rewards=rewards,
-            epistemic_uncertainties=epistemic_vars,
+            rewards=guided_rewards,
+            epistemic_uncertainties=guided_epistemic_vars,
             cumulative_reward=cumulative_r,
             conformal_trajectory_lcb=conformal_lcb,
             score_guidance_norm=float(total_guidance_norm / max(1, H)),
+            unguided_states=raw_states,
+            unguided_rewards=raw_rewards,
+            unguided_epistemic_uncertainties=raw_epistemic_vars,
+            direct_guidance_adjustments=direct_adjustments,
+            branch_state_deltas=branch_deltas,
+            branch_divergence_l2=branch_divergence,
+            unguided_cumulative_reward=raw_cumulative_r,
+            unguided_return_penalty=raw_return_penalty,
+            predictor_evaluations=2 * H,
+            ensemble_member_forwards=2 * H * self.world_model.n_members,
         )
 
     def evaluate_all_intents(

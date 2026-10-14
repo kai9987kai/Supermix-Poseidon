@@ -204,9 +204,11 @@ class DiscoveryResult:
     reward_advantage: float
     p_value: float
     effect_size: float
-    verdict: str  # "ACCEPTED", "REFUTED"
+    verdict: str  # "ACCEPTED", "REFUTED", or "INCONCLUSIVE"
     seeds_evaluated: List[int]
     confidence_interval: Tuple[float, float] = (0.0, 0.0)
+    adjusted_p_value: Optional[float] = None
+    paired_outcomes: List[Dict[str, float]] = field(default_factory=list)
 
 
 @dataclass
@@ -265,6 +267,7 @@ class CausalEFEDecision:
     conformal_override: bool
     factored_state: Optional[Dict[str, List[float]]] = None
     timestamp: float = field(default_factory=time.time)
+    action_scores: List[Dict[str, Any]] = field(default_factory=list)
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -279,6 +282,7 @@ class CausalEFEDecision:
             "conformal_override": bool(self.conformal_override),
             "factored_state": self.factored_state or {},
             "timestamp": round(float(self.timestamp), 4),
+            "action_scores": self.action_scores,
         }
 
 
@@ -291,7 +295,7 @@ class MacroIntent(str, Enum):
 
 @dataclass
 class ImaginedTrajectory:
-    """Score-guided counterfactual trajectory rollout over an H-step horizon."""
+    """Matched raw and heuristic-guided rollouts over one action sequence."""
     horizon: int
     states: List[np.ndarray]              # Shape (H, d_obs)
     actions: List[int]                   # Length H
@@ -301,10 +305,22 @@ class ImaginedTrajectory:
     conformal_trajectory_lcb: float
     score_guidance_norm: float
     macro_intent: MacroIntent = MacroIntent.FORAGE_EXPEDITION
+    unguided_states: List[np.ndarray] = field(default_factory=list)
+    unguided_rewards: List[float] = field(default_factory=list)
+    unguided_epistemic_uncertainties: List[float] = field(default_factory=list)
+    direct_guidance_adjustments: List[np.ndarray] = field(default_factory=list)
+    branch_state_deltas: List[np.ndarray] = field(default_factory=list)
+    branch_divergence_l2: List[float] = field(default_factory=list)
+    unguided_cumulative_reward: float = 0.0
+    unguided_return_penalty: float = 0.0
+    predictor_evaluations: int = 0
+    ensemble_member_forwards: int = 0
     timestamp: float = field(default_factory=time.time)
 
     def to_dict(self) -> Dict[str, Any]:
         return {
+            "schema": "poseidon-matched-rollout-v1",
+            "predictor_status": "untrained_experimental_ensemble",
             "horizon": int(self.horizon),
             "macro_intent": self.macro_intent.value if hasattr(self.macro_intent, "value") else str(self.macro_intent),
             "states": [[round(float(x), 4) for x in s] for s in self.states],
@@ -314,7 +330,22 @@ class ImaginedTrajectory:
             "cumulative_reward": round(float(self.cumulative_reward), 4),
             "conformal_trajectory_lcb": round(float(self.conformal_trajectory_lcb), 4),
             "conformal_return_lcb": round(float(self.conformal_trajectory_lcb), 4),
+            "guided_return_penalty": round(float(self.conformal_trajectory_lcb), 4),
+            "uncertainty_calibrated": False,
             "score_guidance_norm": round(float(self.score_guidance_norm), 4),
+            "unguided_states": [[round(float(x), 4) for x in s] for s in self.unguided_states],
+            "unguided_rewards": [round(float(r), 4) for r in self.unguided_rewards],
+            "unguided_epistemic_uncertainties": [round(float(u), 4) for u in self.unguided_epistemic_uncertainties],
+            "direct_guidance_adjustments": [[round(float(x), 5) for x in row] for row in self.direct_guidance_adjustments],
+            "branch_state_deltas": [[round(float(x), 5) for x in row] for row in self.branch_state_deltas],
+            "branch_divergence_l2": [round(float(x), 5) for x in self.branch_divergence_l2],
+            "max_branch_divergence_l2": round(max(self.branch_divergence_l2, default=0.0), 5),
+            "unguided_cumulative_reward": round(float(self.unguided_cumulative_reward), 4),
+            "unguided_return_penalty": round(float(self.unguided_return_penalty), 4),
+            "unguided_uncertainty_calibrated": False,
+            "guided_return_difference": round(float(self.cumulative_reward - self.unguided_cumulative_reward), 4),
+            "predictor_evaluations": int(self.predictor_evaluations),
+            "ensemble_member_forwards": int(self.ensemble_member_forwards),
             "timestamp": round(float(self.timestamp), 4),
         }
 
@@ -333,6 +364,7 @@ class HierarchicalEFEDecision:
     imagined_trajectory: Optional[ImaginedTrajectory] = None
     factored_state: Optional[Dict[str, List[float]]] = None
     timestamp: float = field(default_factory=time.time)
+    action_scores: List[Dict[str, Any]] = field(default_factory=list)
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -347,6 +379,7 @@ class HierarchicalEFEDecision:
             "imagined_trajectory": self.imagined_trajectory.to_dict() if self.imagined_trajectory else None,
             "factored_state": self.factored_state or {},
             "timestamp": round(float(self.timestamp), 4),
+            "action_scores": self.action_scores,
         }
 
 

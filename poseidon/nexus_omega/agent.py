@@ -31,6 +31,8 @@ from poseidon.nexus_omega.hierarchical_efe import HierarchicalEFEPlanner
 class NexusOmegaAgent:
     """Adaptive agent coordinating causal memory, world model, and comparator updates."""
 
+    V2_SURPRISE_STORM_PERSISTENCE = 3.0
+
     def __init__(
         self,
         d_obs: int = 8,
@@ -40,13 +42,21 @@ class NexusOmegaAgent:
         use_causal_efe: bool = True,
         use_hierarchical_efe: bool = False,
         base_seed: int = 42,
+        residual_adapter_path: Optional[str] = None,
+        exposure_index: Optional[int] = None,
+        dynamics_profile: str = "nexus-phaseworld-v1",
     ):
+        if dynamics_profile not in {"nexus-phaseworld-v1", "nexus-phaseworld-v2"}:
+            raise ValueError("dynamics_profile must be nexus-phaseworld-v1 or nexus-phaseworld-v2")
+        if residual_adapter_path is not None and dynamics_profile != "nexus-phaseworld-v1":
+            raise ValueError("the contextual residual adapter is admitted only for nexus-phaseworld-v1")
         self.d_obs = d_obs
         self.d_working = d_working
         self.n_actions = n_actions
         self.lmbda = uncertainty_penalty_lambda
         self.use_causal_efe = use_causal_efe
         self.use_hierarchical_efe = use_hierarchical_efe
+        self.dynamics_profile = dynamics_profile
 
         self.memory = CausalMemoryFabric(d_working=d_working, d_key=d_obs, d_value=d_obs)
         # Memory combined vector dimension: d_working + 1 (struct) + 1 (ep) = d_working + 2
@@ -58,23 +68,37 @@ class NexusOmegaAgent:
             n_members=3,
             base_seed=base_seed,
         )
-        self.factored_world_model = FactoredCausalWorldModel(
+        model_type = FactoredCausalWorldModel
+        if dynamics_profile == "nexus-phaseworld-v2":
+            from poseidon.nexus_omega.causal_world_model_v2 import ViablePhaseWorldFactoredModel
+            model_type = ViablePhaseWorldFactoredModel
+        self.factored_world_model = model_type(
             d_obs=d_obs,
             d_mem=d_mem,
             n_actions=n_actions,
             n_members=3,
             base_seed=base_seed + 300,
         )
+        if residual_adapter_path is not None:
+            from poseidon.nexus_omega.residual_adapter import (
+                CalibratedFactoredWorldModel,
+                ContextualResidualAdapter,
+            )
+            adapter = ContextualResidualAdapter.from_receipt(residual_adapter_path)
+            self.factored_world_model = CalibratedFactoredWorldModel(self.factored_world_model, adapter)
         self.efe_planner = CausalEFEPlanner(
             world_model=self.factored_world_model,
             n_actions=n_actions,
             base_epistemic_weight=uncertainty_penalty_lambda,
+            exposure_index=exposure_index,
+            safety_fallback_actions=(1, 3) if dynamics_profile == "nexus-phaseworld-v2" else None,
         )
         self.hierarchical_planner = HierarchicalEFEPlanner(
             world_model=self.factored_world_model,
             n_actions=n_actions,
             base_epistemic_weight=uncertainty_penalty_lambda,
             base_seed=base_seed + 500,
+            exposure_index=exposure_index,
         )
 
         # Comparator projection: projects d_obs residual error into d_working memory delta
@@ -86,6 +110,7 @@ class NexusOmegaAgent:
         self.last_mem: Optional[np.ndarray] = None
         self.last_decision: Optional[CausalEFEDecision | HierarchicalEFEDecision] = None
         self.last_hierarchical_decision: Optional[HierarchicalEFEDecision] = None
+        self.last_health_shock_update = False
 
     def reset(self) -> None:
         self.memory.reset()
@@ -95,6 +120,7 @@ class NexusOmegaAgent:
         self.last_mem = None
         self.last_decision = None
         self.last_hierarchical_decision = None
+        self.last_health_shock_update = False
         self.world_model.last_prediction = None
         self.factored_world_model.last_prediction = None
         self.factored_world_model.z_regime = np.array([0.0, 1.0], dtype=np.float32)
@@ -170,6 +196,23 @@ class NexusOmegaAgent:
             e_t = self.factored_world_model.compute_comparator_residual(next_arr)
         else:
             e_t = self.world_model.compute_comparator_residual(next_arr)
+
+        self.last_health_shock_update = False
+        if (
+            self.dynamics_profile == "nexus-phaseworld-v2"
+            and self.use_causal_efe
+            and len(e_t) > 0
+            and float(e_t[0]) <= -0.25
+        ):
+            # A large unexplained health loss is a one-step storm witness, even
+            # when a pulse began before the first observation was available.
+            # Retain a short multi-step belief so longer hidden hazards can be
+            # survived long enough for repeated observations to correct it.
+            self.factored_world_model.z_regime[0] = max(
+                self.V2_SURPRISE_STORM_PERSISTENCE,
+                float(self.factored_world_model.z_regime[0]),
+            )
+            self.last_health_shock_update = True
 
         # 2. Project comparator error into working memory update
         delta_mem = np.dot(self.W_comp, e_t)

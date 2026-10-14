@@ -35,6 +35,7 @@ class HierarchicalEFEPlanner:
         safety_threshold: float = -2.5,
         imagination_horizon: int = 8,
         base_seed: int = 42,
+        exposure_index: Optional[int] = None,
     ):
         self.world_model = world_model
         self.n_actions = n_actions
@@ -49,6 +50,7 @@ class HierarchicalEFEPlanner:
             base_epistemic_weight=base_epistemic_weight,
             conformal_confidence_quantile=conformal_confidence_quantile,
             safety_threshold=safety_threshold,
+            exposure_index=exposure_index,
         )
 
         # Counterfactual trajectory diffusion imaginer
@@ -77,9 +79,10 @@ class HierarchicalEFEPlanner:
     ) -> Tuple[float, ImaginedTrajectory]:
         """Evaluates Level-1 macro Expected Free Energy via counterfactual trajectory rollout."""
         traj = self.imaginer.imagine_trajectory(obs, mem, target_intent=intent, horizon=self.imagination_horizon)
-        # Macro G combines cumulative trajectory return and trajectory conformal lower bound
-        # Plus entropy regularization / alignment bonus
-        macro_efe = float(0.70 * traj.cumulative_reward + 0.30 * traj.conformal_trajectory_lcb)
+        # Macro selection uses the unmodified model branch. Guided rollouts are
+        # retained as a matched shadow candidate and do not silently become the
+        # planner's source of imagined state or reward.
+        macro_efe = float(0.70 * traj.unguided_cumulative_reward + 0.30 * traj.unguided_return_penalty)
         return macro_efe, traj
 
     def select_macro_intent(
@@ -182,6 +185,14 @@ class HierarchicalEFEPlanner:
             conformal_override=conformal_override,
             imagined_trajectory=traj,
             factored_state=micro_dec.factored_state,
+            action_scores=[
+                {
+                    **score,
+                    "selected_by_micro_planner": score["action"] == micro_dec.action,
+                    "selected_after_hierarchy": score["action"] == micro_action,
+                }
+                for score in micro_dec.action_scores
+            ],
         )
 
         self.last_decision = decision

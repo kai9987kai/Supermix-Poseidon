@@ -97,9 +97,12 @@ def test_autonomous_discovery_cycle_and_receipt_verification():
     ledger = engine.run_discovery_cycle(seed_base=60000, num_seeds=4)
 
     assert len(ledger.ledger_sha256) == 64
-    assert len(ledger.ratified_laws) > 0
-    # Negative test hypothesis (noise injection) must be refuted and placed in graveyard
+    # Four matched seeds cannot reach two-sided exact-test significance; the
+    # cycle must not manufacture a discovery from a tiny exploratory sample.
+    assert len(ledger.ratified_laws) == 0
+    # Results remain available with paired outcomes and familywise correction.
     assert len(ledger.refutation_graveyard) > 0
+    assert all(row["verdict"] == "INCONCLUSIVE" for row in ledger.refutation_graveyard)
 
     receipt_dict = {
         "ledger_id": ledger.ledger_id,
@@ -114,7 +117,14 @@ def test_autonomous_discovery_cycle_and_receipt_verification():
 
     # Mutated receipt with forged claims must be rejected
     mutated = copy.deepcopy(receipt_dict)
-    mutated["ratified_laws"][0]["reward_advantage"] = -99.0
+    mutated["refutation_graveyard"][0]["paired_outcomes"][0]["candidate"] += 99.0
+    payload = {
+        "ledger_id": mutated["ledger_id"],
+        "timestamp": mutated["timestamp"],
+        "ratified": mutated["ratified_laws"],
+        "refutations": mutated["refutation_graveyard"],
+    }
+    mutated["ledger_sha256"] = hashlib.sha256(json.dumps(payload, sort_keys=True).encode("utf-8")).hexdigest()
     with pytest.raises(ValueError):
         verify_discovery_receipt(mutated)
 

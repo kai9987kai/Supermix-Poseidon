@@ -389,12 +389,19 @@ async function pollTelemetry(){
           $('#factoredStateText').textContent=`Endo: [${fs.endogenous?.join(', ')}] | Exo: [${fs.exogenous?.join(', ')}] | Regime: storm=${fs.causal_regime?.[0]}`;
         }
         if($('#efeText')){
-          $('#efeText').textContent=`G(a): ${d.free_energy_objective > 0 ? '+':''}${d.free_energy_objective} | Prag: ${d.pragmatic_value} | Epist: ${d.epistemic_value} | LCB: ${d.conformal_lcb} | Guard: ${d.conformal_override?'OVERRIDE':'NOMINAL'}`;
+          $('#efeText').textContent=`G(a): ${d.free_energy_objective > 0 ? '+':''}${d.free_energy_objective} | Prag: ${d.pragmatic_value} | Epist: ${d.epistemic_value} | Uncalibrated penalty: ${d.conformal_lcb} | Heuristic guard: ${d.conformal_override?'OVERRIDE':'inactive'}`;
           if($('#efeStatus')){
-            $('#efeStatus').textContent=d.conformal_override?'GUARD ACTIVE':'CALIBRATED';
-            $('#efeStatus').style.background=d.conformal_override?'#f59e0b':'#10b981';
+            $('#efeStatus').textContent=d.conformal_override?'HEURISTIC OVERRIDE':'UNCALIBRATED';
+            $('#efeStatus').style.background=d.conformal_override?'#f59e0b':'#64748b';
             $('#efeStatus').style.color='white';
           }
+        }
+        if($('#actionRankText')){
+          const labels=['forage','shelter','explore','rest'];
+          const scores=Array.isArray(d.action_scores)?[...d.action_scores].sort((a,b)=>b.efe-a.efe):[];
+          $('#actionRankText').textContent=scores.length
+            ? 'Uncalibrated action scores: '+scores.map(s=>`${labels[s.action]||`action ${s.action}`} G=${decimal(s.efe,3)} R=${decimal(s.predicted_reward,3)}${s.selected_by_objective?' [top]':''}${s.selected_after_guard?' [chosen]':''}`).join(' · ')
+            : 'Per-action ranking unavailable for this planner';
         }
       }
     }
@@ -409,7 +416,12 @@ async function pollTelemetry(){
         }
         if($('#diffusionText') && hd.imagined_trajectory){
           const it=hd.imagined_trajectory;
-          $('#diffusionText').textContent=`Horizon H=${it.horizon} | Return: ${it.cumulative_reward>0?'+':''}${it.cumulative_reward} | Traj-LCB: ${it.conformal_trajectory_lcb} | Guidance Norm: ${it.score_guidance_norm}`;
+          $('#diffusionText').textContent=`H=${it.horizon} | Raw: ${it.unguided_cumulative_reward>0?'+':''}${it.unguided_cumulative_reward} | Guided: ${it.cumulative_reward>0?'+':''}${it.cumulative_reward} | Return Δ: ${it.guided_return_difference} | Max state Δ: ${it.max_branch_divergence_l2} | Uncalibrated penalty: ${it.unguided_return_penalty} | forwards: ${it.ensemble_member_forwards}`;
+        }
+        if($('#actionRankText') && Array.isArray(hd.action_scores) && hd.action_scores.length){
+          const labels=['forage','shelter','explore','rest'];
+          const scores=[...hd.action_scores].sort((a,b)=>b.efe-a.efe);
+          $('#actionRankText').textContent='Uncalibrated micro scores: '+scores.map(s=>`${labels[s.action]||`action ${s.action}`} G=${decimal(s.efe,3)} R=${decimal(s.predicted_reward,3)}${s.selected_by_micro_planner?' [micro]':''}${s.selected_after_hierarchy?' [chosen]':''}`).join(' · ');
         }
       }
     }
@@ -424,7 +436,7 @@ if($('#runDiscoveryBtn'))$('#runDiscoveryBtn').onclick=async()=>{
     if(!res.ok)throw Error(res.statusText);
     const data=await res.json();
     if($('#discoveryStatus')){$('#discoveryStatus').textContent=data.verified?'VERIFIED':'COMPLETE';$('#discoveryStatus').style.background=data.verified?'#10b981':'#ef4444';$('#discoveryStatus').style.color='white';}
-    if($('#discoveryText'))$('#discoveryText').textContent=`Ratified Laws: ${data.ratified_laws_count} | Refutations: ${data.refutations_count} | SHA: ${data.ledger_sha256.slice(0,16)}...`;
+    if($('#discoveryText'))$('#discoveryText').textContent=`Signals passing simulator gate: ${data.ratified_laws_count} | Other results: ${data.refutations_count} | SHA: ${data.ledger_sha256.slice(0,16)}...`;
   }catch(err){
     if($('#discoveryStatus')){$('#discoveryStatus').textContent='FAILED';$('#discoveryStatus').style.background='#ef4444';}
     if($('#discoveryText'))$('#discoveryText').textContent='Discovery cycle failed: '+err.message;

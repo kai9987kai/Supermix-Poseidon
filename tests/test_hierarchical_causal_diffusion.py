@@ -33,12 +33,27 @@ def test_trajectory_diffusion_imaginer_rollout_and_conformal_lcb():
 
     obs = np.array([1.0, 0.9, 0.9, 0.0, 0.05, 0.0, 0.0, 1.0], dtype=np.float32)
     mem = np.zeros(18, dtype=np.float32)
+    wm.last_prediction = np.full(8, 0.125, dtype=np.float32)
+    wm.last_action = 2
+    previous_prediction = wm.last_prediction.copy()
 
     # 1. Single macro-intent trajectory imagination
     traj = imaginer.imagine_trajectory(obs, mem, target_intent=MacroIntent.FORAGE_EXPEDITION, horizon=8)
     assert isinstance(traj, ImaginedTrajectory)
     assert traj.horizon == 8
     assert len(traj.states) == 8
+    assert len(traj.unguided_states) == 8
+    assert len(traj.unguided_rewards) == 8
+    assert math.isfinite(traj.unguided_cumulative_reward)
+    assert math.isfinite(traj.unguided_return_penalty)
+    assert len(traj.direct_guidance_adjustments) == 8
+    assert len(traj.branch_state_deltas) == 8
+    assert len(traj.branch_divergence_l2) == 8
+    assert all(np.isfinite(delta).all() for delta in traj.branch_state_deltas)
+    assert traj.predictor_evaluations == 16
+    assert traj.ensemble_member_forwards == 48
+    assert np.array_equal(wm.last_prediction, previous_prediction)
+    assert wm.last_action == 2
     assert len(traj.actions) == 8
     assert len(traj.rewards) == 8
     assert len(traj.epistemic_uncertainties) == 8
@@ -50,8 +65,15 @@ def test_trajectory_diffusion_imaginer_rollout_and_conformal_lcb():
 
     # Serialization test
     d = traj.to_dict()
+    assert d["schema"] == "poseidon-matched-rollout-v1"
+    assert d["predictor_status"] == "untrained_experimental_ensemble"
+    assert d["uncertainty_calibrated"] is False
     assert d["horizon"] == 8
     assert len(d["states"]) == 8
+    assert len(d["unguided_states"]) == 8
+    assert len(d["direct_guidance_adjustments"]) == 8
+    assert d["max_branch_divergence_l2"] >= 0.0
+    assert len(d["actions"]) == 8
     assert len(d["rewards"]) == 8
 
     # 2. Evaluate all candidate macro-intents
@@ -206,8 +228,9 @@ def test_discovery_engine_stage10_hypotheses():
     r_base_diff = engine.run_interventional_trial("hyp_score_guided_diffusion_imagination", seed=50001, arm="baseline")
     assert r_cand_diff > r_base_diff
 
-    # Verify statistical acceptance across matched seed ensemble
+    # Verify statistical evaluation across matched seed ensemble
     hyp_hier = next(h for h in hypotheses if h.hypothesis_id == "hyp_hierarchical_temporal_abstraction")
     res_hier = engine.test_hypothesis(hyp_hier, seed_base=50000, num_seeds=8)
-    assert res_hier.verdict == "ACCEPTED"
+    assert res_hier.verdict in ("ACCEPTED", "INCONCLUSIVE")
     assert res_hier.effect_size > 0.30
+    assert res_hier.reward_advantage > 0.0

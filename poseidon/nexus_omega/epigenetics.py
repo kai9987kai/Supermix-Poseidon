@@ -73,10 +73,14 @@ class EpigeneticMorphogenesisSystem:
         biomass_threshold: float = 2.0,
         pupa_duration_ticks: int = 4,
         imago_duration_ticks: int = 24,
+        exposure_index: Optional[int] = None,
     ):
+        if exposure_index is not None and (type(exposure_index) is not int or exposure_index < 0):
+            raise ValueError("exposure_index must be a non-negative integer or None")
         self.biomass_threshold = biomass_threshold
         self.pupa_duration_ticks = pupa_duration_ticks
         self.imago_duration_ticks = imago_duration_ticks
+        self.exposure_index = exposure_index
         self.reset()
 
     def reset(self) -> None:
@@ -101,7 +105,11 @@ class EpigeneticMorphogenesisSystem:
         energy = float(obs[1]) if len(obs) > 1 else 1.0
         hydration = float(obs[2]) if len(obs) > 2 else 1.0
         stamina = float(obs[3]) if len(obs) > 3 else 1.0
-        exposure = float(obs[4]) if len(obs) > 4 else 0.0
+        exposure = (
+            float(obs[self.exposure_index])
+            if self.exposure_index is not None and self.exposure_index < len(obs)
+            else 0.0
+        )
 
         if energy > 0.70 and hydration > 0.70:
             self.biomass_accumulated += (energy - 0.50) * 0.35

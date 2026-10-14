@@ -40,6 +40,40 @@ class AutonomousDiscoveryEngine:
         self.min_effect_size = min_effect_size
         self.cf_engine = CounterfactualEngine()
 
+    @staticmethod
+    def _holm_adjust(p_values: List[float]) -> List[float]:
+        """Holm-Bonferroni adjusted p-values, restored to input order."""
+        if not p_values:
+            return []
+        order = sorted(range(len(p_values)), key=p_values.__getitem__)
+        adjusted = [1.0] * len(p_values)
+        running = 0.0
+        for rank, index in enumerate(order):
+            running = max(running, min(1.0, (len(p_values) - rank) * p_values[index]))
+            adjusted[index] = running
+        return adjusted
+
+    @staticmethod
+    def _paired_sign_pvalue(deltas: np.ndarray) -> float:
+        """Two-sided exact sign test, omitting tied pairs."""
+        nonzero = np.asarray(deltas, dtype=float)
+        nonzero = nonzero[nonzero != 0]
+        if len(nonzero) == 0:
+            return 1.0
+        return float(stats.binomtest(int(np.sum(nonzero > 0)), n=len(nonzero), p=0.5,
+                                     alternative="two-sided").pvalue)
+
+    @staticmethod
+    def _paired_mean_interval(deltas: np.ndarray) -> Tuple[float, float]:
+        """Descriptive two-sided 95% Student-t interval for the paired mean."""
+        if len(deltas) < 2:
+            raise ValueError("At least two pairs are required for a mean interval")
+        mean = float(np.mean(deltas))
+        sd = float(np.std(deltas, ddof=1))
+        critical = float(stats.t.ppf(0.975, df=len(deltas) - 1))
+        se = sd / math.sqrt(len(deltas))
+        return round(mean - critical * se, 4), round(mean + critical * se, 4)
+
     def generate_hypotheses(self) -> List[HypothesisSpec]:
         """Formulates targeted scientific hypotheses including positive and negative tests."""
         return [
@@ -332,7 +366,9 @@ class AutonomousDiscoveryEngine:
         seed_base: int = 50000,
         num_seeds: int = 8,
     ) -> DiscoveryResult:
-        """Executes a matched-seed trial, computes student-t and Cohen's d, and issues verdict."""
+        """Executes a matched-seed trial and computes an exact paired test."""
+        if num_seeds < 2:
+            raise ValueError("At least two matched seeds are required for inference")
         seeds = [seed_base + i for i in range(num_seeds)]
         baseline_rewards = []
         candidate_rewards = []
@@ -347,22 +383,19 @@ class AutonomousDiscoveryEngine:
         mean_delta = float(np.mean(deltas))
         std_delta = float(np.std(deltas, ddof=1)) if len(deltas) > 1 else 0.0
 
-        if std_delta > 1e-8:
-            t_stat = mean_delta / (std_delta / math.sqrt(len(deltas)))
-            p_val = float(2.0 * (1.0 - stats.t.cdf(abs(t_stat), df=len(deltas) - 1)))
-            cohens_d = float(mean_delta / std_delta)
-            se = std_delta / math.sqrt(len(deltas))
-            ci = (round(mean_delta - 1.96 * se, 4), round(mean_delta + 1.96 * se, 4))
-        else:
-            p_val = 0.0 if mean_delta > 0 else 1.0
-            cohens_d = 10.0 if mean_delta > 0 else 0.0
-            ci = (round(mean_delta, 4), round(mean_delta, 4))
+        # Exact paired sign test avoids a normality assumption and never turns
+        # a constant positive sample into artificial certainty.
+        p_val = self._paired_sign_pvalue(deltas)
+        cohens_d = float(mean_delta / std_delta) if std_delta > 1e-8 else 0.0
+        ci = self._paired_mean_interval(deltas)
 
         # Scientific decision gate
         if mean_delta > 0 and p_val < hypothesis.alpha and cohens_d >= hypothesis.minimum_effect_size:
             verdict = "ACCEPTED"
-        else:
+        elif mean_delta < 0 and p_val < hypothesis.alpha and abs(cohens_d) >= hypothesis.minimum_effect_size:
             verdict = "REFUTED"
+        else:
+            verdict = "INCONCLUSIVE"
 
         return DiscoveryResult(
             hypothesis=hypothesis,
@@ -374,6 +407,11 @@ class AutonomousDiscoveryEngine:
             verdict=verdict,
             seeds_evaluated=seeds,
             confidence_interval=ci,
+            adjusted_p_value=p_val,
+            paired_outcomes=[
+                {"seed": int(seed), "baseline": float(base), "candidate": float(candidate)}
+                for seed, base, candidate in zip(seeds, baseline_rewards, candidate_rewards)
+            ],
         )
 
     def run_discovery_cycle(
@@ -389,19 +427,35 @@ class AutonomousDiscoveryEngine:
             timestamp=datetime.datetime.now().isoformat(),
         )
 
-        for hyp in hypotheses:
-            res = self.test_hypothesis(hyp, seed_base=seed_base, num_seeds=num_seeds)
+        results = [self.test_hypothesis(hyp, seed_base=seed_base, num_seeds=num_seeds) for hyp in hypotheses]
+        adjusted = self._holm_adjust([res.p_value for res in results])
+        for hyp, res, adjusted_p in zip(hypotheses, results, adjusted):
+            res.adjusted_p_value = adjusted_p
+            if (res.reward_advantage > 0 and adjusted_p < hyp.alpha
+                    and res.effect_size >= hyp.minimum_effect_size):
+                res.verdict = "ACCEPTED"
+            elif (res.reward_advantage < 0 and adjusted_p < hyp.alpha
+                    and abs(res.effect_size) >= hyp.minimum_effect_size):
+                res.verdict = "REFUTED"
+            else:
+                res.verdict = "INCONCLUSIVE"
             entry = {
                 "hypothesis_id": hyp.hypothesis_id,
                 "statement": hyp.statement,
+                "alpha": hyp.alpha,
+                "minimum_effect_size": hyp.minimum_effect_size,
                 "baseline_reward": res.baseline_reward,
                 "candidate_reward": res.candidate_reward,
                 "reward_advantage": res.reward_advantage,
                 "p_value": res.p_value,
+                "adjusted_p_value": adjusted_p,
+                "multiplicity_method": "Holm-Bonferroni",
+                "hypothesis_family_size": len(hypotheses),
                 "effect_size": res.effect_size,
                 "verdict": res.verdict,
                 "seeds_evaluated": res.seeds_evaluated,
                 "confidence_interval": list(res.confidence_interval),
+                "paired_outcomes": res.paired_outcomes,
             }
             if res.verdict == "ACCEPTED":
                 ledger.ratified_laws.append(entry)
@@ -413,7 +467,7 @@ class AutonomousDiscoveryEngine:
 
 
 def verify_discovery_receipt(receipt: Dict[str, Any]) -> bool:
-    """Verifies cryptographic hash and statistical validity of a DiscoveryLedger receipt."""
+    """Verifies receipt digest, seed-level outcomes, summaries and familywise adjustment."""
     if not isinstance(receipt, dict):
         raise ValueError("Discovery receipt must be a dictionary")
 
@@ -432,19 +486,76 @@ def verify_discovery_receipt(receipt: Dict[str, Any]) -> bool:
     if claimed_sha != computed_sha:
         raise ValueError(f"Ledger digest mismatch: claimed {claimed_sha}, computed {computed_sha}")
 
-    # Validate that both ratified laws and refutations exist (showing falsification works)
+    # The historical field names are retained for compatibility; the second
+    # list may contain either evidence against a claim or an inconclusive run.
     ratified = receipt.get("ratified_laws", [])
     refutations = receipt.get("refutation_graveyard", [])
 
     if not isinstance(ratified, list) or not isinstance(refutations, list):
         raise ValueError("Ratified laws and refutations must be lists")
 
+    entries = ratified + refutations
+    if not entries:
+        raise ValueError("Discovery receipt must contain at least one result")
+    if len({entry.get("hypothesis_id") for entry in entries}) != len(entries):
+        raise ValueError("Discovery receipt contains duplicate hypothesis IDs")
+    raw_p = []
+    for entry in entries:
+        try:
+            outcomes = entry["paired_outcomes"]
+            seeds = [int(row["seed"]) for row in outcomes]
+            baseline = np.asarray([float(row["baseline"]) for row in outcomes], dtype=float)
+            candidate = np.asarray([float(row["candidate"]) for row in outcomes], dtype=float)
+            delta = candidate - baseline
+            if (len(seeds) < 2 or seeds != [int(seed) for seed in entry["seeds_evaluated"]]
+                    or len(set(seeds)) != len(seeds) or not np.isfinite(delta).all()):
+                raise ValueError
+            mean = float(np.mean(delta))
+            sd = float(np.std(delta, ddof=1))
+            p = AutonomousDiscoveryEngine._paired_sign_pvalue(delta)
+            effect = mean / sd if sd > 1e-8 else 0.0
+            expected_interval = AutonomousDiscoveryEngine._paired_mean_interval(delta)
+            if not math.isclose(mean, float(entry["reward_advantage"]), rel_tol=1e-6, abs_tol=5.1e-5):
+                raise ValueError
+            if not math.isclose(float(np.mean(baseline)), float(entry["baseline_reward"]), rel_tol=1e-6, abs_tol=5.1e-5):
+                raise ValueError
+            if not math.isclose(float(np.mean(candidate)), float(entry["candidate_reward"]), rel_tol=1e-6, abs_tol=5.1e-5):
+                raise ValueError
+            if not math.isclose(p, float(entry["p_value"]), rel_tol=1e-7, abs_tol=1e-7):
+                raise ValueError
+            if not math.isclose(effect, float(entry["effect_size"]), rel_tol=1e-6, abs_tol=5.1e-5):
+                raise ValueError
+            interval = entry["confidence_interval"]
+            if len(interval) != 2 or tuple(float(x) for x in interval) != expected_interval:
+                raise ValueError
+            if entry.get("multiplicity_method") != "Holm-Bonferroni" or int(entry.get("hypothesis_family_size", -1)) != len(entries):
+                raise ValueError
+            if not math.isfinite(float(entry["alpha"])) or not 0.0 < float(entry["alpha"]) < 1.0:
+                raise ValueError
+            if not math.isfinite(float(entry["minimum_effect_size"])) or float(entry["minimum_effect_size"]) < 0.0:
+                raise ValueError
+            raw_p.append(p)
+        except (KeyError, TypeError, ValueError, OverflowError) as exc:
+            raise ValueError(f"Invalid or inconsistent discovery result: {entry.get('hypothesis_id')}") from exc
+    expected_adjusted = AutonomousDiscoveryEngine._holm_adjust(raw_p)
+    for entry, adjusted_p in zip(entries, expected_adjusted):
+        if not math.isclose(float(entry.get("adjusted_p_value", -1)), adjusted_p, rel_tol=1e-7, abs_tol=1e-7):
+            raise ValueError(f"Adjusted p-value mismatch: {entry.get('hypothesis_id')}")
+        significant = adjusted_p < float(entry["alpha"])
+        large_effect = abs(float(entry["effect_size"])) >= float(entry["minimum_effect_size"])
+        if significant and large_effect and float(entry["reward_advantage"]) > 0:
+            expected_verdict = "ACCEPTED"
+        elif significant and large_effect and float(entry["reward_advantage"]) < 0:
+            expected_verdict = "REFUTED"
+        else:
+            expected_verdict = "INCONCLUSIVE"
+        if entry.get("verdict") != expected_verdict:
+            raise ValueError(f"Verdict mismatch: {entry.get('hypothesis_id')}")
     for law in ratified:
         if law.get("verdict") != "ACCEPTED" or law.get("reward_advantage", 0.0) <= 0:
             raise ValueError(f"Invalid entry in ratified laws: {law.get('hypothesis_id')}")
-
     for ref in refutations:
-        if ref.get("verdict") != "REFUTED":
+        if ref.get("verdict") not in ("REFUTED", "INCONCLUSIVE"):
             raise ValueError(f"Invalid entry in refutation graveyard: {ref.get('hypothesis_id')}")
 
     return True

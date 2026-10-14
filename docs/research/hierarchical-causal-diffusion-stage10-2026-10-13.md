@@ -1,39 +1,37 @@
-# Poseidon Stage 10: Hierarchical Multi-Scale Active Inference & Score-Guided Counterfactual Trajectory Diffusion Kernel (Diff-Causal-EFE)
+# Poseidon Stage 10: Hierarchical Heuristic Planning and Guided Rollouts
 
 **Date:** 13 October 2026  
-**Status:** Integrated, verified, and benchmarked  
-**Milestone:** Stage 10 Advanced Cognitive Architecture: Hierarchical Macro-Temporal Intent, Score-Guided Trajectory Diffusion Rollouts, and Multi-Step Conformal Return Bounds  
+**Status:** Experimental heuristic integration; efficacy and calibration are not established
+**Milestone:** Stage 10 experimental macro-intent selection and deterministic guided rollouts
 
 ---
 
 ## 1. Executive Summary
 
-This milestone formalizes and integrates **Stage 10: Hierarchical Multi-Scale Active Inference & Score-Guided Counterfactual Trajectory Diffusion Kernel (Diff-Causal-EFE)** into the **Poseidon Cognitive Architecture**. Expanding upon Stage 9's factored invariant causal latents and single-step variational Expected Free Energy (EFE), Stage 10 bridges the critical gap between macro-level temporal abstraction and micro-level reactive planning under non-stationary cycles:
+This experimental integration adds macro-intent selection and paired deterministic rollouts beside the micro-action planner. The factored predictor's neural residual ensemble is randomly initialized and is not bound to a trained artifact; measured prediction or control benefit is not established.
 
-1. **Hierarchical Two-Scale Active Inference (Hierarchical-EFE):**
+1. **Hierarchical two-scale action selection (Hierarchical-EFE):**
    - **Level-1 Macro-Intent:** Evaluates temporally extended options over multi-tick horizons ($K$ ticks):
      - `FORAGE_EXPEDITION`: Aggressive nutrient and resource acquisition during calm environmental regimes.
      - `DIAPAUSE_HIBERNATION`: Deep metabolic depression, shelter reinforcement, and vital conservation during acute storm hazard pulses.
      - `HABITAT_RELOCATION`: Directional spatial migration escaping localized resource depletion.
      - `EMERGENCY_FORTIFICATION`: Rapid defensive shelter securing when vital integrity is critically threatened.
-   - **Temporal Commitment with Emergency Interrupts:** Enforces persistent macro-intent execution to prevent myopic policy thrashing, while permitting instantaneous interruption when catastrophic alerts ($\text{exposure} > 0.80$ or $\text{health} < 0.40$) occur.
-2. **Score-Guided Counterfactual Trajectory Diffusion Kernel:**
-   - Synthesizes prospective $H$-step rollouts $\boldsymbol{\tau} = (s_0, a_0, s_1, a_1, \dots, s_H)$ via the Factored Causal World Model.
-   - Applies reverse diffusion score updates with homeostatic guidance gradients:
-     $$\nabla_s \mathcal{J}_{\text{safety}}(s) = - \sum_{i \in \{\text{health}, \text{energy}, \text{hydration}\}} \alpha_i (s_i - s_i^*)$$
-     steering predicted future trajectories toward stable homeostatic equilibria $\mathbf{s}^* = [1.0, 0.90, 0.90, 0.0]^T$.
-3. **Multi-Step Conformal Trajectory Return Lower Confidence Bounds:**
+   - **Temporal commitment with emergency interrupts:** Retains a selected macro intent for a bounded duration, with interruption on a storm-cue threshold ($o_3 > 0.80$) or low health ($o_0 < 0.40$). Whether this reduces policy thrashing is unmeasured.
+2. **Paired deterministic rollouts (not a trained diffusion model):**
+   - Runs raw and homeostatic-guided branches from the same observation with the same intent-conditioned action sequence.
+   - Propagates each branch from its own successor states, keeping the raw baseline free of heuristic edits. The guided branch applies a fixed offset to predicted states:
+     $$g(s) = [2(1.0-h),\; 0.90-e,\; 0.90-w,\; 0,\ldots,0]$$
+     steering the first three named predicted state channels toward fixed targets. Unnamed channels are left unchanged.
+3. **Uncalibrated multi-step uncertainty penalty (not a conformal bound):**
    - Aggregates multi-step predictive epistemic variances across the trajectory horizon $H$:
      $$\sigma_{\text{trajectory}}^2 = \sum_{t=0}^{H-1} \sigma_{\text{epistemic}, t}^2$$
-   - Enforces distribution-free conformal trajectory bounds:
+   - Computes a heuristic return penalty from summed per-step ensemble disagreement:
      $$\underline{R}(\boldsymbol{\tau}) = \sum_{t=0}^{H-1} \hat{r}_t - 1.96 \cdot \sqrt{\sum_{t=0}^{H-1} \sigma_{\text{epistemic}, t}^2}$$
-     providing formal finite-sample risk guarantees prior to trajectory commitment.
-4. **Autonomous Hypothesis Ratification:**
-   - `hyp_hierarchical_temporal_abstraction`: Statistically ratified ($d = 0.971, p = 0.0286 < 0.05$), demonstrating sustained survival advantage across matched non-stationary hazard ensembles.
-   - `hyp_score_guided_diffusion_imagination`: Statistically ratified ($d = 0.971, p = 0.0286 < 0.05$), proving prospective hazard avoidance superior to myopic reactive policies.
+     producing an uncalibrated heuristic penalty. The fixed multiplier and ensemble variance do not provide a finite-sample guarantee.
+4. **Evidence status:** The former discovery cycle used eight matched seeds, tested multiple hypotheses without familywise correction, and measured reward rather than the forecast-accuracy and policy-thrashing outcomes named by these hypotheses. Its nominal p-values do not establish the claims. The discovery ledger now retains seed-level outcomes and applies Holm-Bonferroni correction within each cycle; this improves auditability but does not repair hypothesis/outcome mismatch or substitute for independent evaluation.
 5. **Live Verification & Workbench Integration:**
    - Endpoints `GET /api/nexus-omega/hierarchical-state` and `POST /api/nexus-omega/imagine` operational with real-time UI telemetry cards.
-   - Checkpoint integrity preserved (`runs/tidal_dagger/core.pt` SHA-256 invariant).
+   - The path is optional and experimental. It is not evidence of control benefit or a calibrated safety guarantee.
 
 ---
 
@@ -41,35 +39,33 @@ This milestone formalizes and integrates **Stage 10: Hierarchical Multi-Scale Ac
 
 ### 2.1 Hierarchical Decomposition of Expected Free Energy
 
-Let $\mathcal{M} = \{m_1, m_2, \dots, m_K\}$ denote the set of Level-1 Macro-Intents, and $\mathcal{A}$ denote Level-0 micro-actions. At time $t$, if the agent is not bound by an active macro-commitment or an emergency hazard override is triggered, it selects the macro-intent minimizing cumulative multi-step Free Energy:
+Let $\mathcal{M}$ denote the four macro-intents. When no commitment is active, the implementation evaluates a deterministic rollout for each and selects the highest heuristic score:
 
-$$m^* = \arg\min_{m \in \mathcal{M}} \mathcal{G}_{\text{macro}}(m \mid \mathbf{o}_t, \mathbf{m}_t)$$
+$$m^* = \arg\max_{m \in \mathcal{M}} \left(0.70R(\tau_m) + 0.30P(\tau_m)\right)$$
 
-where:
-$$\mathcal{G}_{\text{macro}}(m) = - \underline{R}(\boldsymbol{\tau}_m) + \lambda_{\text{switch}} \cdot \mathbb{I}(m \ne m_{t-1}) + D_{\text{KL}}\left( Q(\mathbf{s}_{t+H} \mid m) \,\|\, P_{\text{prior}}(\mathbf{s}^*) \right)$$
+Here $R$ and $P$ are the raw branch's summed predicted reward and uncalibrated uncertainty-adjusted score. The guided branch is retained as a shadow candidate; it does not affect macro selection. The implementation has no learned option transition model or KL term. During a commitment it retains the selected intent; emergency cue/health checks can replace it.
 
-Upon committing to macro-intent $m^*$, the agent maintains this commitment for $K = 4$ steps, during which Level-0 micro-actions $a_t \in \mathcal{A}$ minimize conditioned Expected Free Energy:
+The micro-planner selects an action from its own one-step score. The current macro intent does not enter that score as a probability prior; the integration applies a small set of hand-written action overrides. Thus the conditioned policy below is not implemented:
 
 $$a^*_t = \arg\min_{a \in \mathcal{A}} G_{\text{micro}}(a \mid m^*, \mathbf{o}_t, \mathbf{m}_t) - \lambda_{\text{prior}} \cdot \log P(a \mid m^*)$$
 
-### 2.2 Score-Guided Reverse Diffusion Formulation
+### 2.2 Deterministic Homeostatic Offset
 
-During trajectory imagination over horizon $H$, each state transition is generated by Factored Causal World Model $f_{\text{causal}}$, followed by an Invariant Causal Mechanism (ICM) score-guided diffusion step:
+During rollout over horizon $H$, each state transition is generated by the factored model and then adjusted by a fixed heuristic:
 
-$$\hat{s}_{t+1}^{(0)} = f_{\text{causal}}(s_t, a_t, z_{\text{regime}}, m_{\text{working}})$$
-$$\hat{s}_{t+1} = \hat{s}_{t+1}^{(0)} + \gamma \cdot \nabla_s \log p_{\text{data}}(\hat{s}) + \eta \cdot \nabla_s \mathcal{J}_{\text{homeostatic}}(\hat{s})$$
+$$\hat{s}_{t+1} = \operatorname{clip}\left(f_{\text{factored}}(s_t,a_t,z,m) + \eta g_{\text{homeostatic}}(f_{\text{factored}}(s_t,a_t,z,m))\right)$$
 
-Where the homeostatic potential gradient is analytically evaluated:
-$$\nabla_s \mathcal{J}_{\text{homeostatic}}(s) = \begin{bmatrix} 2 \cdot (1.0 - \text{health}) \\ 2 \cdot (0.90 - \text{energy}) \\ 2 \cdot (0.90 - \text{hydration}) \\ - 2 \cdot \text{exposure} \\ \mathbf{0}_{4} \end{bmatrix}$$
+The implemented heuristic direction adjusts only the first three named vital channels:
+$$g(s) = [2(1.0-h),\;0.90-e,\;0.90-w,\;0,\ldots,0]$$
 
-This guidance analytically pushes predicted trajectories away from lethal exposure and vital depletion zones.
+This deterministic offset changes predicted states toward hand-selected targets. It is not a learned data score, a diffusion process, or evidence that real trajectories improve. An earlier index-4 exposure adjustment was removed because the canonical POMDP uses index 4 for episode progress; unnamed observation channels are now left unchanged. The raw and guided branches are matched on initial observation and actions, but their later states diverge by design; the reported return difference is a model-generated diagnostic, not an observed treatment effect.
 
-### 2.3 Finite-Horizon Conformal Trajectory Risk Envelope
+### 2.3 Uncalibrated Finite-Horizon Uncertainty Penalty
 
-Given multi-step ensemble epistemic uncertainties $\{\sigma_t\}_{t=0}^{H-1}$, the cumulative trajectory risk follows:
-$$\underline{R}(\boldsymbol{\tau}) = \sum_{t=0}^{H-1} \hat{r}_t - q_{1-\alpha} \cdot \left( \sum_{t=0}^{H-1} \sigma_t^2 \right)^{1/2}$$
+Given the model's per-step scalar ensemble disagreement values $u_t$, the implementation computes:
+$$P(\tau) = \sum_{t=0}^{H-1} \hat{r}_t - c\sqrt{\max(10^{-6},\sum_{t=0}^{H-1}u_t)}$$
 
-When $\underline{R}(\boldsymbol{\tau}) < \theta_{\text{safe}}$ under active hazard signals, the hierarchical planner initiates emergency diapause / fortification override, guaranteeing bounded catastrophe risk.
+The configured constant $c$ defaults to 1.96. The $u_t$ values are variances, so this is a heuristic scale penalty rather than a calibrated trajectory interval. This value is not consumed by a safety gate and is not a risk bound or catastrophe guarantee.
 
 ---
 
@@ -91,36 +87,45 @@ When $\underline{R}(\boldsymbol{\tau}) < \theta_{\text{safe}}$ under active haza
                                                   |  Selected Macro-Intent m*
                                                   v
        +-----------------------------------------------------------------------------------+
-       |                 Score-Guided Trajectory Diffusion Imaginer (Kernel)                |
-       |  - H-step rollout synthesis via Factored Causal World Model                       |
+       |                 Deterministic Guided Rollout                                      |
+       |  - H-step heuristic rollout via factored predictor                                |
        |  - Homeostatic score guidance: nabla_s J_homeo (vital envelope attraction)        |
-       |  - Conformal Trajectory LCB: R_bar - 1.96 * sqrt(sum sigma^2)                     |
+       |  - Uncalibrated uncertainty penalty                                               |
        +-----------------------------------------------------------------------------------+
                                                   |  Imagined Trajectory tau* & Action Prior
                                                   v
        +-----------------------------------------------------------------------------------+
        |                 Level-0 Micro-Action Variational EFE Planner                      |
        |  - G(a | m*) = Pragmatic(a) + beta(o) * Epistemic(a) + Empowerment(a)             |
-       |  - Conformal-SPI Safety Gate & Shelter Override                                    |
+       |  - Heuristic safety checks and shelter override                                    |
        +-----------------------------------------------------------------------------------+
                                                   |
-                                                  v  Certified Micro-Action a_t in {0, 1, 2, 3}
+                                                  v  Selected Micro-Action a_t in {0, 1, 2, 3}
                                        [Environment Interaction]
 ```
 
 ---
 
-## 4. Empirical Evaluation & Autonomous Hypothesis Ratification
+## 4. Empirical status and next evidence gate
 
-| Hypothesis ID | Statement | Verdict | Cohen's $d$ | $p$-value | Matched Ensemble Benefit |
-| :--- | :--- | :---: | :---: | :---: | :---: |
-| `hyp_hierarchical_temporal_abstraction` | Macro-intent temporal options prevent policy thrashing under non-stationary cycles | **ACCEPTED** | **0.971** | **0.0286** | +1.80 reward advantage under hazard |
-| `hyp_score_guided_diffusion_imagination` | Score-guided trajectory diffusion enables prospective hazard avoidance | **ACCEPTED** | **0.971** | **0.0286** | +1.80 reward advantage under hazard |
+No confirmatory result is reported for this stage. The previous table's figures are withdrawn: the sample was small, its cycle tested a family of hypotheses without correction, and the measured outcome did not match both named hypotheses. The implementation has not demonstrated that temporal commitment reduces action switching, that its state forecasts are accurate, or that imagined rollouts improve realized control. A future evaluation must pre-register those separate outcomes, include reactive and unguided-rollout controls, use common seeds with complete pair retention, adjust across the declared hypothesis family, and report untouched-seed replication.
+
+The versioned rollout telemetry now exposes raw and guided states and returns, the direct per-step guidance adjustment, the resulting guided-minus-raw state delta, maximum state divergence, predictor status, explicit uncalibrated fields, and ensemble forward-call counts for the same intent-conditioned action sequence. Direct adjustment and later state divergence are distinct: divergence includes repeated model propagation from each branch's own state and the guided branch's clipping. A horizon-$H$ paired rollout costs $2H$ predictor evaluations ($2H$ times the ensemble size in member forwards). Macro selection uses the raw branch; the guidance branch remains diagnostic. In a separate held-out one-step assay against actual synthetic POMDP transitions, the primary scale increased vital-state forecast MAE by 0.02523 versus zero guidance (95% environment-seed cluster-bootstrap interval for sham minus guided: [-0.02688, -0.02355]; exact sign-test p = 4.66e-10; 32 environment seeds averaged over eight fixed predictor initializations). This is evidence against forecast improvement for this untrained predictor on this synthetic distribution, not evidence about policy benefit or a trained model. See [the assay protocol and results](homeostatic-guidance-forecast-assay-2026-10-13.md) and its full [machine-readable receipt](../../runs/nexus_omega/guidance_forecast_assay.json). A follow-up action-conditioned residual correction, fitted and selected on disjoint seed partitions, reduced holdout vital MAE by 0.000768 (95% interval [0.000277, 0.001227]) but fell below the predeclared 0.001 minimum useful gain, so the evidence gate rejected it and the correction remains inactive. See the [residual-calibration protocol and result](nexus-omega-residual-calibration-gate-2026-10-13.md) and its [receipt](../../runs/nexus_omega/residual_calibration_gate.json). A context-conditioned residual model then passed the same forecast gate on 64 new environment seeds and eight predictor initializations withheld from fitting and selection (vital MAE reduction 0.00235; 95% interval [0.00164, 0.00302]). It is available only through an explicit, receipt-validated opt-in. A fresh 64-pair closed-loop assay with corrected observation semantics found lower reward with the adapter (-1.071; 95% interval [-1.163, -0.969]); action switching increased and neither arm survived. A same-state counterfactual ranking audit then found higher immediate regret and lower EFE-to-reward rank agreement in two fresh seed/agent-initialization blocks. Vital-state forecast error also increased on these anchors even though all-channel error fell. The adapter is not promoted. See [the corrected control report](nexus-omega-adapter-schema-control-assay-2026-10-13.md), [decision-rank audit](nexus-omega-decision-rank-audit-2026-10-13.md), and the [first receipt](../../runs/nexus_omega/decision_rank_audit.json) and [replication receipt](../../runs/nexus_omega/decision_rank_audit_replication.json). The NEXUS-Ω discovery ledger records each seed's baseline and candidate reward, recomputes the paired summaries during receipt verification, uses a two-sided exact paired sign test, and applies Holm-Bonferroni adjustment across the hypotheses in a cycle. It reports `INCONCLUSIVE` when the adjusted test does not meet the declared threshold instead of treating a failure to reject as a refutation. These checks protect the stored analysis from inconsistent or tampered summaries under the test assumptions. A content hash alone still does not prove that the experiment was executed as described, and passing this gate is not independent replication.
 
 ---
+
+### Corrected paired control follow-up
+
+A rerun corrected the safety planner's observation mapping: canonical POMDP channel 4 is episode progress, not exposure. Across 64 fresh paired seeds and a fresh agent initialization, the opt-in contextual adapter reduced mean reward by 1.071 (95% paired interval [-1.163, -0.969]); all 58 non-tied pairs favored baseline. Action switching rose from 0.279 to 0.335, and neither arm survived. The adapter remains opt-in, and the zero-survival baseline is not evidence of a safe controller. The previous run is retained as historical because it used the false exposure mapping. The same audit removed implicit channel-4 exposure interpretation from the epigenetic stress counter; exposure now requires an explicit channel mapping. See the [corrected control report](nexus-omega-adapter-schema-control-assay-2026-10-13.md) and [receipt](../../runs/nexus_omega/adapter_schema_control_assay.json).
+
+### Versioned viability and surprise-triggered hazard memory
+
+The legacy phaseworld drains hydration without a recovery action, so a new `nexus-phaseworld-v2` benchmark adds bounded hydration recovery to Rest while preserving the observation/action contract and leaving v1 untouched. The first 32-step refinement found a large initial-hidden-storm failure margin: an aligned agent survived all 64 seeds at both initializations, but one episode reached 0.05 energy and health fell to 0.20. The v2-only structured prior now corrects the false storm-Shelter health gain; the planner can choose its higher-scoring Rest fallback; and a health residual at or below -0.25 raises the latent storm belief for one subsequent step.
+
+On fresh blocks of 64 environment seeds and two fixed initializations at 64- and 128-step horizons, the aligned NEXUS profile survived 64/64 episodes for both initializations in both blocks. At h128, minimum health was 0.60, minimum energy 0.75, and minimum hydration 0.24–0.30; average hydration change over steps 65–128 was near zero. The cue-only control and both v1-prior arms survived 0/64 in each block; the hand-coded pulse-memory positive control survived 64/64. All 448 complete trajectories replayed exactly in each block. This result is specific to the synthetic benchmark, a structured untrained prior, two initializations per block, and horizons up to 128; it does not establish safety or promotion. See the [protocol and results](nexus-omega-phaseworld-v2-robustness-2026-10-14.md), the [h64 receipt](../../runs/nexus_omega/phaseworld_v2_robustness_h64_20261014.json), and the [h128 receipt](../../runs/nexus_omega/phaseworld_v2_robustness_h128_20261014.json).
 
 ## 5. System Integrity & Backward Compatibility
 
 - **Frozen Core Checkpoint:** [`runs/tidal_dagger/core.pt`](file:///c:/Users/kai99/Desktop/Poseidon/runs/tidal_dagger/core.pt) SHA-256 (`a053104ae63dc7f86baa15b4b34e46730e1ccb92117f221801fb21f90d2d6c27`) remained bitwise untouched.
 - **Backward Compatibility:** All existing agents (`core`, `atlas`, `contrast`, `horizon`, `odyssey`, `helm`, `odysseus`, `mco`, `aura`, `metamorph`, `chimera`, `hyperion`, `titan`, `trident`, `cognitive`) and standard `NexusOmegaAgent(use_hierarchical_efe=False)` run with zero behavioral alteration.
-- **Verification Receipt:** All unit, integration, and server endpoint tests pass with 100% success rate.
+- **Verification boundary:** Existing unit and endpoint tests establish code-path behavior only; they do not validate predictive accuracy, decision benefit, or statistical claims.
