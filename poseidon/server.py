@@ -470,7 +470,8 @@ def make_handler(runtime, port):
                     max_steps = payload.get("max_steps", 256)
                     if payload.get("mode", "chat") == "world" and (type(max_steps) is not int or not 1 <= max_steps <= 512):
                         raise ValueError("Workbench worlds require a 1–512 step horizon.")
-                    result = runtime.respond(payload.get("prompt"), payload.get("mode", "chat"), payload.get("history"), payload.get("seed", 42), payload.get("disabled_carriers"), planner=payload.get("planner", "policy"), scarcity=payload.get("scarcity", 1.0), max_steps=max_steps)
+                    max_new_tokens = payload.get("max_new_tokens")
+                    result = runtime.respond(payload.get("prompt"), payload.get("mode", "chat"), payload.get("history"), payload.get("seed", 42), payload.get("disabled_carriers"), planner=payload.get("planner", "policy"), scarcity=payload.get("scarcity", 1.0), max_steps=max_steps, max_new_tokens=max_new_tokens)
                     if "paths" in result:
                         result["links"] = {key: "/artifacts/"+Path(value).resolve().relative_to(runtime.root/"outputs").as_posix() for key,value in result["paths"].items()}
                 self.send_json(200, result)

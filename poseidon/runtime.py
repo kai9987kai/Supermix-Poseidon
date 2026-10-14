@@ -1574,9 +1574,9 @@ class Poseidon:
             memory.save(self.memory_path)
         return {"saved": True, "entry": entry}
 
-    def respond(self, prompt, mode="chat", history=None, seed=42, disabled_carriers=None, planner="policy", scarcity=1.0, max_steps=256):
-        if not isinstance(prompt, str) or not 1 <= len(prompt.strip()) <= 8000:
-            raise ValueError("Prompt must contain 1–8000 characters.")
+    def respond(self, prompt, mode="chat", history=None, seed=42, disabled_carriers=None, planner="policy", scarcity=1.0, max_steps=256, max_new_tokens=None):
+        if not isinstance(prompt, str) or not 1 <= len(prompt.strip()) <= 16000:
+            raise ValueError("Prompt must contain 1–16000 characters.")
         if type(seed) is not int or not 0 <= seed < 2**63:
             raise ValueError("Seed must be a nonnegative integer below 2^63.")
         with self.lock:
@@ -1687,6 +1687,6 @@ class Poseidon:
             if mode != "chat":
                 raise ValueError("Unknown mode.")
             memories = self._memory().retrieve(prompt, disabled_carriers=disabled_carriers or []) if self.memory_path.exists() else []
-            result = self.language.generate(prompt, history, memories)
+            result = self.language.generate(prompt, history, memories, max_new_tokens=max_new_tokens or 512)
             result["memories"] = memories
             return result

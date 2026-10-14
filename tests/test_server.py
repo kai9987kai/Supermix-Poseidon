@@ -295,7 +295,28 @@ def test_nexus_omega_server_endpoints(server):
     assert len(op_res["verification_certificate"]) == 64
 
 
+def test_context_expansion_and_token_budget(server):
+    url, root = server
+    runtime = Poseidon(root)
 
+    # 1. Test 16000-character prompt boundary on runtime
+    padded_math = "3*x + 7 = 22" + " " * (16000 - len("3*x + 7 = 22"))
+    assert len(padded_math) == 16000
+    res = runtime.respond(padded_math, mode="math")
+    assert res["answer"] == "5"
 
+    with pytest.raises(ValueError, match="1–16000"):
+        runtime.respond("x" * 16001, mode="math")
 
+    # 2. Test server HTTP endpoint with 16000-char prompt and max_new_tokens parameter
+    res = json.load(post(url + "/api/respond", {
+        "prompt": padded_math,
+        "mode": "math",
+        "max_new_tokens": 1024
+    }))
+    assert res["answer"] == "5"
 
+    # 3. Test HTTP 400 rejection when prompt exceeds 16000 characters
+    with pytest.raises(HTTPError) as err:
+        post(url + "/api/respond", {"prompt": "x" * 16001, "mode": "math"})
+    assert err.value.code == 400

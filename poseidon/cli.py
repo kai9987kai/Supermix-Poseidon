@@ -66,6 +66,7 @@ def main():
     p.add_argument("--eval-episodes", type=int, default=32, help="fresh episodes per ORACLE evaluation condition")
     p.add_argument("--bootstrap-reps", type=int, default=2000)
     p.add_argument("--skip-replay", action="store_true", help="verify receipt hashes without regenerating episodes")
+    p.add_argument("--max-new-tokens", type=int, default=None, help="maximum new generation tokens for language model")
     args = p.parse_args()
     if args.oracle_architecture != "mlp-v1" and args.command != "oracle-fit":
         p.error("--oracle-architecture is only supported by oracle-fit")
@@ -816,7 +817,8 @@ def main():
         result = runtime.status()
     else:
         result = runtime.respond(args.prompt or "Survive", args.command, seed=args.seed, planner=args.planner,
-                                 scarcity=args.scarcity, max_steps=args.max_steps if args.max_steps is not None else 256)
+                                 scarcity=args.scarcity, max_steps=args.max_steps if args.max_steps is not None else 256,
+                                 max_new_tokens=args.max_new_tokens)
     print(json.dumps(result, indent=2, ensure_ascii=False))
 
 if __name__ == "__main__":
