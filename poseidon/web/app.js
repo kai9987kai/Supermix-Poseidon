@@ -389,7 +389,7 @@ async function pollTelemetry(){
           $('#factoredStateText').textContent=`Endo: [${fs.endogenous?.join(', ')}] | Exo: [${fs.exogenous?.join(', ')}] | Regime: storm=${fs.causal_regime?.[0]}`;
         }
         if($('#efeText')){
-          $('#efeText').textContent=`G(a): ${d.free_energy_objective > 0 ? '+':''}${d.free_energy_objective} | Prag: ${d.pragmatic_value} | Epist: ${d.epistemic_value} | Uncalibrated penalty: ${d.conformal_lcb} | Heuristic guard: ${d.conformal_override?'OVERRIDE':'inactive'}`;
+          $('#efeText').textContent=`G(a): ${d.free_energy_objective > 0 ? '+':''}${d.free_energy_objective} | Prag: ${d.pragmatic_value} | Epist: ${d.epistemic_value} | Uncalibrated penalty: ${d.conformal_lcb} | Heuristic guard: ${d.conformal_override?'OVERRIDE':'inactive'} | Calm recovery: ${d.recovery_admission?'ADMITTED':'inactive'}`;
           if($('#efeStatus')){
             $('#efeStatus').textContent=d.conformal_override?'HEURISTIC OVERRIDE':'UNCALIBRATED';
             $('#efeStatus').style.background=d.conformal_override?'#f59e0b':'#64748b';
@@ -425,9 +425,52 @@ async function pollTelemetry(){
         }
       }
     }
+
+    const uRes=await fetch('/api/nexus-omega/ultima-state');
+    if(uRes.ok){
+      const uData=await uRes.json();
+      if(uData.quantum_state && $('#quantumText')){
+        const qs=uData.quantum_state;
+        $('#quantumText').textContent=`Purity: ${Number(qs.purity).toFixed(4)} | Berry Phase: ${Number(qs.berry_phase_holonomy).toFixed(4)} rad | Ent: ${Number(qs.von_neumann_entropy).toFixed(4)} | Tunnel: ${Number(qs.tunneling_rate).toFixed(3)}`;
+        if($('#quantumStatus')){$('#quantumStatus').textContent=qs.purity>0.8?'SUPERPOSITION':'DECOHERENT';$('#quantumStatus').style.background=qs.purity>0.8?'#06b6d4':'#f59e0b';}
+      }
+      if(uData.spectral_profile && $('#spectralText')){
+        const sp=uData.spectral_profile;
+        $('#spectralText').textContent=`Dom Period: T=${Number(sp.dominant_period).toFixed(1)} | Phase: ${Number(sp.current_phase).toFixed(3)} rad | Storm Resonance: ${(Number(sp.storm_resonance_probability)*100).toFixed(1)}% | Spec Ent: ${Number(sp.spectral_entropy).toFixed(3)}`;
+        if($('#spectralStatus')){$('#spectralStatus').textContent=sp.storm_resonance_probability>0.5?'RESONANCE SPIKE':'HARMONIC';$('#spectralStatus').style.background=sp.storm_resonance_probability>0.5?'#ef4444':'#ec4899';}
+      }
+      if(uData.active_opcode && $('#bytecodeText')){
+        const op=uData.active_opcode;
+        $('#bytecodeText').textContent=`Opcode: ${op.opcode_name} | Steps: ${op.execution_steps?.length||0} | Mutated: ${op.mutated} | Cert: ${op.verification_certificate?.slice(0,12)}...`;
+        if($('#bytecodeStatus')){$('#bytecodeStatus').textContent=op.ltl_safe?'LTL CERTIFIED':'FALLBACK SAFE';$('#bytecodeStatus').style.background=op.ltl_safe?'#10b981':'#f59e0b';}
+      }
+      if(uData.thermodynamic_state && $('#autopoiesisText')){
+        const ts=uData.thermodynamic_state;
+        const pad=ts.affect_valence_pad||[0,0,0];
+        $('#autopoiesisText').textContent=`PAD: [${pad.map(v=>Number(v)>=0?'+'+Number(v).toFixed(2):Number(v).toFixed(2)).join(', ')}] | S_int: +${Number(ts.internal_entropy_production).toFixed(3)} | S_diss: +${Number(ts.heat_dissipation_rate).toFixed(3)} | Viability: ${(Number(ts.autopoietic_viability)*100).toFixed(1)}%`;
+      }
+      if(uData.dream_receipt && $('#dreamText')){
+        const dr=uData.dream_receipt;
+        $('#dreamText').textContent=`Replayed: ${dr.replayed_transitions} | Regret Red: ${Number(dr.mean_regret_mitigation).toFixed(3)} | Synaptic Pruning: ${(Number(dr.synaptic_pruning_ratio)*100).toFixed(1)}% | Hub Resilience: +${Number(dr.hub_resilience_gain).toFixed(3)}`;
+      }
+    }
   }catch{}
 }
 if($('#pollTelemetryBtn'))$('#pollTelemetryBtn').onclick=()=>pollTelemetry();
+if($('#triggerDreamBtn'))$('#triggerDreamBtn').onclick=async()=>{
+  try{
+    if($('#dreamStatus')){$('#dreamStatus').textContent='REPLAYING';$('#dreamStatus').style.background='#8b5cf6';}
+    if($('#dreamText'))$('#dreamText').textContent='Morpheus offline generative replay consolidating counterfactual rollouts...';
+    const res=await fetch('/api/nexus-omega/dream',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({num_rollouts:4,seed:42})});
+    if(!res.ok)throw Error(res.statusText);
+    const data=await res.json();
+    if($('#dreamStatus')){$('#dreamStatus').textContent='CONSOLIDATED';$('#dreamStatus').style.background='#10b981';}
+    if($('#dreamText'))$('#dreamText').textContent=`Replayed: ${data.replayed_transitions} | Regret Red: ${Number(data.mean_regret_mitigation).toFixed(3)} | Synaptic Pruning: ${(Number(data.synaptic_pruning_ratio)*100).toFixed(1)}% | Hub Resilience: +${Number(data.hub_resilience_gain).toFixed(3)}`;
+  }catch(err){
+    if($('#dreamStatus')){$('#dreamStatus').textContent='FAILED';$('#dreamStatus').style.background='#ef4444';}
+    if($('#dreamText'))$('#dreamText').textContent='Dream consolidation failed: '+err.message;
+  }
+};
 if($('#runDiscoveryBtn'))$('#runDiscoveryBtn').onclick=async()=>{
   try{
     if($('#discoveryStatus')){$('#discoveryStatus').textContent='RUNNING';$('#discoveryStatus').style.background='#8b5cf6';$('#discoveryStatus').style.color='white';}

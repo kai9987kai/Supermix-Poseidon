@@ -255,7 +255,7 @@ class FactoredPredictionOutput:
 
 @dataclass
 class CausalEFEDecision:
-    """Rich decision telemetry under Deep Active Inference & Conformal SPI."""
+    """Decision telemetry for active inference and heuristic safety actions."""
     action: int
     action_name: str
     free_energy_objective: float
@@ -268,6 +268,7 @@ class CausalEFEDecision:
     factored_state: Optional[Dict[str, List[float]]] = None
     timestamp: float = field(default_factory=time.time)
     action_scores: List[Dict[str, Any]] = field(default_factory=list)
+    recovery_admission: bool = False
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -280,6 +281,7 @@ class CausalEFEDecision:
             "empowerment_value": round(float(self.empowerment_value), 6),
             "conformal_lcb": round(float(self.conformal_lcb), 6),
             "conformal_override": bool(self.conformal_override),
+            "recovery_admission": bool(self.recovery_admission),
             "factored_state": self.factored_state or {},
             "timestamp": round(float(self.timestamp), 4),
             "action_scores": self.action_scores,
@@ -381,5 +383,236 @@ class HierarchicalEFEDecision:
             "timestamp": round(float(self.timestamp), 4),
             "action_scores": self.action_scores,
         }
+
+
+# ============================================================================
+# STAGE 11: POSEIDON NEXUS-ULTIMA (OMNI-RESONANCE COGNITIVE ARCHITECTURE)
+# ============================================================================
+
+@dataclass
+class QuantumCausalState:
+    """Holonomic quantum superposition state over macro-intent Hilbert space C^4."""
+    amplitudes: List[complex]              # 4 complex amplitudes (c_0, c_1, c_2, c_3)
+    probabilities: List[float]             # Born rule probabilities |c_m|^2
+    phases: List[float]                    # Phase angles theta_m in [-pi, pi]
+    berry_phase: float                     # Geometric holonomic Berry phase accumulated along trajectory loop
+    purity: float                          # Tr(rho^2) state purity in [0.25, 1.0]
+    von_neumann_entropy: float             # -Tr(rho log rho)
+    tunneling_rate: float                  # Inter-intent superposition tunneling amplitude
+    timestamp: float = field(default_factory=time.time)
+
+    @property
+    def berry_phase_holonomy(self) -> float:
+        return self.berry_phase
+
+    @property
+    def complex_amplitudes(self) -> List[complex]:
+        return self.amplitudes
+
+    @property
+    def born_probabilities(self) -> List[float]:
+        return self.probabilities
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "amplitudes_real": [round(float(c.real), 5) for c in self.amplitudes],
+            "amplitudes_imag": [round(float(c.imag), 5) for c in self.amplitudes],
+            "probabilities": [round(float(p), 5) for p in self.probabilities],
+            "born_probabilities": [round(float(p), 5) for p in self.probabilities],
+            "phases": [round(float(th), 5) for th in self.phases],
+            "berry_phase": round(float(self.berry_phase), 6),
+            "berry_phase_holonomy": round(float(self.berry_phase), 6),
+            "purity": round(float(self.purity), 5),
+            "von_neumann_entropy": round(float(self.von_neumann_entropy), 5),
+            "tunneling_rate": round(float(self.tunneling_rate), 5),
+            "timestamp": round(float(self.timestamp), 4),
+        }
+
+
+@dataclass
+class HarmonicSpectralProfile:
+    """Bio-Harmonic Fourier spectral frequency profile for cyclical pulse forecasting."""
+    dominant_frequency: float              # Primary cyclical frequency omega_dom (rad/tick)
+    dominant_period: float                 # Estimated period T = 2*pi / omega_dom (ticks)
+    spectral_power: List[float]            # Power spectral density across frequency bins
+    current_phase: float                   # Current cyclical phase in [-pi, pi]
+    predicted_phase_advance: float         # Anticipated phase advance over horizon H
+    spectral_entropy: float                # Spectral disorder / coherence measure
+    storm_resonance_probability: float     # Resonant anticipation probability for upcoming hazard pulse
+    timestamp: float = field(default_factory=time.time)
+
+    @property
+    def fourier_amplitudes(self) -> List[float]:
+        return self.spectral_power
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "dominant_frequency": round(float(self.dominant_frequency), 5),
+            "dominant_period": round(float(self.dominant_period), 3),
+            "spectral_power": [round(float(p), 5) for p in self.spectral_power],
+            "fourier_amplitudes": [round(float(p), 5) for p in self.spectral_power],
+            "current_phase": round(float(self.current_phase), 5),
+            "predicted_phase_advance": round(float(self.predicted_phase_advance), 5),
+            "spectral_entropy": round(float(self.spectral_entropy), 5),
+            "storm_resonance_probability": round(float(self.storm_resonance_probability), 5),
+            "timestamp": round(float(self.timestamp), 4),
+        }
+
+
+@dataclass
+class SynthesizedOpcode:
+    """Metamorphic composite bytecode instruction formally verified under LTL."""
+    opcode_id: str
+    opcode_name: str
+    micro_action_sequence: List[int]       # Concrete macro-unrolled micro actions
+    ltl_formula: str                       # e.g., "G(health > 0.20) & (storm -> F[<=2] shelter)"
+    ltl_verified: bool                     # True if verified by safety automaton
+    verification_hash: str                 # Cryptographic verification receipt SHA-256
+    execution_horizon: int
+    homeostatic_cost: float
+    timestamp: float = field(default_factory=time.time)
+
+    @property
+    def execution_steps(self) -> List[int]:
+        return self.micro_action_sequence
+
+    @property
+    def ltl_safe(self) -> bool:
+        return self.ltl_verified
+
+    @property
+    def verification_certificate(self) -> str:
+        return self.verification_hash
+
+    @property
+    def mutated(self) -> bool:
+        return False
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "opcode_id": self.opcode_id,
+            "opcode_name": self.opcode_name,
+            "micro_action_sequence": [int(a) for a in self.micro_action_sequence],
+            "execution_steps": [int(a) for a in self.micro_action_sequence],
+            "ltl_formula": self.ltl_formula,
+            "ltl_verified": bool(self.ltl_verified),
+            "ltl_safe": bool(self.ltl_verified),
+            "verification_hash": self.verification_hash,
+            "verification_certificate": self.verification_hash,
+            "mutated": False,
+            "execution_horizon": int(self.execution_horizon),
+            "homeostatic_cost": round(float(self.homeostatic_cost), 4),
+            "timestamp": round(float(self.timestamp), 4),
+        }
+
+
+@dataclass
+class ThermodynamicState:
+    """Nonequilibrium autopoietic dissipation and PAD affect valence."""
+    entropy_production_rate: float         # dS/dt internal entropy production
+    heat_dissipation_rate: float           # Prigogine dissipative rate
+    pleasure: float                        # P in [-1, 1]: vital reserve surplus
+    arousal: float                         # A in [-1, 1]: epistemic prediction error intensity
+    dominance: float                       # D in [-1, 1]: empowerment / agency controllability
+    effective_curiosity_temp: float        # Beta_curiosity modulated by PAD
+    effective_risk_aversion: float         # Lambda_risk modulated by PAD
+    autopoietic_integrity: float           # Viability distance from fatal boundary
+    timestamp: float = field(default_factory=time.time)
+
+    @property
+    def internal_entropy_production(self) -> float:
+        return self.entropy_production_rate
+
+    @property
+    def autopoietic_viability(self) -> float:
+        return self.autopoietic_integrity
+
+    @property
+    def affect_valence_pad(self) -> Tuple[float, float, float]:
+        return (self.pleasure, self.arousal, self.dominance)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "entropy_production_rate": round(float(self.entropy_production_rate), 5),
+            "internal_entropy_production": round(float(self.entropy_production_rate), 5),
+            "heat_dissipation_rate": round(float(self.heat_dissipation_rate), 5),
+            "pleasure": round(float(self.pleasure), 4),
+            "arousal": round(float(self.arousal), 4),
+            "dominance": round(float(self.dominance), 4),
+            "affect_valence_pad": [round(float(self.pleasure), 4), round(float(self.arousal), 4), round(float(self.dominance), 4)],
+            "effective_curiosity_temp": round(float(self.effective_curiosity_temp), 4),
+            "effective_risk_aversion": round(float(self.effective_risk_aversion), 4),
+            "autopoietic_integrity": round(float(self.autopoietic_integrity), 4),
+            "autopoietic_viability": round(float(self.autopoietic_integrity), 4),
+        }
+
+
+@dataclass
+
+class DreamConsolidationReceipt:
+    """Morpheus dream-state sleep consolidation trace during diapause."""
+    episodes_dreamed: int
+    replayed_transitions: int
+    mean_regret_mitigation: float
+    synaptic_pruning_ratio: float
+    hub_resilience_gain: float
+    consolidation_sha256: str
+    timestamp: float = field(default_factory=time.time)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "episodes_dreamed": int(self.episodes_dreamed),
+            "replayed_transitions": int(self.replayed_transitions),
+            "mean_regret_mitigation": round(float(self.mean_regret_mitigation), 5),
+            "synaptic_pruning_ratio": round(float(self.synaptic_pruning_ratio), 4),
+            "hub_resilience_gain": round(float(self.hub_resilience_gain), 4),
+            "consolidation_sha256": self.consolidation_sha256,
+            "timestamp": round(float(self.timestamp), 4),
+        }
+
+
+@dataclass
+class UltimaDecision:
+    """The unified Stage 11 decision spanning quantum, spectral, hierarchical, and metamorphic planes."""
+    quantum_state: QuantumCausalState
+    harmonic_profile: HarmonicSpectralProfile
+    thermodynamic_state: ThermodynamicState
+    hierarchical_decision: HierarchicalEFEDecision
+    active_opcode: Optional[SynthesizedOpcode] = None
+    dream_receipt: Optional[DreamConsolidationReceipt] = None
+    final_action: int = 0
+    final_action_name: str = "forage"
+    holonomic_override: bool = False
+    timestamp: float = field(default_factory=time.time)
+
+    @property
+    def spectral_profile(self) -> HarmonicSpectralProfile:
+        return self.harmonic_profile
+
+    @property
+    def dream_consolidation(self) -> Optional[DreamConsolidationReceipt]:
+        return self.dream_receipt
+
+    @property
+    def action(self) -> int:
+        return self.final_action
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "quantum_state": self.quantum_state.to_dict(),
+            "harmonic_profile": self.harmonic_profile.to_dict(),
+            "spectral_profile": self.harmonic_profile.to_dict(),
+            "thermodynamic_state": self.thermodynamic_state.to_dict(),
+            "hierarchical_decision": self.hierarchical_decision.to_dict(),
+            "active_opcode": self.active_opcode.to_dict() if self.active_opcode else None,
+            "dream_receipt": self.dream_receipt.to_dict() if self.dream_receipt else None,
+            "dream_consolidation": self.dream_receipt.to_dict() if self.dream_receipt else None,
+            "final_action": int(self.final_action),
+            "action": int(self.final_action),
+            "final_action_name": str(self.final_action_name),
+            "holonomic_override": bool(self.holonomic_override),
+            "timestamp": round(float(self.timestamp), 4),
+        }
+
 
 

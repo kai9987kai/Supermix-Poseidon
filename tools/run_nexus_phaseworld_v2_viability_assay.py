@@ -25,17 +25,6 @@ SEEDS = tuple(range(99101, 99165))
 AGENT_SEEDS = (55001, 55002)
 HORIZON = 32
 BOOTSTRAP_REPLICATES = 20_000
-ARM_NAMES = (
-    "legacy_v1_trace_memory",
-    "v2_reactive_cue_only",
-    "v2_trace_memory",
-    "v2_agent_v1_prior_55001",
-    "v2_agent_v2_prior_55001",
-    "v2_agent_v1_prior_55002",
-    "v2_agent_v2_prior_55002",
-)
-
-
 def _sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
@@ -57,12 +46,17 @@ def _sign_test(values: np.ndarray) -> dict:
     return {"n_nonzero": n, "positive": positive, "p_value": p}
 
 
-def _policy_action(name: str, obs: np.ndarray, memory: dict) -> int:
+def _policy_action(
+    name: str,
+    obs: np.ndarray,
+    memory: dict,
+    trace_memory_duration: int = 3,
+) -> int:
     if name == "reactive":
         return 3 if float(obs[3]) > 0.8 else 0
     if name == "trace_memory":
         if float(obs[3]) > 0.8:
-            memory["storm_ticks"] = 3
+            memory["storm_ticks"] = trace_memory_duration
         if memory["storm_ticks"] > 0:
             memory["storm_ticks"] -= 1
             return 3
@@ -70,9 +64,23 @@ def _policy_action(name: str, obs: np.ndarray, memory: dict) -> int:
     raise ValueError(f"unknown non-agent policy: {name}")
 
 
-def _run_episode(seed: int, arm: str, agent_seed: int | None = None, horizon: int = HORIZON) -> dict:
+def _run_episode(
+    seed: int,
+    arm: str,
+    agent_seed: int | None = None,
+    horizon: int = HORIZON,
+    storm_interval: int = 6,
+    storm_duration: int = 3,
+    trace_memory_duration: int = 3,
+) -> dict:
     legacy = arm == "legacy_v1_trace_memory"
-    env = POMDPPhaseWorld(seed=seed, max_steps=horizon) if legacy else POMDPPhaseWorldV2(seed=seed, max_steps=horizon)
+    env_type = POMDPPhaseWorld if legacy else POMDPPhaseWorldV2
+    env = env_type(
+        seed=seed,
+        max_steps=horizon,
+        storm_interval=storm_interval,
+        storm_duration=storm_duration,
+    )
     obs = env.reset()
     memory = {"storm_ticks": 0}
     agent = None
@@ -84,10 +92,14 @@ def _run_episode(seed: int, arm: str, agent_seed: int | None = None, horizon: in
         profile = "nexus-phaseworld-v2" if "v2_prior" in arm else "nexus-phaseworld-v1"
         agent = NexusOmegaAgent(base_seed=agent_seed, dynamics_profile=profile)
         agent.reset()
-    elif arm == "v2_trace_memory" or legacy:
+    elif arm in {"v2_trace_memory", "v2_duration_matched_trace_memory"} or legacy:
         policy = "trace_memory"
+        if arm == "v2_trace_memory":
+            trace_memory_duration = 3
     elif arm == "v2_reactive_cue_only":
         policy = "reactive"
+    elif arm == "v2_oracle_state_controller":
+        policy = "oracle_state"
     else:
         raise ValueError(f"unknown arm: {arm}")
 
@@ -96,10 +108,17 @@ def _run_episode(seed: int, arm: str, agent_seed: int | None = None, horizon: in
     rewards: list[float] = []
     transitions: list[dict] = []
     for _ in range(horizon):
-        action = int(agent.act(obs)) if agent is not None else _policy_action(policy, obs, memory)
+        if agent is not None:
+            action = int(agent.act(obs))
+        elif policy == "oracle_state":
+            action = 3 if env.cycle_step >= (storm_interval - storm_duration) else 0
+        else:
+            policy_duration = 3 if arm == "v2_trace_memory" else trace_memory_duration
+            action = _policy_action(policy, obs, memory, policy_duration)
         next_obs, reward, done, info = env.step(action)
         if agent is not None:
             agent.observe_transition(next_obs, reward, done)
+        decision = agent.get_last_decision() if agent is not None else None
         actions.append(action)
         rewards.append(float(reward))
         transitions.append({
@@ -111,8 +130,13 @@ def _run_episode(seed: int, arm: str, agent_seed: int | None = None, horizon: in
             "energy": float(env.energy),
             "hydration": float(env.hydration),
             "version": info.get("version", "nexus-phaseworld-v1"),
+            "storm_interval": int(storm_interval),
+            "storm_duration": int(storm_duration),
             "health_shock_update": bool(agent.last_health_shock_update) if agent is not None else False,
             "regime_storm_ticks": float(agent.factored_world_model.z_regime[0]) if agent is not None else 0.0,
+            "storm_duration_estimate": float(agent.v2_storm_duration_estimate) if profile == "nexus-phaseworld-v2" else None,
+            "recovery_admission": bool(getattr(decision, "recovery_admission", False)),
+            "guard_override": bool(getattr(decision, "conformal_override", False)),
         })
         obs = next_obs
         observations.append([float(x) for x in obs])
@@ -125,6 +149,10 @@ def _run_episode(seed: int, arm: str, agent_seed: int | None = None, horizon: in
         "arm": arm,
         "agent_seed": agent_seed,
         "dynamics_profile": profile,
+        "privileged_oracle": arm == "v2_oracle_state_controller",
+        "storm_interval": storm_interval,
+        "storm_duration": storm_duration,
+        "trace_memory_duration": trace_memory_duration,
         "survived": not terminal["death"],
         "death": terminal["death"],
         "truncated": terminal["truncated"],
@@ -156,8 +184,17 @@ def _episode_metrics(rows: list[dict]) -> dict:
     }
 
 
-def _replay_check(episode: dict, horizon: int) -> bool:
-    replayed = _run_episode(episode["seed"], episode["arm"], episode["agent_seed"], horizon)
+def _replay_check(
+    episode: dict,
+    horizon: int,
+    storm_interval: int,
+    storm_duration: int,
+    trace_memory_duration: int,
+) -> bool:
+    replayed = _run_episode(
+        episode["seed"], episode["arm"], episode["agent_seed"], horizon,
+        storm_interval, storm_duration, trace_memory_duration,
+    )
     keys = ("survived", "death", "truncated", "steps", "total_reward", "actions", "rewards", "observations", "transitions")
     return all(replayed[key] == episode[key] for key in keys)
 
@@ -166,24 +203,42 @@ def run(
     environment_seeds: tuple[int, ...] = SEEDS,
     agent_seeds: tuple[int, ...] = AGENT_SEEDS,
     horizon: int = HORIZON,
+    storm_interval: int = 6,
+    storm_duration: int = 3,
+    trace_memory_duration: int | None = None,
 ) -> dict:
+    if trace_memory_duration is None:
+        trace_memory_duration = storm_duration
     episodes: list[dict] = []
     arm_names = (
         "legacy_v1_trace_memory",
         "v2_reactive_cue_only",
         "v2_trace_memory",
+        "v2_duration_matched_trace_memory",
+        "v2_oracle_state_controller",
         *(f"v2_agent_v1_prior_{seed}" for seed in agent_seeds),
         *(f"v2_agent_v2_prior_{seed}" for seed in agent_seeds),
     )
     for seed in environment_seeds:
-        episodes.append(_run_episode(seed, "legacy_v1_trace_memory", horizon=horizon))
-        episodes.append(_run_episode(seed, "v2_reactive_cue_only", horizon=horizon))
-        episodes.append(_run_episode(seed, "v2_trace_memory", horizon=horizon))
+        episode_args = {
+            "horizon": horizon,
+            "storm_interval": storm_interval,
+            "storm_duration": storm_duration,
+            "trace_memory_duration": trace_memory_duration,
+        }
+        episodes.append(_run_episode(seed, "legacy_v1_trace_memory", **episode_args))
+        episodes.append(_run_episode(seed, "v2_reactive_cue_only", **episode_args))
+        episodes.append(_run_episode(seed, "v2_trace_memory", **episode_args))
+        episodes.append(_run_episode(seed, "v2_duration_matched_trace_memory", **episode_args))
+        episodes.append(_run_episode(seed, "v2_oracle_state_controller", **episode_args))
         for agent_seed in agent_seeds:
-            episodes.append(_run_episode(seed, f"v2_agent_v1_prior_{agent_seed}", agent_seed, horizon))
-            episodes.append(_run_episode(seed, f"v2_agent_v2_prior_{agent_seed}", agent_seed, horizon))
+            episodes.append(_run_episode(seed, f"v2_agent_v1_prior_{agent_seed}", agent_seed, **episode_args))
+            episodes.append(_run_episode(seed, f"v2_agent_v2_prior_{agent_seed}", agent_seed, **episode_args))
 
-    replay_verified = sum(_replay_check(episode, horizon) for episode in episodes)
+    replay_verified = sum(
+        _replay_check(episode, horizon, storm_interval, storm_duration, trace_memory_duration)
+        for episode in episodes
+    )
     if replay_verified != len(episodes):
         raise RuntimeError(f"trajectory replay failed for {len(episodes) - replay_verified} episodes")
 
@@ -215,13 +270,15 @@ def run(
 
     trace_v_reactive = np.asarray([
         int(trace["survived"]) - int(reactive["survived"])
-        for trace, reactive in zip(by_arm["v2_trace_memory"], by_arm["v2_reactive_cue_only"])
+        for trace, reactive in zip(by_arm["v2_duration_matched_trace_memory"], by_arm["v2_reactive_cue_only"])
     ], dtype=np.float64)
-    viability_passed = summaries["v2_trace_memory"]["survival_rate"] >= 0.95
+    viability_passed = summaries["v2_oracle_state_controller"]["survival_rate"] >= 0.95
 
     source_paths = {
         "assay": Path(__file__).resolve(),
         "agent": ROOT / "poseidon/nexus_omega/agent.py",
+        "contracts": ROOT / "poseidon/nexus_omega/contracts.py",
+        "memory": ROOT / "poseidon/nexus_omega/memory.py",
         "benchmark_v1": ROOT / "poseidon/nexus_omega/benchmark.py",
         "benchmark_v2": ROOT / "poseidon/nexus_omega/benchmark_v2.py",
         "causal_world_model_v1": ROOT / "poseidon/nexus_omega/causal_world_model.py",
@@ -229,19 +286,28 @@ def run(
         "causal_efe": ROOT / "poseidon/nexus_omega/causal_efe.py",
     }
     return {
-        "schema": "poseidon-nexus-phaseworld-v2-viability-assay-v1",
+        "schema": "poseidon-nexus-phaseworld-v2-viability-assay-v3",
         "created_utc": datetime.now(timezone.utc).isoformat(),
         "protocol": {
             "environment_seeds": list(environment_seeds),
             "agent_seeds": list(agent_seeds),
             "horizon": horizon,
+            "storm_interval": storm_interval,
+            "storm_duration": storm_duration,
+            "trace_memory_duration": trace_memory_duration,
+            "trace_memory_controller_durations": {
+                "v2_trace_memory": 3,
+                "v2_duration_matched_trace_memory": trace_memory_duration,
+                "legacy_v1_trace_memory": trace_memory_duration,
+            },
             "version_change": "v2 adds +0.12 hydration to Rest before the unchanged -0.05 basal hydration drain; v1 remains untouched",
             "v2_prior_refinement": "corrects the inherited storm-shelter health gain and selects the higher-LCB action from shelter/rest when the safety guard overrides exploration",
-            "v2_shock_update": "unexpected health residual <= -0.25 sets latent storm ticks to at least one; the update is recorded on each transition",
+            "v2_shock_update": "pulse-relative storm duration is inferred from health residuals up to five ticks; low-energy forage is admitted only with no cue, memory or regime storm belief and a predicted vital-state recovery",
             "observation_contract": "same 8 float32 channels; channel 3 transient storm pulse and channel 4 episode progress",
             "action_contract": "same four actions: forage, shelter, explore, rest",
-            "arms": list(ARM_NAMES),
-            "primary_task_validity_gate": "three-tick pulse-trace controller survival >= 0.95 on v2",
+            "arms": list(arm_names),
+            "primary_task_validity_gate": "privileged oracle-state controller survival >= 0.95 on v2; validates task viability only",
+            "oracle_arm": "uses the simulator's hidden current storm phase to choose Rest during storm and Forage otherwise; not an agent comparator",
             "agent_comparison": "same random initialization and same environment seed, v1 structured world prior versus v2 hydration-aligned prior",
             "bootstrap_replicates": BOOTSTRAP_REPLICATES,
             "promotion": False,
@@ -266,6 +332,7 @@ def run(
             "The NEXUS agent comparison uses two fixed random initializations; environment seeds do not substitute for additional trained lineages.",
             "This assay is not a controller promotion gate and does not test the residual adapter.",
             "The v2 environment changes only rest hydration recovery; it is not a general ecology or real-world safety model.",
+            "The oracle-state arm has privileged simulator access and only checks that the altered environment admits a viable policy.",
         ],
         "identity": {
             "source_sha256": {name: _sha256(path) for name, path in source_paths.items()},
@@ -282,15 +349,25 @@ def main() -> None:
     parser.add_argument("--seed-count", type=int, default=len(SEEDS))
     parser.add_argument("--agent-seeds", type=int, nargs=2, default=AGENT_SEEDS)
     parser.add_argument("--horizon", type=int, default=HORIZON)
+    parser.add_argument("--storm-interval", type=int, default=6)
+    parser.add_argument("--storm-duration", type=int, default=3)
+    parser.add_argument("--trace-memory-duration", type=int)
     args = parser.parse_args()
     if args.output.exists():
         raise FileExistsError(f"refusing to overwrite existing receipt: {args.output}")
     if args.seed_count < 2:
         raise ValueError("seed-count must be at least 2 for paired evaluation")
+    if args.storm_interval < 2 or not 1 <= args.storm_duration < args.storm_interval:
+        raise ValueError("require storm-interval >= 2 and 1 <= storm-duration < storm-interval")
+    if args.trace_memory_duration is not None and args.trace_memory_duration < 1:
+        raise ValueError("trace-memory-duration must be positive")
     receipt = run(
         environment_seeds=tuple(range(args.seed_start, args.seed_start + args.seed_count)),
         agent_seeds=tuple(args.agent_seeds),
         horizon=args.horizon,
+        storm_interval=args.storm_interval,
+        storm_duration=args.storm_duration,
+        trace_memory_duration=args.trace_memory_duration,
     )
     canonical = json.dumps(receipt, sort_keys=True, separators=(",", ":"), allow_nan=False).encode()
     receipt["receipt_sha256"] = hashlib.sha256(canonical).hexdigest()

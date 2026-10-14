@@ -421,7 +421,7 @@ class Poseidon:
     def nexus_omega_status(self):
         return {
             "ready": True,
-            "version": "1.0.0",
+            "version": "2.0.0",
             "type": "causal_epigenetic_self_experimenting_autonomous_discovery_agent",
             "subsystems": [
                 "causal_memory_fabric",
@@ -435,6 +435,12 @@ class Poseidon:
                 "independent_scientific_auditor",
                 "hierarchical_efe_planner",
                 "score_guided_trajectory_diffusion",
+                "quantum_causal_kernel",
+                "bioharmonic_spectral_resonator",
+                "metamorphic_bytecode_weaver",
+                "ltl_safety_shield",
+                "autopoiesis_thermodynamic_field",
+                "morpheus_dream_engine",
             ],
             "developmental_stages": [
                 "PROTOCELL", "LARVAL_FORAGER", "PUPAL_DIAPAUSE", "IMAGO_NAVIGATOR", "SENESCENT_CRYSTALLINE"
@@ -448,6 +454,12 @@ class Poseidon:
             "conformal_safe_policy_improvement": True,
             "hierarchical_efe_planner": True,
             "score_guided_trajectory_diffusion": True,
+            "nexus_ultima": True,
+            "quantum_causal_holonomy": True,
+            "bioharmonic_spectral_resonator": True,
+            "metamorphic_bytecode_weaver": True,
+            "autopoiesis_thermodynamic_field": True,
+            "morpheus_dream_engine": True,
         }
 
     def nexus_omega_factored_state(self, obs=None, seed: int = 42):
@@ -482,6 +494,41 @@ class Poseidon:
         target_macro = MacroIntent(intent) if intent in [m.value for m in MacroIntent] else MacroIntent.FORAGE_EXPEDITION
         traj = agent.imagine_trajectory(intent=target_macro, horizon=horizon)
         return traj.to_dict()
+
+    def nexus_omega_ultima_state(self, obs=None, seed: int = 42):
+        from .nexus_omega import NexusOmegaAgent
+        agent = NexusOmegaAgent(use_hierarchical_efe=True, use_ultima_engine=True, base_seed=seed)
+        sample_obs = obs if obs is not None else [1.0, 0.9, 0.9, 0.8, 0.05, 0.1, 0.0, 0.0]
+        act = agent.act(sample_obs)
+        ultima_dec = agent.get_last_ultima_decision()
+        return {
+            "action": act,
+            "decision": ultima_dec.to_dict() if ultima_dec else None,
+            "quantum_state": ultima_dec.quantum_state.to_dict() if (ultima_dec and ultima_dec.quantum_state) else None,
+            "spectral_profile": ultima_dec.spectral_profile.to_dict() if (ultima_dec and ultima_dec.spectral_profile) else None,
+            "thermodynamic_state": ultima_dec.thermodynamic_state.to_dict() if (ultima_dec and ultima_dec.thermodynamic_state) else None,
+            "active_opcode": ultima_dec.active_opcode.to_dict() if (ultima_dec and ultima_dec.active_opcode) else None,
+            "dream_receipt": ultima_dec.dream_consolidation.to_dict() if (ultima_dec and ultima_dec.dream_consolidation) else None,
+        }
+
+    def nexus_omega_dream(self, num_rollouts: int = 4, seed: int = 42):
+        from .nexus_omega import NexusOmegaAgent
+        agent = NexusOmegaAgent(use_hierarchical_efe=True, use_ultima_engine=True, base_seed=seed)
+        agent.act([1.0, 0.9, 0.9, 0.8, 0.05, 0.1, 0.0, 0.0])
+        receipt = agent.dream_consolidate(num_rollouts=num_rollouts)
+        return receipt.to_dict() if receipt else None
+
+    def nexus_omega_synthesize_opcode(self, intent="forage_expedition", obs=None, seed: int = 42):
+        from .nexus_omega import NexusOmegaAgent, MacroIntent
+        agent = NexusOmegaAgent(use_hierarchical_efe=True, use_ultima_engine=True, base_seed=seed)
+        target_macro = MacroIntent(intent) if intent in [m.value for m in MacroIntent] else MacroIntent.FORAGE_EXPEDITION
+        sample_obs = obs if obs is not None else [1.0, 0.9, 0.9, 0.8, 0.05, 0.1, 0.0, 0.0]
+        agent.act(sample_obs)
+        opcode = agent.bytecode_weaver.synthesize_opcode(target_macro, sample_obs, agent.factored_world_model)
+        return opcode.to_dict()
+
+
+
 
     def nexus_omega_discovery(self, seed_base: int = 50000, num_seeds: int = 4, max_steps: int = 16):
         from .nexus_omega import AutonomousDiscoveryEngine, verify_discovery_receipt

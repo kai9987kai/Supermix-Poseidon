@@ -25,6 +25,12 @@ from poseidon.nexus_omega.contracts import (
     MacroIntent,
     ImaginedTrajectory,
     HierarchicalEFEDecision,
+    QuantumCausalState,
+    HarmonicSpectralProfile,
+    SynthesizedOpcode,
+    ThermodynamicState,
+    DreamConsolidationReceipt,
+    UltimaDecision,
 )
 from poseidon.nexus_omega.memory import CausalMemoryFabric
 from poseidon.nexus_omega.world_model import EnsembleWorldModel
@@ -32,6 +38,11 @@ from poseidon.nexus_omega.causal_world_model import FactoredCausalWorldModel
 from poseidon.nexus_omega.causal_efe import CausalEFEPlanner
 from poseidon.nexus_omega.trajectory_diffusion import TrajectoryDiffusionImaginer
 from poseidon.nexus_omega.hierarchical_efe import HierarchicalEFEPlanner
+from poseidon.nexus_omega.spectral_resonator import BioharmonicResonator
+from poseidon.nexus_omega.quantum_causal import QuantumCausalKernel
+from poseidon.nexus_omega.bytecode_weaver import MetamorphicBytecodeWeaver, LTLSafetyShield
+from poseidon.nexus_omega.autopoiesis_field import AutopoiesisThermodynamicField
+from poseidon.nexus_omega.morpheus_dream import MorpheusDreamEngine
 from poseidon.nexus_omega.agent import NexusOmegaAgent
 from poseidon.nexus_omega.benchmark import POMDPPhaseWorld
 from poseidon.nexus_omega.auditor import IndependentScientificAuditor
@@ -81,4 +92,17 @@ __all__ = [
     "HierarchicalEFEDecision",
     "TrajectoryDiffusionImaginer",
     "HierarchicalEFEPlanner",
+    "QuantumCausalState",
+    "HarmonicSpectralProfile",
+    "SynthesizedOpcode",
+    "ThermodynamicState",
+    "DreamConsolidationReceipt",
+    "UltimaDecision",
+    "BioharmonicResonator",
+    "QuantumCausalKernel",
+    "MetamorphicBytecodeWeaver",
+    "LTLSafetyShield",
+    "AutopoiesisThermodynamicField",
+    "MorpheusDreamEngine",
 ]
+

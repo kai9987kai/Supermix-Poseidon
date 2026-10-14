@@ -37,6 +37,18 @@ from .nexus_omega import (
     HierarchicalEFEDecision,
     TrajectoryDiffusionImaginer,
     HierarchicalEFEPlanner,
+    QuantumCausalState,
+    HarmonicSpectralProfile,
+    SynthesizedOpcode,
+    ThermodynamicState,
+    DreamConsolidationReceipt,
+    UltimaDecision,
+    BioharmonicResonator,
+    QuantumCausalKernel,
+    MetamorphicBytecodeWeaver,
+    LTLSafetyShield,
+    AutopoiesisThermodynamicField,
+    MorpheusDreamEngine,
 )
 
 _SOURCE_SNAPSHOT = _capture_sources()

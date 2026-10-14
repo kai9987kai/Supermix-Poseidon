@@ -1,16 +1,16 @@
-"""PROJECT NEXUS-Ω: Deep Active Inference & Conformal Safe Policy Improvement (Causal-EFE).
+"""PROJECT NEXUS-Ω: Active Inference with Model-Score Guarded Recovery.
 
 Formulates action selection as variational Expected Free Energy (EFE) optimization
-governed by distribution-free Conformal Safety Return Bounds:
+with an uncalibrated uncertainty penalty and explicit heuristic action guard:
 1. Pragmatic Instrumental Value:
    Mahalanobis divergence from homeostatic viability kernel (health, energy, hydration, stamina).
 2. Epistemic Curiosity Value:
    Information gain / variance reduction over exogenous field and latent causal regime.
 3. Dynamic Curiosity Regulation:
    Suppressed when physiological safety is endangered; unconstrained during surplus.
-4. Conformal Safety Guard:
-   Computes distribution-free lower confidence bound (LCB) on return, preventing
-   catastrophic exploration into fatal storms.
+4. Heuristic Guard:
+   Uses ensemble disagreement and vital/exposure thresholds to override selected
+   actions. Its score is not a distribution-free bound or safety guarantee.
 """
 from __future__ import annotations
 
@@ -27,7 +27,7 @@ from poseidon.nexus_omega.causal_world_model import FactoredCausalWorldModel
 
 
 class CausalEFEPlanner:
-    """Plans actions minimizing Expected Free Energy under Conformal Safety Guardrails."""
+    """Plans by Expected Free Energy under uncalibrated, model-score heuristics."""
 
     def __init__(
         self,
@@ -38,6 +38,7 @@ class CausalEFEPlanner:
         safety_threshold: float = -1.20,
         exposure_index: Optional[int] = None,
         safety_fallback_actions: Optional[Sequence[int]] = None,
+        calm_recovery_action: Optional[int] = None,
     ):
         self.world_model = world_model
         self.n_actions = n_actions
@@ -57,6 +58,11 @@ class CausalEFEPlanner:
             self.safety_fallback_actions: Optional[Tuple[int, ...]] = fallback_actions
         else:
             self.safety_fallback_actions = None
+        if calm_recovery_action is not None and (
+            type(calm_recovery_action) is not int or not 0 <= calm_recovery_action < n_actions
+        ):
+            raise ValueError("calm_recovery_action must be a valid action index or None")
+        self.calm_recovery_action = calm_recovery_action
 
         # Target homeostatic vital prior: health=1.0, energy=0.9, hydration=0.9, stamina=0.9
         self.s_target = np.array([1.0, 0.90, 0.90, 0.90], dtype=np.float32)
@@ -163,10 +169,10 @@ class CausalEFEPlanner:
 
         objective_action = best_action
 
-        # Conformal Safe Policy Improvement Guard:
-        # If best action is an exploratory/foraging action with high risk (LCB < safety_threshold),
-        # and health/exposure is threatened, override to safe shelter (action 1) or rest (action 3).
+        # Model-score guard: if the selected forage/explore action has a low
+        # heuristic score while health/exposure is threatened, choose a fallback.
         conformal_override = False
+        recovery_admission = False
         has_high_exposure = (
             self.exposure_index is not None
             and self.exposure_index < len(obs_arr)
@@ -174,18 +180,37 @@ class CausalEFEPlanner:
         )
         is_threatened = (obs_arr[0] < 0.6) or has_high_exposure
         if best_lcb < self.safety_threshold and is_threatened and best_action in (0, 2):
-            # Keep the v1 shelter fallback unless a profile supplies alternatives.
-            # Among configured viable actions, select the strongest model LCB.
-            fallback_actions = self.safety_fallback_actions or ((1,) if self.n_actions > 1 else (0,))
-            fallback_action = max(fallback_actions, key=lambda action: action_scores[action]["lcb"])
-            best_action = fallback_action
-            conformal_override = True
-            fallback_data = action_scores[fallback_action]
-            best_efe = fallback_data["efe"]
-            best_prag = fallback_data["prag"]
-            best_epistemic = fallback_data["epistemic"]
-            best_empowerment = fallback_data["empowerment"]
-            best_lcb = fallback_data["lcb"]
+            recovery_data = action_scores[self.calm_recovery_action] if self.calm_recovery_action is not None else None
+            recovery_state = recovery_data["predicted_endogenous"] if recovery_data is not None else []
+            regime = getattr(self.world_model, "z_regime", np.zeros(1, dtype=np.float32))
+            storm_belief = (
+                (len(obs_arr) > 3 and float(obs_arr[3]) > 0.8)
+                or (len(regime) > 0 and float(regime[0]) > 0.1)
+                or (len(mem) > 0 and float(mem[0]) > 0.1)
+            )
+            recovery_admission = bool(
+                self.calm_recovery_action == best_action == 0
+                and len(obs_arr) > 2
+                and float(obs_arr[1]) < 0.50
+                and float(obs_arr[2]) > 0.25
+                and not storm_belief
+                and len(recovery_state) > 1
+                and float(recovery_state[0]) >= float(obs_arr[0]) - 0.05
+                and float(recovery_state[1]) > float(obs_arr[1]) + 0.05
+            )
+            if not recovery_admission:
+                # Keep the v1 shelter fallback unless a profile supplies alternatives.
+                # Among configured viable actions, select the strongest model LCB.
+                fallback_actions = self.safety_fallback_actions or ((1,) if self.n_actions > 1 else (0,))
+                fallback_action = max(fallback_actions, key=lambda action: action_scores[action]["lcb"])
+                best_action = fallback_action
+                conformal_override = True
+                fallback_data = action_scores[fallback_action]
+                best_efe = fallback_data["efe"]
+                best_prag = fallback_data["prag"]
+                best_epistemic = fallback_data["epistemic"]
+                best_empowerment = fallback_data["empowerment"]
+                best_lcb = fallback_data["lcb"]
 
         # Ensure world model last_prediction corresponds to chosen action
         self.world_model.predict_factored(obs_arr, mem, best_action)
@@ -209,6 +234,7 @@ class CausalEFEPlanner:
             empowerment_value=best_empowerment,
             conformal_lcb=best_lcb,
             conformal_override=conformal_override,
+            recovery_admission=recovery_admission,
             factored_state=factored_dict,
             action_scores=[
                 {

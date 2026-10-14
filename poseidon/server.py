@@ -124,6 +124,12 @@ def make_handler(runtime, port):
                 except Exception as error:
                     self.send_json(500, {"error": str(error), "type": type(error).__name__})
                 return
+            if path == "/api/nexus-omega/ultima-state":
+                try:
+                    self.send_json(200, runtime.nexus_omega_ultima_state())
+                except Exception as error:
+                    self.send_json(500, {"error": str(error), "type": type(error).__name__})
+                return
             if path in ("/", "/index.html", "/style.css", "/app.js"):
                 file = WEB/("index.html" if path in ("/", "/index.html") else path[1:])
             elif path.startswith("/artifacts/"):
@@ -271,6 +277,29 @@ def make_handler(runtime, port):
                     obs = payload.get("obs")
                     seed = int(payload.get("seed", 42))
                     result = runtime.nexus_omega_imagine(obs=obs, intent=intent, horizon=horizon, seed=seed)
+                    self.send_json(200, result)
+                except (ValueError, TypeError) as error:
+                    self.send_json(400, {"error": str(error)})
+                except Exception as error:
+                    self.send_json(500, {"error": str(error), "type": type(error).__name__})
+                return
+            if path == "/api/nexus-omega/dream":
+                try:
+                    num_rollouts = int(payload.get("num_rollouts", 4))
+                    seed = int(payload.get("seed", 42))
+                    result = runtime.nexus_omega_dream(num_rollouts=num_rollouts, seed=seed)
+                    self.send_json(200, result)
+                except (ValueError, TypeError) as error:
+                    self.send_json(400, {"error": str(error)})
+                except Exception as error:
+                    self.send_json(500, {"error": str(error), "type": type(error).__name__})
+                return
+            if path == "/api/nexus-omega/synthesize-opcode":
+                try:
+                    intent = str(payload.get("intent", "forage_expedition"))
+                    obs = payload.get("obs")
+                    seed = int(payload.get("seed", 42))
+                    result = runtime.nexus_omega_synthesize_opcode(intent=intent, obs=obs, seed=seed)
                     self.send_json(200, result)
                 except (ValueError, TypeError) as error:
                     self.send_json(400, {"error": str(error)})

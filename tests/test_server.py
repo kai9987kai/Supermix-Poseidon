@@ -211,8 +211,10 @@ def test_nexus_omega_server_endpoints(server):
     # 1. GET /api/nexus-omega/status
     stat = json.load(urlopen(url + "/api/nexus-omega/status"))
     assert stat["ready"] is True
-    assert stat["version"] == "1.0.0"
+    assert stat["version"] in ("1.0.0", "2.0.0")
     assert "causal_memory_fabric" in stat["subsystems"]
+    assert "quantum_causal_kernel" in stat["subsystems"]
+    assert stat.get("nexus_ultima") is True
     assert "PROTOCELL" in stat["developmental_stages"]
 
     # 2. POST /api/nexus-omega/discover
@@ -263,6 +265,35 @@ def test_nexus_omega_server_endpoints(server):
     assert len(img_res["states"]) == 6
     assert len(img_res["actions"]) == 6
     assert "conformal_return_lcb" in img_res
+
+    # 6. GET /api/nexus-omega/ultima-state
+    ult_res = json.load(urlopen(url + "/api/nexus-omega/ultima-state"))
+    assert "action" in ult_res
+    assert "decision" in ult_res
+    assert "quantum_state" in ult_res
+    assert "spectral_profile" in ult_res
+    assert "thermodynamic_state" in ult_res
+    assert "active_opcode" in ult_res
+    assert ult_res["quantum_state"]["purity"] > 0.0
+    assert ult_res["spectral_profile"]["dominant_period"] > 0.0
+    assert ult_res["thermodynamic_state"]["autopoietic_viability"] > 0.0
+
+    # 7. POST /api/nexus-omega/dream
+    dream_res = json.load(post(url + "/api/nexus-omega/dream", {"num_rollouts": 2, "seed": 42}))
+    assert "replayed_transitions" in dream_res
+    assert "mean_regret_mitigation" in dream_res
+    assert "synaptic_pruning_ratio" in dream_res
+
+    # 8. POST /api/nexus-omega/synthesize-opcode
+    op_res = json.load(post(url + "/api/nexus-omega/synthesize-opcode", {
+        "intent": "forage_expedition",
+        "seed": 42
+    }))
+    assert "opcode_name" in op_res
+    assert "execution_steps" in op_res
+    assert "ltl_safe" in op_res
+    assert len(op_res["verification_certificate"]) == 64
+
 
 
 

@@ -158,6 +158,42 @@ class AutonomousDiscoveryEngine:
                 alpha=self.alpha,
                 minimum_effect_size=self.min_effect_size,
             ),
+            HypothesisSpec(
+                hypothesis_id="hyp_quantum_holonomic_coherence",
+                statement="Quantum superposition and Berry phase holonomy over macro-intent options protect strategic policy intent through sensory occlusion compared to classical reactive policies.",
+                null_hypothesis="Quantum holonomic superposition yields no survival advantage over classical reactive heuristics.",
+                independent_variable="Quantum-Holonomic Causal Superposition Kernel",
+                dependent_variable="Cumulative POMDP reward",
+                alpha=self.alpha,
+                minimum_effect_size=self.min_effect_size,
+            ),
+            HypothesisSpec(
+                hypothesis_id="hyp_bioharmonic_fourier_resonance",
+                statement="Bioharmonic Fourier spectral frequency estimation anticipates cyclical environmental pulses, enabling proactive shelter before hazard onset.",
+                null_hypothesis="Bioharmonic spectral estimation yields no survival advantage over reactive baseline heuristics.",
+                independent_variable="Bioharmonic Spectral Fourier Resonator",
+                dependent_variable="Cumulative POMDP reward",
+                alpha=self.alpha,
+                minimum_effect_size=self.min_effect_size,
+            ),
+            HypothesisSpec(
+                hypothesis_id="hyp_ltl_metamorphic_bytecode",
+                statement="Metamorphic bytecode synthesis formally certified by an LTL temporal logic safety shield achieves higher cumulative return and eliminates catastrophe violations compared to fixed micro-actions.",
+                null_hypothesis="Metamorphic bytecode synthesis yields no survival advantage over unverified reactive actions.",
+                independent_variable="Metamorphic Opcode Synthesizer & LTL Safety Shield",
+                dependent_variable="Cumulative POMDP reward",
+                alpha=self.alpha,
+                minimum_effect_size=self.min_effect_size,
+            ),
+            HypothesisSpec(
+                hypothesis_id="hyp_morpheus_dream_consolidation",
+                statement="Offline Morpheus dream-state replay consolidation during diapause mitigates cumulative regret and improves post-diapause survival.",
+                null_hypothesis="Dream-state replay consolidation yields no survival advantage over non-consolidating baselines.",
+                independent_variable="Morpheus Dream-State Replay Consolidation Engine",
+                dependent_variable="Cumulative POMDP reward",
+                alpha=self.alpha,
+                minimum_effect_size=self.min_effect_size,
+            ),
         ]
 
     def run_interventional_trial(
@@ -342,6 +378,69 @@ class AutonomousDiscoveryEngine:
             # Candidate executes score-guided counterfactual trajectory imagination.
             # Baseline executes reactive un-imagined heuristic.
             agent = NexusOmegaAgent(
+                use_hierarchical_efe=(arm == "candidate"),
+                use_causal_efe=(arm == "candidate"),
+            )
+            agent.reset()
+        elif hypothesis_id == "hyp_quantum_holonomic_coherence":
+            # Candidate utilizes Quantum Holonomic Causal Superposition with Berry Phase Invariance.
+            # Baseline uses reactive non-superposition baseline.
+            agent = NexusOmegaAgent(
+                use_ultima_engine=(arm == "candidate"),
+                use_hierarchical_efe=(arm == "candidate"),
+                use_causal_efe=(arm == "candidate"),
+            )
+            agent.reset()
+            for _ in range(self.max_steps):
+                action = agent.act(obs)
+                next_obs, reward, done, _ = env.step(action)
+                agent.observe(next_obs, reward, done)
+                total_reward += reward
+                obs = next_obs
+                if done:
+                    break
+
+        elif hypothesis_id == "hyp_bioharmonic_fourier_resonance":
+            # Candidate utilizes Bioharmonic Fourier Resonator for anticipatory storm phase locking.
+            # Baseline uses reactive cue-only policy.
+            agent = NexusOmegaAgent(
+                use_ultima_engine=(arm == "candidate"),
+                use_hierarchical_efe=(arm == "candidate"),
+                use_causal_efe=(arm == "candidate"),
+            )
+            agent.reset()
+            for _ in range(self.max_steps):
+                action = agent.act(obs)
+                next_obs, reward, done, _ = env.step(action)
+                agent.observe(next_obs, reward, done)
+                total_reward += reward
+                obs = next_obs
+                if done:
+                    break
+
+        elif hypothesis_id == "hyp_ltl_metamorphic_bytecode":
+            # Candidate synthesizes and executes LTL-certified metamorphic bytecodes.
+            # Baseline executes primitive unverified actions.
+            agent = NexusOmegaAgent(
+                use_ultima_engine=(arm == "candidate"),
+                use_hierarchical_efe=(arm == "candidate"),
+                use_causal_efe=(arm == "candidate"),
+            )
+            agent.reset()
+            for _ in range(self.max_steps):
+                action = agent.act(obs)
+                next_obs, reward, done, _ = env.step(action)
+                agent.observe(next_obs, reward, done)
+                total_reward += reward
+                obs = next_obs
+                if done:
+                    break
+
+        elif hypothesis_id == "hyp_morpheus_dream_consolidation":
+            # Candidate executes Morpheus dream-state replay consolidation during diapause.
+            # Baseline runs without dream consolidation.
+            agent = NexusOmegaAgent(
+                use_ultima_engine=(arm == "candidate"),
                 use_hierarchical_efe=(arm == "candidate"),
                 use_causal_efe=(arm == "candidate"),
             )
