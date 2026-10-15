@@ -640,6 +640,29 @@ class Poseidon:
             "info": info,
         }
 
+    def discovery_lab_river_state(self, seed: int = 42, river_width: int = 3):
+        env = self.discovery_lab(seed=seed, river_width=river_width)
+        return {
+            "river_width": env.river_width,
+            "river_start_x": env.river_start_x,
+            "river_end_x": env.river_end_x,
+            "water_depth": env.water_depth,
+            "grid_width": env.grid_width,
+            "grid_height": env.grid_height,
+            "agent": {
+                "x": round(float(env.agent.x), 3),
+                "y": round(float(env.agent.y), 3),
+                "z": round(float(env.agent.z), 3),
+                "health": round(float(env.agent.health), 3),
+                "stamina": round(float(env.agent.stamina), 3),
+                "held": env.agent.held_object_id,
+                "alive": env.agent.alive,
+                "reached_goal": env.agent.reached_goal,
+            },
+            "objects": [obj.to_dict() for obj in env.objects.values()],
+            "state_hash": env.get_state_hash(),
+        }
+
     def discovery_lab_enzyme(self, substrate: str = "lignocellulose", target_shear: float = 300.0, seed: int = 42):
         from .discovery_lab import MultimodalEnzymeGenerator
         gen = MultimodalEnzymeGenerator(seed=seed)
@@ -1571,14 +1594,25 @@ class Poseidon:
         }
 
     def reason(self, prompt, seed=42, max_new_tokens=512):
-        if not isinstance(prompt, str) or not 1 <= len(prompt.strip()) <= 16000:
-            raise ValueError("Prompt must contain 1–16000 characters.")
+        if not isinstance(prompt, str) or not 1 <= len(prompt.strip()) <= 32000:
+            raise ValueError("Prompt must contain 1–32000 characters.")
         with self.lock:
             from .omni_reasoner import OmniReasoner
             if self._omni_reasoner is None:
                 self._omni_reasoner = OmniReasoner(seed=seed)
             res = self._omni_reasoner.reason(prompt.strip(), seed=seed, language_runtime=self.language, max_new_tokens=max_new_tokens)
             return res.to_dict()
+
+    def solve_problem(self, prompt: str, domain: Optional[str] = None):
+        if not isinstance(prompt, str) or not 1 <= len(prompt.strip()) <= 32000:
+            raise ValueError("Prompt must contain 1–32000 characters.")
+        with self.lock:
+            from .problem_solver import solve_problem
+            return solve_problem(prompt.strip(), domain=domain)
+
+    def problem_capabilities(self):
+        from .problem_solver import ProblemSolver
+        return ProblemSolver().capabilities()
 
     def _memory(self):
         from .memory import MemoryBank
@@ -1595,15 +1629,21 @@ class Poseidon:
         return {"saved": True, "entry": entry}
 
     def respond(self, prompt, mode="chat", history=None, seed=42, disabled_carriers=None, planner="policy", scarcity=1.0, max_steps=256, max_new_tokens=None):
-        if not isinstance(prompt, str) or not 1 <= len(prompt.strip()) <= 16000:
-            raise ValueError("Prompt must contain 1–16000 characters.")
+        if not isinstance(prompt, str) or not 1 <= len(prompt.strip()) <= 32000:
+            raise ValueError("Prompt must contain 1–32000 characters.")
         if type(seed) is not int or not 0 <= seed < 2**63:
             raise ValueError("Seed must be a nonnegative integer below 2^63.")
         with self.lock:
             if mode == "reason":
                 return self.reason(prompt, seed=seed, max_new_tokens=max_new_tokens or 512)
+            if mode == "problem":
+                return self.solve_problem(prompt)
             if mode == "math" or (mode == "chat" and extract_math(prompt)):
                 return solve(extract_math(prompt) or prompt)
+            if mode == "chat":
+                from .problem_solver import detect_problem
+                if detect_problem(prompt) is not None:
+                    return self.solve_problem(prompt)
             if mode in ("image", "video", "mesh"):
                 from .media import render_scene
                 core = self.core()

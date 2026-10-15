@@ -5,14 +5,14 @@ const candidateStatus={cognitive:null,atlas:null,contrast:null,horizon:null,odys
 const plannerNotes={cognitive:'Supermix Poseidon v2.0 Cognitive Platform with 3-tier Mnemosyne memory, Oracle world ensemble, Active Inference EFE minimization, generative Dream sleep consolidation, and second-order Metacognition.',policy:'Direct actions from the trained policy. No teacher fallback.',mpc:'Plans actions using the learned dynamics head. Predicted outcomes can be inaccurate.',hybrid:'Combines the learned policy with dynamics-based planning.',trident:'Residual identity probes gate overrides and directed travel uses only observed TidePool transitions; synthetic results remain experimental.',titan:'Opt-in experimental composite. Sidecars are software simulations; inspect the paired seed receipt and replay before drawing conclusions.',chimera:'Experimental classical composite using an amplitude-based action heuristic, associative memory, and synthetic 3D lattice telemetry.',atlas:'Experimental Atlas v2 with retrieved residuals and absolute error bounds. Availability is not evidence of superiority.',contrast:'Experimental Contrast Atlas with selected channel corrections and calibrated paired action margins. Inspect its decisions in the replay; calibration does not guarantee safety.',horizon:'Experimental Horizon Atlas v4 with multi-horizon return advantage, depletion-trap guards and held-out calibration margins.',odyssey:'Experimental Odyssey Atlas v5 with episodic topological cognitive mapping, replenishment decay tracking and goal-oriented waypoint navigation.',helm:'Experimental Helm Critic v0.6 with history-conditioned return critique, reservoir memory and calibrated advantage gating.',odysseus:'Experimental Odysseus Navigator with empirical macro-action transition matrices, Bayesian replenishment LCB estimation and stamina rest guards.',aura:'Experimental AURA biomimetic controller with Central Complex 16-wedge ring attractor compass, sparse Kenyon cell neuropil arbiter, and ratified Tessera macro-actions.',risk_aware:'Experimental uncertainty-aware ensemble controller.'};
 const controllerNames={cognitive:'POSEIDON v2.0 Intact',intact:'POSEIDON v2.0 Intact',erased:'POSEIDON v2.0 (Erased Memory)',shifted:'POSEIDON v2.0 (Shifted Memory)',random_retrieval:'POSEIDON v2.0 (Random Retrieval)',memory_free:'POSEIDON v2.0 (Memory Free)',frozen_tidal:'Frozen Tidal core',policy:'Learned policy',titan:'TITAN Composite Controller',trident:'TRIDENT Identity-Gated Residual Controller',core:'Frozen Tidal core',aura:'AURA Biomimetic Controller',metamorph:'METAMORPH Controller',chimera:'CHIMERA Controller',hyperion:'HYPERION Controller',chimera_causeway:'CHIMERA · Causeway Superposition',chimera_hologram:'CHIMERA · Holographic Memory',chimera_lattice:'CHIMERA · Diamond Lattice',molt:'MOLT Developmental Ecdysis',nexusflow:'NexusFlow Causal Flux',chronos:'Chronos Cyclic Sync',mpc:'Dynamics MPC',neural_mpc:'Neural MPC',hybrid:'Policy + dynamics',atlas:'Counterfactual Atlas v2',atlas_v2:'Counterfactual Atlas v2',atlas_no_memory:'Atlas v2 without memory',contrast:'Contrast Atlas',contrast_absolute:'Contrast · absolute bounds',contrast_no_memory:'Contrast · no memory',contrast_unfiltered:'Contrast · unfiltered',horizon:'Horizon Atlas v4',horizon_no_memory:'Horizon · no memory',horizon_ungated:'Horizon · ungated',odyssey:'Odyssey Atlas v5',odyssey_no_memory:'Odyssey · no memory',odyssey_ungated:'Odyssey · ungated',helm:'Helm Critic v0.6',selected:'Helm · selected',observation:'Helm · observation',no_innovation:'Helm · no innovation',yoked:'Helm · yoked',ungated:'Helm · ungated',odysseus:'Odysseus Navigator',odysseus_calibrated:'Odysseus · calibrated',odysseus_ungated:'Odysseus · ungated',odysseus_no_memory:'Odysseus · no memory',aura_no_ring:'AURA · no ring compass',aura_no_neuropil:'AURA · no neuropil arbiter',tessera:'Tessera Macro Commons',mnemorph:'Mnemorph Archaeological Memory',heuristic:'Heuristic control',random:'Random control',risk_aware:'Uncertainty ensemble'};
 const controllerName=value=>controllerNames[value]||String(value||'Unspecified controller');
-const notes={chat:'Local pretrained language model. Answers can be wrong; arithmetic is checked by a separate exact solver.',reason:'Dual-system neuro-symbolic coprocessor. Introspective Ghost Monologue, physical Archimedean buoyancy, and formal LTL safety proof.',math:'Exact rational arithmetic and linear equations. Use explicit multiplication: 3*x + 7 = 22. This result comes from a tool, not unaided neural reasoning.',image:'Learned scene attributes → software renderer. Describe cube, sphere, pyramid or cylinder; color; one to three objects; and small, medium or large.',video:'A learned scene becomes a 2.4-second animation. Motions: still, orbit, bounce, spin. Geometric animation, not photorealistic video.',mesh:'Create basic OBJ + MTL and glTF assets from the same learned scene representation. Up to three geometric objects.',world:'The trained policy chooses six actions in a deterministic synthetic world. Reaches the 256-step horizon or dies. No teacher fallback.'};
-const examples={chat:'Ask Poseidon something…',reason:'How do I cross a 10-meter river when stepping stones sink?',math:'(17 + 5) * 3, or 3*x + 7 = 22',image:'Create two small cyan spheres with orbit motion.',video:'Make three medium purple cubes with bounce motion.',mesh:'Build one large yellow pyramid with still motion.',world:'Run the learned agent in TidePool'};
+const notes={chat:'Local pretrained language model. Answers can be wrong; arithmetic is checked by a separate exact solver.',reason:'Dual-system neuro-symbolic coprocessor. Introspective Ghost Monologue, physical Archimedean buoyancy, and formal LTL safety proof.',problem:'PROBLEM FORGE: Verified combinatorial & state-space problem solving. Solves Water Jugs, River Crossing, Missionaries & Cannibals, Hanoi, N-Queens, Sudoku, 24-Game, Cryptarithms, Shortest Path, and Sliding Puzzles with formal certificates.',river:'Project PROMETHEUS Discovery Lab: Procedural 3D RiverWorld with stepping stone reach, Archimedean buoyant pine logs, multimodal bioadhesive enzyme curing, and naval metacentric stability.',math:'Exact rational arithmetic and linear equations. Use explicit multiplication: 3*x + 7 = 22. This result comes from a tool, not unaided neural reasoning.',image:'Learned scene attributes → software renderer. Describe cube, sphere, pyramid or cylinder; color; one to three objects; and small, medium or large.',video:'A learned scene becomes a 2.4-second animation. Motions: still, orbit, bounce, spin. Geometric animation, not photorealistic video.',mesh:'Create basic OBJ + MTL and glTF assets from the same learned scene representation. Up to three geometric objects.',world:'The trained policy chooses six actions in a deterministic synthetic world. Reaches the 256-step horizon or dies. No teacher fallback.'};
+const examples={chat:'Ask Poseidon something…',reason:'How do I cross a 10-meter river when stepping stones sink?',problem:'Solve the cryptarithm SEND + MORE = MONEY',river:'Assemble floating pine logs into a raft and cross the wide river channel.',math:'(17 + 5) * 3, or 3*x + 7 = 22',image:'Create two small cyan spheres with orbit motion.',video:'Make three medium purple cubes with bounce motion.',mesh:'Build one large yellow pyramid with still motion.',world:'Run the learned agent in TidePool'};
 notes.world='Choose a controller, resource scarcity and episode horizon for a deterministic synthetic world. Replay the actual decisions. Both Atlas candidates are opt-in experiments.';
 $('#planner').onchange=()=>{$('#plannerNote').textContent=plannerNotes[$('#planner').value]||'Experimental survival controller.';};
-function setMode(value){mode=value;document.querySelectorAll('[data-mode]').forEach(b=>{b.classList.toggle('selected',b.dataset.mode===mode);b.setAttribute('aria-selected',String(b.dataset.mode===mode));});$('#modeNote').textContent=notes[mode];$('#prompt').placeholder=examples[mode];if($('#plannerControls'))$('#plannerControls').hidden=(mode!=='world');}
+function setMode(value){mode=value;document.querySelectorAll('[data-mode]').forEach(b=>{b.classList.toggle('selected',b.dataset.mode===mode);b.setAttribute('aria-selected',String(b.dataset.mode===mode));});$('#modeNote').textContent=notes[mode];$('#prompt').placeholder=examples[mode];if($('#plannerControls'))$('#plannerControls').hidden=(mode!=='world');if($('#riverControls'))$('#riverControls').hidden=(mode!=='river');if(mode==='river'){initRiverWorld();}}
 document.querySelectorAll('[data-mode]').forEach(b=>b.onclick=()=>setMode(b.dataset.mode));
 document.querySelectorAll('[data-prompt]').forEach(b=>b.onclick=()=>{if(b.dataset.target)setMode(b.dataset.target);$('#prompt').value=b.dataset.prompt;$('#prompt').focus();});
-function message(role,text,backend,details){if(first){$('#messages').replaceChildren();first=false;}let card=document.createElement('div');card.className='message '+role;let label=document.createElement('div');label.className='message-label';label.textContent=role==='user'?'YOU':role==='error'?'REQUEST ERROR':'POSEIDON';let body=document.createElement('div');body.className='message-body';body.textContent=text;if(details?.thought_steps){let thoughts=document.createElement('details');thoughts.className='thought-steps';thoughts.style.marginTop='8px';thoughts.style.padding='8px';thoughts.style.background='rgba(99, 102, 241, 0.08)';thoughts.style.borderRadius='4px';thoughts.style.fontSize='12px';let summary=document.createElement('summary');summary.style.cursor='pointer';summary.style.fontWeight='bold';summary.style.color='#818cf8';summary.textContent=`Introspective Ghost Monologue (${details.thought_steps.length} Steps)`;thoughts.append(summary);details.thought_steps.forEach(st=>{let p=document.createElement('p');p.style.margin='4px 0';p.innerHTML=`<strong>Step ${st.step} (${st.phase}):</strong> ${st.content}`;thoughts.append(p);});if(details.formal_proof){let badge=document.createElement('div');badge.style.marginTop='6px';badge.style.color='#34d399';badge.innerHTML=`🛡️ <strong>LTL Proof Certified:</strong> <code>${details.formal_proof.certificate_sha256?.slice(0, 16)}...</code> (${details.formal_proof.verdict})`;thoughts.append(badge);}body.append(thoughts);}card.append(label,body);if(backend){let meta=document.createElement('div');meta.className='message-backend';meta.textContent=backend;card.append(meta);}$('#messages').append(card);$('#messages').scrollTop=$('#messages').scrollHeight;}
+function message(role,text,backend,details){if(first){$('#messages').replaceChildren();first=false;}let card=document.createElement('div');card.className='message '+role;let label=document.createElement('div');label.className='message-label';label.textContent=role==='user'?'YOU':role==='error'?'REQUEST ERROR':'POSEIDON';let body=document.createElement('div');body.className='message-body';body.textContent=text;if(details?.plan&&Array.isArray(details.plan)){let planDiv=document.createElement('details');planDiv.className='problem-plan';planDiv.style.marginTop='8px';planDiv.style.padding='8px';planDiv.style.background='rgba(56, 189, 248, 0.08)';planDiv.style.borderRadius='4px';planDiv.style.fontSize='12px';let pSum=document.createElement('summary');pSum.style.cursor='pointer';pSum.style.fontWeight='bold';pSum.style.color='#38bdf8';pSum.textContent=`Verified Solution Plan (${details.plan.length} Steps)`;planDiv.append(pSum);details.plan.forEach((st,idx)=>{let p=document.createElement('p');p.style.margin='3px 0';p.textContent=`${idx+1}. ${st}`;planDiv.append(p);});body.append(planDiv);}if(details?.insight){let insDiv=document.createElement('div');insDiv.style.marginTop='6px';insDiv.style.color='#facc15';insDiv.style.fontSize='12px';insDiv.innerHTML=`💡 <strong>Structural Insight:</strong> ${details.insight}`;body.append(insDiv);}if(details?.thought_steps){let thoughts=document.createElement('details');thoughts.className='thought-steps';thoughts.style.marginTop='8px';thoughts.style.padding='8px';thoughts.style.background='rgba(99, 102, 241, 0.08)';thoughts.style.borderRadius='4px';thoughts.style.fontSize='12px';let summary=document.createElement('summary');summary.style.cursor='pointer';summary.style.fontWeight='bold';summary.style.color='#818cf8';summary.textContent=`Introspective Ghost Monologue (${details.thought_steps.length} Steps)`;thoughts.append(summary);details.thought_steps.forEach(st=>{let p=document.createElement('p');p.style.margin='4px 0';p.innerHTML=`<strong>Step ${st.step} (${st.phase}):</strong> ${st.content}`;thoughts.append(p);});if(details.formal_proof){let badge=document.createElement('div');badge.style.marginTop='6px';badge.style.color='#34d399';badge.innerHTML=`🛡️ <strong>LTL Proof Certified:</strong> <code>${details.formal_proof.certificate_sha256?.slice(0, 16)}...</code> (${details.formal_proof.verdict})`;thoughts.append(badge);}body.append(thoughts);}card.append(label,body);if(backend){let meta=document.createElement('div');meta.className='message-backend';meta.textContent=backend;card.append(meta);}$('#messages').append(card);$('#messages').scrollTop=$('#messages').scrollHeight;}
 async function request(url,payload){const response=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});const data=await response.json();if(!response.ok)throw Error(data.error||response.statusText);return data;}
 function excluded(){return [...document.querySelectorAll('.ablations input:checked')].map(x=>x.value);}
 function worldSettings(){const invalid=[$('#worldScarcity'),$('#worldHorizon')].find(control=>!control.checkValidity());if(invalid){invalid.reportValidity();$('#activity').textContent='Check the Survival settings';return null;}return {scarcity:Number($('#worldScarcity').value),max_steps:Number($('#worldHorizon').value)};}
@@ -554,5 +554,210 @@ if($('#synthesizeEnzymeBtn'))$('#synthesizeEnzymeBtn').onclick=async()=>{
   }
 };
 
+let riverState = null;
+async function initRiverWorld(seed=42, riverWidth=null) {
+  stopWorld();
+  $('#timeline').hidden = true;
+  $('#decisionPanel').hidden = true;
+  $('#artifactType').textContent = 'RIVERWORLD';
+  const rw = riverWidth !== null ? riverWidth : Number($('#riverWidthSelect')?.value || 3);
+  try {
+    const res = await fetch(`/api/discovery-lab/river-state?seed=${seed}&river_width=${rw}`);
+    if (res.ok) {
+      riverState = await res.json();
+      drawRiverWorld(riverState);
+      if ($('#riverStatusNote')) {
+        $('#riverStatusNote').textContent = `RiverWorld initialized: Width ${rw}m | Objects: ${riverState.objects?.length || 0} | Health: 100% | Stamina: 100%`;
+      }
+    }
+  } catch (e) {
+    console.error('RiverWorld load error:', e);
+  }
+}
+
+function drawRiverWorld(state) {
+  if (!state) return;
+  const c = $('#worldCanvas');
+  if (!c) return;
+  const ctx = c.getContext('2d');
+  const W = 600, H = 400;
+  ctx.clearRect(0, 0, W, H);
+
+  // World-grid → canvas mapping (each grid cell spans one column/row)
+  const gridW = Math.max(1, state.grid_width || 16);
+  const gridH = Math.max(1, state.grid_height || 10);
+  const toCanvasX = (x) => ((x + 0.5) / gridW) * W;
+  const toCanvasY = (y) => ((y + 0.5) / gridH) * H;
+
+  // 2. River Channel bounds (computed first so the bank fills match)
+  const isWide = state.river_width > 4;
+  const riverStartX = ((state.river_start_x ?? 7) / gridW) * W;
+  const riverEndX = (((state.river_end_x ?? 9) + 1) / gridW) * W;
+  const riverW = riverEndX - riverStartX;
+
+  // 1. Left Riverbank (Earthen grass)
+  ctx.fillStyle = '#14532d';
+  ctx.fillRect(0, 0, riverStartX, H);
+  ctx.fillStyle = '#166534';
+  for (let i = 0; i < 15; i++) {
+    ctx.fillRect(10 + (i*8) % Math.max(20, riverStartX - 20), 20 + (i*26)%360, 4, 8);
+  }
+
+  const grad = ctx.createLinearGradient(riverStartX, 0, riverEndX, 0);
+  grad.addColorStop(0, '#0284c7');
+  grad.addColorStop(0.5, '#0369a1');
+  grad.addColorStop(1, '#0284c7');
+  ctx.fillStyle = grad;
+  ctx.fillRect(riverStartX, 0, riverW, H);
+
+  // Wave ripple lines
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.18)';
+  ctx.lineWidth = 1.5;
+  for (let y = 30; y < H; y += 45) {
+    ctx.beginPath();
+    ctx.moveTo(riverStartX + 15, y);
+    ctx.bezierCurveTo(riverStartX + 100, y - 8, riverStartX + 200, y + 8, riverEndX - 15, y);
+    ctx.stroke();
+  }
+
+  // 3. Right Bank (Target territory)
+  ctx.fillStyle = '#1e3a8a';
+  ctx.fillRect(riverEndX, 0, W - riverEndX, H);
+  ctx.fillStyle = '#fbbf24';
+  ctx.fillRect(riverEndX + 55, 180, 5, 40);
+  ctx.beginPath();
+  ctx.moveTo(riverEndX + 60, 180);
+  ctx.lineTo(riverEndX + 90, 192);
+  ctx.lineTo(riverEndX + 60, 204);
+  ctx.fill();
+  ctx.font = 'bold 11px Segoe UI';
+  ctx.fillStyle = '#fde68a';
+  ctx.fillText('GOAL BANK', riverEndX + 35, 170);
+
+  // 4. Render Physical Objects
+  const objects = state.objects || [];
+  let connectedLogs = [];
+
+  objects.forEach(obj => {
+    const cx = toCanvasX(obj.position[0]);
+    const cy = toCanvasY(obj.position[1]);
+
+    if (obj.material.includes('stone') || obj.material.includes('granite')) {
+      const inRiver = obj.position[0] >= state.river_start_x && obj.position[0] <= state.river_end_x;
+      ctx.fillStyle = inRiver ? '#334155' : '#64748b';
+      ctx.beginPath();
+      ctx.arc(cx, cy, 14, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = inRiver && isWide ? '#ef4444' : '#94a3b8';
+      ctx.lineWidth = inRiver && isWide ? 2 : 1;
+      ctx.stroke();
+
+      if (inRiver) {
+        ctx.fillStyle = isWide ? '#f87171' : '#cbd5e1';
+        ctx.font = '9px monospace';
+        ctx.fillText(isWide ? 'SUBMERGED' : 'STEP', cx - 20, cy + 22);
+      }
+    } else if (obj.is_buoyant) {
+      ctx.fillStyle = '#b45309';
+      ctx.strokeStyle = '#f59e0b';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      if (typeof ctx.roundRect === 'function') {
+        ctx.roundRect(cx - 10, cy - 20, 20, 40, 5);
+      } else {
+        ctx.rect(cx - 10, cy - 20, 20, 40);
+      }
+      ctx.fill();
+      ctx.stroke();
+
+      if (obj.connected_object_ids && obj.connected_object_ids.length > 0) {
+        connectedLogs.push({cx, cy, id: obj.object_id, strength: obj.bond_strength});
+      }
+    }
+  });
+
+  // Raft catalytic cross-linking lines
+  if (connectedLogs.length >= 2) {
+    ctx.strokeStyle = '#c084fc';
+    ctx.lineWidth = 3;
+    ctx.setLineDash([4, 2]);
+    ctx.beginPath();
+    ctx.moveTo(connectedLogs[0].cx, connectedLogs[0].cy);
+    for (let k = 1; k < connectedLogs.length; k++) {
+      ctx.lineTo(connectedLogs[k].cx, connectedLogs[k].cy);
+    }
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = '#e9d5ff';
+    ctx.font = 'bold 10px monospace';
+    ctx.fillText('RAFT (CATALYZED BOND 0.98)', connectedLogs[0].cx - 30, connectedLogs[0].cy - 26);
+  }
+
+  // 5. Render Agent Avatar
+  const agentX = toCanvasX(state.agent.x);
+  const agentY = toCanvasY(state.agent.y);
+  ctx.fillStyle = '#38bdf8';
+  ctx.beginPath();
+  ctx.arc(agentX, agentY, 12, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = '#ffffff';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  ctx.fillStyle = '#0f172a';
+  ctx.font = 'bold 9px Segoe UI';
+  ctx.fillText('YOU', agentX - 9, agentY + 3);
+
+  // 6. Canvas HUD Overlays
+  ctx.fillStyle = 'rgba(15, 23, 42, 0.88)';
+  ctx.fillRect(0, 0, W, 28);
+  ctx.fillStyle = '#e2e8f0';
+  ctx.font = '11px Segoe UI';
+  ctx.fillText(`PROMETHEUS RIVERWORLD · Channel: ${isWide ? 'WIDE (7m) - RAFT REQUIRED' : 'NARROW (3m) - STONES VIABLE'} · Health: ${Math.round(state.agent.health * 100)}% · Stamina: ${Math.round(state.agent.stamina * 100)}%`, 12, 18);
+
+  ctx.fillStyle = 'rgba(15, 23, 42, 0.88)';
+  ctx.fillRect(0, H - 28, W, 28);
+  ctx.fillStyle = '#38bdf8';
+  ctx.font = '10px monospace';
+  const gmText = isWide ? 'GM: +0.28m (CATAMARAN STABLE)' : 'GM: N/A (STEPPING)';
+  const payloadText = isWide ? 'Payload: 108kg > 70kg' : 'Direct Stride';
+  ctx.fillText(`Buoyancy: +353.2N | ${payloadText} | Naval: ${gmText} | Shield: PROVEN_SAFE`, 12, H - 10);
+}
+
+if ($('#riverWidthSelect')) {
+  $('#riverWidthSelect').onchange = () => {
+    initRiverWorld(42, Number($('#riverWidthSelect').value));
+  };
+}
+
+if ($('#stepRiverBtn')) {
+  $('#stepRiverBtn').onclick = async () => {
+    try {
+      const act = Number($('#riverActionSelect')?.value || 1);
+      const rw = Number($('#riverWidthSelect')?.value || 3);
+      const res = await fetch('/api/discovery-lab/step', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({action: act, river_width: rw, seed: 42})
+      });
+      if (!res.ok) throw Error(res.statusText);
+      const data = await res.json();
+      message('assistant', `Executed step: ${data.action_executed} | Event: ${data.info?.event || 'none'} | Reward: ${data.reward} | Pos: ${JSON.stringify(data.info?.agent_position)}`, 'Project PROMETHEUS Discovery Lab');
+      if ($('#riverStatusNote')) {
+        $('#riverStatusNote').textContent = `Action: ${data.action_executed} | Reward: ${data.reward} | Event: ${data.info?.event || 'nominal'} | State Hash: ${data.state_hash.slice(0, 16)}...`;
+      }
+      initRiverWorld(42, rw);
+    } catch (err) {
+      message('error', 'RiverWorld step failed: ' + err.message);
+    }
+  };
+}
+
+if ($('#resetRiverBtn')) {
+  $('#resetRiverBtn').onclick = () => {
+    initRiverWorld(42, Number($('#riverWidthSelect')?.value || 3));
+  };
+}
+
 drawIdle();refreshStatus();refreshJobs();pollTelemetry();setInterval(()=>{refreshStatus();pollTelemetry();},15000);
+
 

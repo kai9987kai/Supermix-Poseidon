@@ -142,9 +142,25 @@ def make_handler(runtime, port):
                 except Exception as error:
                     self.send_json(500, {"error": str(error), "type": type(error).__name__})
                 return
+            if path == "/api/discovery-lab/river-state":
+                try:
+                    from urllib.parse import parse_qs
+                    params = parse_qs(urlsplit(self.path).query)
+                    seed = int(params.get("seed", [42])[0])
+                    rw = int(params.get("river_width", [3])[0])
+                    self.send_json(200, runtime.discovery_lab_river_state(seed=seed, river_width=rw))
+                except Exception as error:
+                    self.send_json(500, {"error": str(error), "type": type(error).__name__})
+                return
             if path == "/api/reasoning-status":
                 try:
                     self.send_json(200, runtime.omni_reasoner_status())
+                except Exception as error:
+                    self.send_json(500, {"error": str(error), "type": type(error).__name__})
+                return
+            if path == "/api/problem/capabilities":
+                try:
+                    self.send_json(200, {"ready": True, "capabilities": runtime.problem_capabilities()})
                 except Exception as error:
                     self.send_json(500, {"error": str(error), "type": type(error).__name__})
                 return
@@ -375,6 +391,17 @@ def make_handler(runtime, port):
                     seed = int(payload.get("seed", 42))
                     max_new_tokens = int(payload.get("max_new_tokens", 512))
                     res = runtime.reason(prompt, seed=seed, max_new_tokens=max_new_tokens)
+                    self.send_json(200, res)
+                except (ValueError, TypeError) as error:
+                    self.send_json(400, {"error": str(error)})
+                except Exception as error:
+                    self.send_json(500, {"error": str(error), "type": type(error).__name__})
+                return
+            if path == "/api/problem/solve":
+                try:
+                    prompt = payload.get("prompt", "")
+                    domain = payload.get("domain")
+                    res = runtime.solve_problem(prompt, domain=domain)
                     self.send_json(200, res)
                 except (ValueError, TypeError) as error:
                     self.send_json(400, {"error": str(error)})

@@ -18,6 +18,12 @@ from .skill_composer import DiscoverySkillComposer, CompositionPlan, StrategyTyp
 from .enzyme_generator import MultimodalEnzymeGenerator, SynthesizedEnzyme, CatalyticActiveSite
 from .curriculum import DiscoveryCurriculumRunner, CurriculumPhaseResult
 from .evaluator import DiscoveryEvaluator
+from .biomechanics import (
+    BiomechanicalGaitModel,
+    NavalStabilityModel,
+    StrideAssessment,
+    NavalStabilityAssessment,
+)
 
 __all__ = [
     "PhysicalObject",
@@ -47,4 +53,8 @@ __all__ = [
     "DiscoveryCurriculumRunner",
     "CurriculumPhaseResult",
     "DiscoveryEvaluator",
+    "BiomechanicalGaitModel",
+    "NavalStabilityModel",
+    "StrideAssessment",
+    "NavalStabilityAssessment",
 ]

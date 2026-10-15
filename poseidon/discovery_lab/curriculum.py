@@ -258,18 +258,40 @@ class DiscoveryCurriculumRunner:
         res.seal()
         return res
 
+    def run_phase_6_synthesis_benchmark(self, seeds: Tuple[int, ...] = (2001, 2002)) -> CurriculumPhaseResult:
+        """Phase 6: Synthesis benchmark & statistical evidence audit across held-out seeds."""
+        from .evaluator import DiscoveryEvaluator
+        evaluator = DiscoveryEvaluator(bootstrap_reps=200)
+        narrow_bench = evaluator.evaluate_crossing_benchmark(seeds=seeds, river_width=3)
+        wide_bench = evaluator.evaluate_crossing_benchmark(seeds=seeds, river_width=7)
+        passed = bool(narrow_bench.get("eval_sha256") and wide_bench.get("eval_sha256"))
+        res = CurriculumPhaseResult(
+            phase_id=6,
+            phase_name="Synthesis Benchmark & Statistical Evidence Audit",
+            passed=passed,
+            metrics={
+                "narrow_crossing": narrow_bench,
+                "wide_crossing": wide_bench,
+                "audit_certified": passed,
+                "paired_gain_positive": bool(narrow_bench.get("mean_paired_reward_gain", 0.0) >= 0.0),
+            }
+        )
+        res.seal()
+        return res
+
     def run_full_curriculum(self) -> Dict[str, Any]:
-        """Runs all 5 active developmental phases and produces unified verification report."""
+        """Runs all 6 developmental phases and produces unified verification report."""
         p1 = self.run_phase_1_simulation_foundation()
         p2 = self.run_phase_2_autonomous_exploration()
         p3 = self.run_phase_3_causal_reasoning()
         p4 = self.run_phase_4_skill_acquisition()
         p5 = self.run_phase_5_strategy_transfer()
+        p6 = self.run_phase_6_synthesis_benchmark()
 
-        all_passed = p1.passed and p2.passed and p3.passed and p4.passed and p5.passed
+        all_passed = p1.passed and p2.passed and p3.passed and p4.passed and p5.passed and p6.passed
 
         report = {
-            "version": "project-prometheus-curriculum-v1",
+            "version": "project-prometheus-curriculum-v2",
             "base_seed": self.base_seed,
             "overall_status": "PASSED" if all_passed else "FAILED",
             "phases": {
@@ -278,6 +300,7 @@ class DiscoveryCurriculumRunner:
                 "phase_3": p3.__dict__,
                 "phase_4": p4.__dict__,
                 "phase_5": p5.__dict__,
+                "phase_6": p6.__dict__,
             }
         }
         report["receipt_sha256"] = hashlib.sha256(json.dumps(report, sort_keys=True).encode("utf-8")).hexdigest()

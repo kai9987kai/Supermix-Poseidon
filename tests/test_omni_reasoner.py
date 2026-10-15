@@ -134,3 +134,69 @@ def test_server_reasoning_endpoints(test_server):
     assert reason_res["intent"] == "physical_discovery"
     assert len(reason_res["thought_steps"]) == 5
     assert len(reason_res["certificate_sha256"]) == 64
+
+
+def test_biomechanical_gait_and_naval_stability():
+    from poseidon.discovery_lab.biomechanics import BiomechanicalGaitModel, NavalStabilityModel
+
+    gait = BiomechanicalGaitModel(agent_mass=70.0)
+    # Safe step on earthen bank (1.0m)
+    stride_safe = gait.assess_stride((1.0, 5.0, 0.0), (2.0, 5.0, 0.0), target_material="earth", is_wet=False)
+    assert stride_safe.stride_feasible is True
+    assert stride_safe.verdict == "SAFE_STEP"
+    assert stride_safe.dynamic_balance_margin > 0.0
+    assert stride_safe.ground_friction_coeff > 0.70
+
+    # Wet granite rock leap (1.7m)
+    stride_wet = gait.assess_stride((2.0, 5.0, 0.0), (3.7, 5.0, 0.0), target_material="granite_stone", is_wet=True)
+    assert stride_wet.ground_friction_coeff == 0.28
+    assert stride_wet.slip_probability > 0.50
+    assert stride_wet.verdict in ("SLIP_SUBMERSION", "RISKY_LEAP")
+
+    # Impossible jump (3.0m gap)
+    stride_imp = gait.assess_stride((2.0, 5.0, 0.0), (5.0, 5.0, 0.0), target_material="granite_stone", is_wet=True)
+    assert stride_imp.stride_feasible is False
+    assert stride_imp.verdict == "STRIDE_EXCEEDED"
+
+    # Naval stability: 1 log vs 3 logs
+    naval = NavalStabilityModel()
+    single_log = naval.assess_assemblage(num_logs=1, agent_mass=70.0, agent_onboard=True)
+    assert single_log.metacentric_height_gm_m < 0.0
+    assert single_log.is_stably_righting is False
+    assert single_log.capsize_risk_rating == "CRITICAL_CAPSIZE"
+
+    raft_3log = naval.assess_assemblage(num_logs=3, agent_mass=70.0, agent_onboard=True)
+    assert raft_3log.metacentric_height_gm_m > 0.15
+    assert raft_3log.is_stably_righting is True
+    assert raft_3log.capsize_risk_rating == "STABLE"
+    assert raft_3log.righting_moment_at_10deg_nm > 0.0
+    assert raft_3log.net_buoyant_reserve_kg > 100.0
+
+
+def test_omni_reasoner_extended_domains():
+    reasoner = OmniReasoner(seed=42)
+
+    # Biomechanical query
+    res_bio = reasoner.reason("Evaluate humanoid articulated gait, stride reach limits, and wet rock slip hazard")
+    assert res_bio.intent == "biomechanical_kinematics"
+    assert res_bio.verified is True
+    assert "gait" in res_bio.empirical_simulation["simulation_type"].lower()
+
+    # Naval stability query
+    res_naval = reasoner.reason("Analyze transverse metacentric height GM and righting moment for log raft hull stability")
+    assert res_naval.intent == "naval_stability"
+    assert res_naval.verified is True
+    assert res_naval.empirical_simulation["catamaran_raft_3log"]["is_stably_righting"] is True
+
+    # Multi-substrate enzyme generation
+    gen = reasoner.enzyme_gen
+    enz_chitin = gen.generate_catalyst_for_substrate("chitin_polymer", target_shear_force=400.0)
+    assert enz_chitin.target_class == "chitinase_transpeptidase"
+    assert enz_chitin.catalytic_efficiency > 0.0
+
+    enz_pectin = gen.generate_catalyst_for_substrate("pectin_mucilage", ambient_ph=7.2)
+    assert enz_pectin.target_class == "pectin_mucilage_lyase"
+
+    enz_pet = gen.generate_catalyst_for_substrate("synthetic_bioplastic_ester", ambient_temperature_c=50.0)
+    assert enz_pet.target_class == "pet_depolymerase_cutinase"
+

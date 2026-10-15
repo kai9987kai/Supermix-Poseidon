@@ -299,16 +299,16 @@ def test_context_expansion_and_token_budget(server):
     url, root = server
     runtime = Poseidon(root)
 
-    # 1. Test 16000-character prompt boundary on runtime
-    padded_math = "3*x + 7 = 22" + " " * (16000 - len("3*x + 7 = 22"))
-    assert len(padded_math) == 16000
+    # 1. Test 32000-character prompt boundary on runtime
+    padded_math = "3*x + 7 = 22" + " " * (32000 - len("3*x + 7 = 22"))
+    assert len(padded_math) == 32000
     res = runtime.respond(padded_math, mode="math")
     assert res["answer"] == "5"
 
-    with pytest.raises(ValueError, match="1–16000"):
-        runtime.respond("x" * 16001, mode="math")
+    with pytest.raises(ValueError, match="1–32000"):
+        runtime.respond("x" * 32001, mode="math")
 
-    # 2. Test server HTTP endpoint with 16000-char prompt and max_new_tokens parameter
+    # 2. Test server HTTP endpoint with 32000-char prompt and max_new_tokens parameter
     res = json.load(post(url + "/api/respond", {
         "prompt": padded_math,
         "mode": "math",
@@ -316,7 +316,60 @@ def test_context_expansion_and_token_budget(server):
     }))
     assert res["answer"] == "5"
 
-    # 3. Test HTTP 400 rejection when prompt exceeds 16000 characters
+    # 3. Test HTTP 400 rejection when prompt exceeds 32000 characters
     with pytest.raises(HTTPError) as err:
-        post(url + "/api/respond", {"prompt": "x" * 16001, "mode": "math"})
+        post(url + "/api/respond", {"prompt": "x" * 32001, "mode": "math"})
     assert err.value.code == 400
+
+
+def test_discovery_lab_server_endpoints(server):
+    url, _ = server
+
+    # 1. GET /api/discovery-lab/status
+    status = json.load(urlopen(url + "/api/discovery-lab/status"))
+    assert status["ready"] is True
+    assert "river_world_simulation" in status["subsystems"]
+
+    # 2. GET /api/discovery-lab/river-state
+    state = json.load(urlopen(url + "/api/discovery-lab/river-state?seed=42&river_width=3"))
+    assert state["river_width"] == 3
+    assert "agent" in state
+    assert "objects" in state
+    assert len(state["objects"]) > 0
+    assert len(state["state_hash"]) == 64
+
+    # 3. POST /api/discovery-lab/step
+    step_res = json.load(post(url + "/api/discovery-lab/step", {"action": 1, "seed": 42, "river_width": 3}))
+    assert "action_executed" in step_res
+    assert len(step_res["observation"]) == 24
+    assert "state_hash" in step_res
+
+
+def test_problem_solver_server_endpoints(server):
+    url, _ = server
+
+    # 1. GET /api/problem/capabilities
+    caps = json.load(urlopen(url + "/api/problem/capabilities"))
+    assert caps["ready"] is True
+    assert len(caps["capabilities"]) >= 10
+    domain_names = [c["domain"] for c in caps["capabilities"]]
+    assert "water_jugs" in domain_names
+    assert "sudoku" in domain_names
+    assert "cryptarithm" in domain_names
+
+    # 2. POST /api/problem/solve
+    solve_res = json.load(post(url + "/api/problem/solve", {
+        "prompt": "Solve SEND + MORE = MONEY"
+    }))
+    assert solve_res["domain"] == "cryptarithm"
+    assert solve_res["verified"] is True
+    assert "9567 + 1085 = 10652" in solve_res["answer"]
+
+    # 3. POST /api/respond with mode="problem"
+    resp = json.load(post(url + "/api/respond", {
+        "prompt": "Solve Tower of Hanoi with 3 disks",
+        "mode": "problem"
+    }))
+    assert resp["domain"] == "tower_of_hanoi"
+    assert resp["answer"] == "7"
+    assert resp["verified"] is True
