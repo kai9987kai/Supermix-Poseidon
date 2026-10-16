@@ -1674,6 +1674,42 @@ class Poseidon:
         from .problem_solver import ProblemSolver
         return ProblemSolver().capabilities()
 
+    def hypothesis_status(self):
+        return {
+            "ready": True,
+            "version": "1.0.0",
+            "project": "OLYMPUS: Scientific Hypothesis & Falsification Engine",
+            "popperian_demarcation": True,
+            "lakatos_msrp_evaluator": True,
+            "crucial_experiment_designer": True,
+            "shannon_information_bits": True,
+            "cryptographic_falsification_receipts": True,
+        }
+
+    def hypothesis_formulate(
+        self,
+        conjecture: str,
+        domain: str = "empirical_science",
+        hard_core_assumptions=None,
+        protective_belt=None,
+        falsification_criteria=None,
+        novel_predictions=None,
+        prior: float = 0.5,
+    ):
+        with self.lock:
+            from .hypothesis_engine import HypothesisEngine
+            engine = HypothesisEngine()
+            hyp = engine.formulate_hypothesis(
+                conjecture=conjecture,
+                domain=domain,
+                hard_core_assumptions=hard_core_assumptions or ["Primary Invariant Axiom"],
+                protective_belt=protective_belt or [],
+                falsification_criteria=falsification_criteria or ["Empirical divergence > 3-sigma"],
+                novel_predictions=novel_predictions or [],
+                prior=prior,
+            )
+            return hyp.to_dict()
+
     def _memory(self):
         from .memory import MemoryBank
         return MemoryBank.load(self.memory_path) if self.memory_path.exists() else MemoryBank()
@@ -1694,6 +1730,8 @@ class Poseidon:
         if type(seed) is not int or not 0 <= seed < 2**63:
             raise ValueError("Seed must be a nonnegative integer below 2^63.")
         with self.lock:
+            if mode == "hypothesis":
+                return self.hypothesis_formulate(prompt)
             if mode == "creative":
                 return self.creative_synthesize(prompt, seed=seed)
             if mode == "pantheon":

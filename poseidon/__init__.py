@@ -60,5 +60,12 @@ from .nexus_omega import (
     POMDPPhaseWorldV2,
     POMDPPhaseWorldV3,
 )
+from .hypothesis_engine import (
+    ScientificHypothesis,
+    CrucialExperiment,
+    HypothesisFalsificationReceipt,
+    FalsificationOutcome,
+    HypothesisEngine,
+)
 
 _SOURCE_SNAPSHOT = _capture_sources()

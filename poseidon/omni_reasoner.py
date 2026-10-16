@@ -111,6 +111,7 @@ class OmniReasoner:
         "causal_superposition",
         "pantheon_24_pillar_synthesis",
         "creative_bisociation_synthesis",
+        "scientific_hypothesis_falsification",
         "general_hyper_reasoning",
     )
 
@@ -127,6 +128,8 @@ class OmniReasoner:
     def classify_intent(self, query: str) -> str:
         """Classifies the semantic intent of the query to select domain co-processors."""
         q = query.lower()
+        if any(k in q for k in ("hypothesis", "hypotheses", "falsif", "popper", "crucial experiment", "lakatos", "research programme", "paradigm synthesis")):
+            return "scientific_hypothesis_falsification"
         if any(k in q for k in ("pantheon", "24-pillar", "24 pillar", "quibble", "mnemorph", "ntag215", "ntag-215")):
             return "pantheon_24_pillar_synthesis"
         if any(k in q for k in ("bisociat", "noosphere", "dialectic", "concept blend", "analogical synthesis", "creative synthesis")):
@@ -314,6 +317,55 @@ class OmniReasoner:
                 "verified": False,
                 "conclusion": f"Problem solver encountered constraint: {e}",
             }
+
+    def _simulate_scientific_hypothesis(self, prompt: str) -> Dict[str, Any]:
+        """Executes Project OLYMPUS Popperian falsification and Lakatosian research programme synthesis."""
+        from .hypothesis_engine import HypothesisEngine
+        engine = HypothesisEngine()
+        h1 = engine.formulate_hypothesis(
+            conjecture=f"Theoretical Paradigm H1 for inquiry: {prompt[:80]}",
+            domain="empirical_science",
+            hard_core_assumptions=["Primary Invariant Principle", "Symmetry Conservation"],
+            protective_belt=["Auxiliary Calibration Parameter", "Measurement Error Model"],
+            falsification_criteria=["Null divergence beyond 3-sigma tolerance threshold"],
+            novel_predictions=["Observable empirical anomaly resolution"],
+            prior=0.6,
+        )
+        h2 = engine.formulate_hypothesis(
+            conjecture="Standard Baseline Null Model H2",
+            domain="empirical_science",
+            hard_core_assumptions=["Homogeneous Uniformity"],
+            protective_belt=[],
+            falsification_criteria=["Persistent structured deviation detected"],
+            novel_predictions=["Zero macroscopic divergence"],
+            prior=0.4,
+        )
+        exp = engine.design_crucial_experiment(
+            hypothesis_a=h1,
+            hypothesis_b=h2,
+            name="OLYMPUS Baconian Decisive Discriminator",
+            description=f"Empirical test resolving '{prompt[:60]}...'",
+            discriminator_variable="epistemic_divergence",
+            prediction_a={"range": [0.5, 2.0]},
+            prediction_b={"range": [-0.1, 0.1]},
+            severity_score=0.92,
+        )
+        outcome = engine.conduct_test(exp, observed_data={"epistemic_divergence": 1.25})
+        synthesis = engine.generate_paradigm_synthesis("empirical_science")
+        return {
+            "simulation_type": "Stage 18 Project OLYMPUS Scientific Hypothesis & Falsification Engine",
+            "hypothesis_id": h1.id,
+            "status": h1.status,
+            "outcome": outcome.to_dict(),
+            "falsification_receipt_sha256": outcome.receipt.hash_sha256,
+            "receipt_verified": outcome.receipt.verify(),
+            "paradigm_synthesis": synthesis,
+            "conclusion": (
+                f"Project OLYMPUS scientific inquiry completed: Hypothesis {h1.id} [{h1.status}]. "
+                f"Lakatos assessment: {outcome.lakatos_assessment}. "
+                f"Receipt SHA-256: {outcome.receipt.hash_sha256[:16]}... (verified={outcome.receipt.verify()})."
+            ),
+        }
 
     def _simulate_biocatalytic_synthesis(self, seed: int) -> Dict[str, Any]:
         """Runs Multimodal Enzyme Generator with Michaelis-Menten kinetics."""
@@ -509,6 +561,12 @@ class OmniReasoner:
                 "route via Top-2 Sparse MoE, amplify via QuantumBot CHSH entanglement and Causeway Pearl do(X) calculus, synthesize a verified Morpheus counterfactual dream twin, "
                 "confirm Mnemorph lesion self-repair, and seal a 24-node Quibble Merkle DAG + NTAG-215 CRC-16 frame."
             )
+        elif intent == "scientific_hypothesis_falsification":
+            hypo_text = (
+                "Hypothesis H1 (Popperian Falsifiable Conjecture): Theoretical Paradigm posits invariant structural symmetries "
+                "with explicit refutation bounds. Competing Hypothesis H2 posits standard homogeneous null dynamics. "
+                "Crucial discriminator experiment designed with high Popperian severity and maximum Shannon information gain."
+            )
         else:
             hypo_text = (
                 "Hypothesis H1: System 2 deliberation combined with 24-Pillar Pantheon synthesis and formal bounded model checking will resolve the query with provable safety invariants, "
@@ -562,6 +620,8 @@ class OmniReasoner:
                 "receipt_sha256": c_res["receipt_sha256"],
                 "conclusion": c_res["text"],
             }
+        elif intent == "scientific_hypothesis_falsification":
+            sim_result = self._simulate_scientific_hypothesis(prompt)
         else:
             from .pantheon import PantheonEngine
             from .creative_synthesis import DialecticalTribunal

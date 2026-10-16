@@ -373,3 +373,33 @@ def test_problem_solver_server_endpoints(server):
     assert resp["domain"] == "tower_of_hanoi"
     assert resp["answer"] == "7"
     assert resp["verified"] is True
+
+
+def test_hypothesis_server_endpoints(server):
+    url, _ = server
+
+    # 1. GET /api/hypothesis/status
+    stat = json.load(urlopen(url + "/api/hypothesis/status"))
+    assert stat["ready"] is True
+    assert stat["popperian_demarcation"] is True
+    assert stat["lakatos_msrp_evaluator"] is True
+
+    # 2. POST /api/hypothesis/formulate
+    res = json.load(post(url + "/api/hypothesis/formulate", {
+        "conjecture": "Energy conservation holds across closed thermodynamic transformations",
+        "domain": "thermodynamics",
+        "hard_core_assumptions": ["First Law of Thermodynamics"],
+        "falsification_criteria": ["Net energy generated ex nihilo in closed cycle"],
+        "novel_predictions": ["Delta U = Q - W"],
+    }))
+    assert res["id"].startswith("hyp-")
+    assert res["domain"] == "thermodynamics"
+    assert res["status"] == "PROPOSED"
+
+    # 3. POST /api/respond with mode="hypothesis"
+    resp = json.load(post(url + "/api/respond", {
+        "prompt": "General Relativity curved spacetime predicts light deflection",
+        "mode": "hypothesis"
+    }))
+    assert resp["id"].startswith("hyp-")
+

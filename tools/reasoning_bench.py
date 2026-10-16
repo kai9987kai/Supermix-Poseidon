@@ -59,6 +59,11 @@ CASES = [
     ("p10", "problem", "Kalman filter gain for A=1.0, H=1.0, Q=0.1, R=0.5", ["0.358"]),
     ("p11", "problem", "Is the CNF formula (A or B) and (not A) and (not B) satisfiable?", ["unsatisfiable"]),
     ("p12", "problem", "Make 24 from the numbers 4, 7, 8, 8", ["24"]),
+    ("p13", "problem", "Fisher information metric and Cramer-Rao lower bound for Bernoulli coin flip with p=0.5", ["4.0000", "0.2500"]),
+    ("p14", "problem", "Turing pattern morphogenesis activator-inhibitor critical wavenumber with a11=1.0, a12=-1.5, a21=1.5, a22=-2.0, Du=1.0, Dv=10.0", ["0.6325", "9.9346"]),
+    ("p15", "problem", "Carnot heat engine thermal efficiency and work with Th=600K, Tc=300K, Qh=1000J", ["0.5000", "500.00"]),
+    ("p16", "problem", "Spectral graph partition Fiedler algebraic connectivity and Cheeger conductance for dumbbell graph", ["0.4384", "0.1429"]),
+    ("p17", "problem", "Kendall M/M/1 queuing system waiting time and queue length with arrival rate lambda=4.0 and service rate mu=5.0", ["4.000", "1.0000"]),
 ]
 
 

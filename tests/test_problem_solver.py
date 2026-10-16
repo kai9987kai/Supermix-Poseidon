@@ -29,6 +29,11 @@ from poseidon.problem_solver import (
     BayesianInferenceSolver,
     KalmanLqrControlSolver,
     SequenceAlignmentSolver,
+    InformationGeometrySolver,
+    ReactionDiffusionSolver,
+    ThermodynamicsSolver,
+    SpectralGraphSolver,
+    QueuingTheorySolver,
 )
 
 
@@ -156,10 +161,10 @@ def test_problem_solver_unknown():
         solve_problem("What is the capital of France?")
 
 
-def test_problem_solver_25_capabilities():
+def test_problem_solver_30_capabilities():
     solver = ProblemSolver()
     caps = solver.capabilities()
-    assert len(caps) == 25
+    assert len(caps) == 30
     domains = [c["domain"] for c in caps]
     assert "logic_knights_knaves" in domains
     assert "knapsack" in domains
@@ -176,6 +181,11 @@ def test_problem_solver_25_capabilities():
     assert "bayesian_inference_network" in domains
     assert "control_kalman_lqr" in domains
     assert "string_edit_alignment" in domains
+    assert "information_geometry_fisher" in domains
+    assert "reaction_diffusion_turing" in domains
+    assert "thermodynamic_carnot_entropy" in domains
+    assert "graph_spectral_partition" in domains
+    assert "queuing_markov_chains" in domains
 
 
 def test_logic_knights_knaves_unique():
@@ -425,4 +435,92 @@ def test_string_edit_alignment_levenshtein_and_lcs():
     assert res["lcs"] == "ITTN"
     assert res["lcs_length"] == 4
     assert len(res["edit_operations"]) >= 7
+
+
+def test_information_geometry_gaussian_and_bernoulli():
+    prompt_gauss = "Calculate the Fisher information metric and Rao distance between mu1=0.0, sigma1=1.0 and mu2=2.0, sigma2=1.5 with sample size N=100."
+    res_g = solve_problem(prompt_gauss)
+    assert res_g["domain"] == "information_geometry_fisher"
+    assert res_g["verified"] is True
+    assert res_g["rao_distance"] > 1.0
+    assert res_g["determinant"] > 0
+    assert len(res_g["natural_gradient"]) == 2
+
+    prompt_bern = "Find Fisher information metric and Cramér-Rao lower bound for a coin flip with Bernoulli probability p=0.4."
+    res_b = solve_problem(prompt_bern)
+    assert res_b["domain"] == "information_geometry_fisher"
+    assert res_b["verified"] is True
+    assert abs(res_b["fisher_information"] - (1.0 / (0.4 * 0.6))) < 1e-4
+    assert abs(res_b["cramer_rao_lower_bound"] - (0.4 * 0.6)) < 1e-4
+
+
+def test_reaction_diffusion_turing_and_fisher_kpp():
+    prompt_turing = "Analyze Turing pattern morphogenesis with activator-inhibitor parameters a11=1.0, a12=-1.5, a21=1.5, a22=-2.0, Du=1.0, Dv=10.0."
+    res_t = solve_problem(prompt_turing)
+    assert res_t["domain"] == "reaction_diffusion_turing"
+    assert res_t["verified"] is True
+    assert res_t["status"] == "TURING_INSTABILITY_SATISFIED"
+    assert res_t["critical_wavenumber"] > 0
+    assert res_t["critical_wavelength"] > 0
+
+    prompt_wave = "Compute Fisher-KPP traveling wave front velocity and decay rate with D=1.0 and r=4.0."
+    res_w = solve_problem(prompt_wave)
+    assert res_w["domain"] == "reaction_diffusion_turing"
+    assert res_w["verified"] is True
+    assert abs(res_w["wave_speed"] - 4.0) < 1e-6
+    assert abs(res_w["decay_rate"] - 2.0) < 1e-6
+
+
+def test_thermodynamics_carnot_and_gibbs():
+    prompt_carnot = "Calculate Carnot heat engine thermal efficiency and work output with Th=600K, Tc=300K, and heat input Qh=1000J."
+    res_c = solve_problem(prompt_carnot)
+    assert res_c["domain"] == "thermodynamic_carnot_entropy"
+    assert res_c["verified"] is True
+    assert abs(res_c["efficiency"] - 0.5) < 1e-6
+    assert abs(res_c["work_joules"] - 500.0) < 1e-6
+    assert abs(res_c["cop_heat_pump"] - (res_c["cop_refrigerator"] + 1.0)) < 1e-9
+
+    prompt_gibbs = "Determine Gibbs free energy change and chemical equilibrium constant with delta_h=-50.0, delta_s=-100.0 at temperature T=298.15K."
+    res_g = solve_problem(prompt_gibbs)
+    assert res_g["domain"] == "thermodynamic_carnot_entropy"
+    assert res_g["verified"] is True
+    assert res_g["spontaneous"] is True
+    assert res_g["equilibrium_constant"] > 1.0
+
+
+def test_spectral_graph_partition_and_cheeger():
+    prompt_dumb = "Find graph Laplacian eigenvalues, Fiedler vector, algebraic connectivity, and Cheeger bounds for dumbbell graph."
+    res_d = solve_problem(prompt_dumb)
+    assert res_d["domain"] == "graph_spectral_partition"
+    assert res_d["verified"] is True
+    assert res_d["algebraic_connectivity"] > 0.0
+    assert res_d["cut_edges"] == 1
+    assert len(res_d["bipartition_S"]) == 3
+    assert len(res_d["bipartition_T"]) == 3
+
+    prompt_path = "Compute spectral graph partition for edges: (0, 1), (1, 2), (2, 3)."
+    res_p = solve_problem(prompt_path)
+    assert res_p["domain"] == "graph_spectral_partition"
+    assert res_p["verified"] is True
+    assert res_p["algebraic_connectivity"] > 0.0
+
+
+def test_queuing_theory_mm1_and_mmc():
+    prompt_mm1 = "Compute Kendall M/M/1 queue length, waiting time, and verify Little's Law with arrival rate lambda=4.0 and service rate mu=5.0."
+    res_1 = solve_problem(prompt_mm1)
+    assert res_1["domain"] == "queuing_markov_chains"
+    assert res_1["verified"] is True
+    assert res_1["system_type"] == "M/M/1"
+    assert abs(res_1["traffic_intensity"] - 0.8) < 1e-6
+    assert abs(res_1["mean_customers_system"] - 4.0) < 1e-6
+    assert abs(res_1["mean_time_system"] - 1.0) < 1e-6
+
+    prompt_mmc = "Analyze Kendall M/M/c multi-server queue with arrival rate lambda=8.0, service rate mu=5.0, and servers c=2."
+    res_c = solve_problem(prompt_mmc)
+    assert res_c["domain"] == "queuing_markov_chains"
+    assert res_c["verified"] is True
+    assert res_c["system_type"] == "M/M/2"
+    assert abs(res_c["traffic_intensity"] - 0.8) < 1e-6
+    assert res_c["erlang_c_delay_probability"] > 0
+
 

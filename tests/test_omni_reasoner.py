@@ -200,3 +200,14 @@ def test_omni_reasoner_extended_domains():
     enz_pet = gen.generate_catalyst_for_substrate("synthetic_bioplastic_ester", ambient_temperature_c=50.0)
     assert enz_pet.target_class == "pet_depolymerase_cutinase"
 
+
+def test_omni_reasoner_scientific_hypothesis_falsification():
+    reasoner = OmniReasoner(seed=42)
+    res = reasoner.reason("Formulate Popperian falsifiable hypothesis and design crucial experiment with Lakatos research programme analysis")
+    assert res.intent == "scientific_hypothesis_falsification"
+    assert res.verified is True
+    assert "OLYMPUS" in res.empirical_simulation["simulation_type"]
+    assert res.empirical_simulation["receipt_verified"] is True
+    assert "paradigm_synthesis" in res.empirical_simulation
+
+

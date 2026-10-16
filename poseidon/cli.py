@@ -35,6 +35,7 @@ def main():
         "problem",
         "pantheon",
         "creative",
+        "hypothesis",
     ])
     p.add_argument("prompt", nargs="?", default="")
     p.add_argument("--root", default=".")

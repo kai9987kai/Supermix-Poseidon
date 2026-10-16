@@ -176,6 +176,12 @@ def make_handler(runtime, port):
                 except Exception as error:
                     self.send_json(500, {"error": str(error), "type": type(error).__name__})
                 return
+            if path == "/api/hypothesis/status":
+                try:
+                    self.send_json(200, runtime.hypothesis_status())
+                except Exception as error:
+                    self.send_json(500, {"error": str(error), "type": type(error).__name__})
+                return
             if path in ("/", "/index.html", "/style.css", "/app.js"):
                 file = WEB/("index.html" if path in ("/", "/index.html") else path[1:])
             elif path.startswith("/artifacts/"):
@@ -436,6 +442,30 @@ def make_handler(runtime, port):
                     prompt = payload.get("prompt", "")
                     seed = int(payload.get("seed", 42))
                     res = runtime.creative_synthesize(prompt, seed=seed)
+                    self.send_json(200, res)
+                except (ValueError, TypeError) as error:
+                    self.send_json(400, {"error": str(error)})
+                except Exception as error:
+                    self.send_json(500, {"error": str(error), "type": type(error).__name__})
+                return
+            if path == "/api/hypothesis/formulate":
+                try:
+                    conjecture = str(payload.get("conjecture", ""))
+                    domain = str(payload.get("domain", "science"))
+                    hard_core = payload.get("hard_core_assumptions", ["Primary Axiom"])
+                    protective_belt = payload.get("protective_belt", [])
+                    falsification_criteria = payload.get("falsification_criteria", ["Null divergence"])
+                    novel_predictions = payload.get("novel_predictions", [])
+                    prior = float(payload.get("prior", 0.5))
+                    res = runtime.hypothesis_formulate(
+                        conjecture=conjecture,
+                        domain=domain,
+                        hard_core_assumptions=hard_core,
+                        protective_belt=protective_belt,
+                        falsification_criteria=falsification_criteria,
+                        novel_predictions=novel_predictions,
+                        prior=prior,
+                    )
                     self.send_json(200, res)
                 except (ValueError, TypeError) as error:
                     self.send_json(400, {"error": str(error)})
