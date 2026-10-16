@@ -32,6 +32,9 @@ def main():
         "verify-3d-replay",
         "discovery-lab",
         "reason",
+        "problem",
+        "pantheon",
+        "creative",
     ])
     p.add_argument("prompt", nargs="?", default="")
     p.add_argument("--root", default=".")
@@ -41,7 +44,7 @@ def main():
     p.add_argument("--scarcity", type=float, default=None)
     p.add_argument("--adapter")
     p.add_argument("--oracle-checkpoint", help="explicit trained research ORACLE for cognitive/hyper TidePool control")
-    p.add_argument("--planner", choices=["policy", "mpc", "hybrid", "risk_aware", "uncertainty", "atlas", "contrast", "horizon", "odyssey", "helm", "odysseus", "aura", "metamorph", "chimera", "hyperion", "titan", "trident", "cognitive", "hyper", "poseidon_x", "nexus_omega"], default="policy", help="world simulation planner")
+    p.add_argument("--planner", choices=["policy", "mpc", "hybrid", "risk_aware", "uncertainty", "atlas", "contrast", "horizon", "odyssey", "helm", "odysseus", "aura", "metamorph", "chimera", "hyperion", "titan", "trident", "cognitive", "hyper", "poseidon_x", "nexus_omega", "pantheon"], default="policy", help="world simulation planner")
     p.add_argument("--use-pomdp", action="store_true", help="use partially observable POMDP TidePool environment")
     p.add_argument("--max-steps", type=int, default=None)
     p.add_argument("--anchors", type=int, default=24)

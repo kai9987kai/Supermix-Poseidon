@@ -39,6 +39,7 @@ class Poseidon:
         self._tessera = None
         self._external_adapter_bridge = None
         self._omni_reasoner = None
+        self._pantheon = None
         self._candidate_status_snapshots = {}
         self.memory_path = self.root/"outputs/memory.json"
 
@@ -1579,7 +1580,7 @@ class Poseidon:
             core_ready = active_core_path(self.root).is_file()
         except (ValueError, TypeError, OSError) as error:
             core_ready, core_error = False, str(error)
-        result = {"version": __version__, "name": "Supermix Poseidon", "language_ready": (self.root/"models/language/model.safetensors").exists(), "core_ready": core_ready, "atlas": self.atlas_status(), "contrast": self.contrast_status(), "horizon": self.horizon_status(), "odyssey": self.odyssey_status(), "helm": self.helm_status(), "odysseus": self.odysseus_status(), "mco": self.mco_status(), "aura": self.aura_status(), "tessera": self.tessera_status(), "mnemorph": self.mnemorph_status(), "metamorph": self.metamorph_status(), "chimera": self.chimera_status(), "hyperion": self.hyperion_status(), "titan": self.titan_status(), "trident": self.trident_status(), "hyper_agent": self.hyper_agent_status(), "ecosystem": self.ecosystem_status(), "poseidon_x": self.poseidon_x_status(), "external_adapter": self.external_adapter_status(), "nexus_omega": self.nexus_omega_status(), "discovery_lab": self.discovery_lab_status(), "omni_reasoner": self.omni_reasoner_status(), "reports": reports, "limits": "Experimental composite system. Controlled geometric media. Tool-assisted maths. Synthetic survival."} | source_status()
+        result = {"version": __version__, "name": "Supermix Poseidon", "language_ready": (self.root/"models/language/model.safetensors").exists(), "core_ready": core_ready, "atlas": self.atlas_status(), "contrast": self.contrast_status(), "horizon": self.horizon_status(), "odyssey": self.odyssey_status(), "helm": self.helm_status(), "odysseus": self.odysseus_status(), "mco": self.mco_status(), "aura": self.aura_status(), "tessera": self.tessera_status(), "mnemorph": self.mnemorph_status(), "metamorph": self.metamorph_status(), "chimera": self.chimera_status(), "hyperion": self.hyperion_status(), "titan": self.titan_status(), "trident": self.trident_status(), "hyper_agent": self.hyper_agent_status(), "ecosystem": self.ecosystem_status(), "poseidon_x": self.poseidon_x_status(), "external_adapter": self.external_adapter_status(), "nexus_omega": self.nexus_omega_status(), "discovery_lab": self.discovery_lab_status(), "omni_reasoner": self.omni_reasoner_status(), "pantheon": self.pantheon_status(), "noosphere": self.creative_status(), "reports": reports, "limits": "Experimental composite system. Controlled geometric media. Tool-assisted maths. Synthetic survival."} | source_status()
         if core_error:
             result["core_error"] = core_error
         return result
@@ -1587,11 +1588,70 @@ class Poseidon:
     def omni_reasoner_status(self):
         return {
             "ready": True,
-            "version": "stage-14-omni-reasoner-v1",
+            "version": "stage-17-omni-reasoner-v3",
             "prover": "Tessera LTL Bounded Model Checker",
-            "deliberation": "GhostInTheMachine Cognitive Monologue",
-            "intents": ["physical_discovery", "biocatalytic_synthesis", "formal_verification", "clifford_geometric", "causal_superposition", "general_hyper_reasoning"],
+            "deliberation": "GhostInTheMachine Cognitive Monologue + 4-Agent Dialectical Tribunal",
+            "intents": [
+                "physical_discovery",
+                "biocatalytic_synthesis",
+                "formal_verification",
+                "clifford_geometric",
+                "causal_superposition",
+                "biomechanical_kinematics",
+                "naval_stability",
+                "heuristic_problem_solving",
+                "pantheon_24_pillar_synthesis",
+                "creative_bisociation_synthesis",
+                "general_hyper_reasoning",
+            ],
         }
+
+    def creative_status(self):
+        from .creative_synthesis import ARCHETYPE_LIBRARY, INVARIANT_AXES
+        return {
+            "ready": True,
+            "version": "stage-17-noosphere-v1",
+            "archetypes_count": len(ARCHETYPE_LIBRARY),
+            "invariant_axes": list(INVARIANT_AXES),
+            "tribunal_agents": ["ThesisArchitect", "AntithesisSkeptic", "CreativeBisociator", "SynthesisArbiter"],
+        }
+
+    def creative_synthesize(self, prompt: str, seed: int = 42):
+        if not isinstance(prompt, str) or not 1 <= len(prompt.strip()) <= 32000:
+            raise ValueError("Prompt must contain 1–32000 characters.")
+        with self.lock:
+            from .creative_synthesis import DialecticalTribunal
+            return DialecticalTribunal().deliberate(prompt.strip(), seed=seed)
+
+    def pantheon(self, seed=42):
+        with self.lock:
+            if self._pantheon is None:
+                from .pantheon import PantheonEngine
+                try:
+                    core = self.core()
+                except Exception:
+                    core = None
+                self._pantheon = PantheonEngine(core=core, seed=seed)
+            return self._pantheon
+
+    def pantheon_status(self):
+        from .pantheon import PANTHEON_24_PILLARS
+        return {
+            "ready": True,
+            "version": "stage-16-pantheon-v1",
+            "total_pillars": len(PANTHEON_24_PILLARS),
+            "layers": sorted({p["layer"] for p in PANTHEON_24_PILLARS}),
+            "merkle_dag": "Quibble Content-Addressed 24-Node Merkle Build DAG",
+            "hardware_frame": "Flipper NTAG 215 NFC NDEF + ISO/IEC 14443-A CRC-16 (0x6363)",
+            "dream_consolidation": "Morpheus Counterfactual Theorem Synthesis",
+        }
+
+    def pantheon_synthesize(self, prompt: str, seed: int = 42):
+        if not isinstance(prompt, str) or not 1 <= len(prompt.strip()) <= 32000:
+            raise ValueError("Prompt must contain 1–32000 characters.")
+        with self.lock:
+            engine = self.pantheon(seed=seed)
+            return engine.synthesize(prompt.strip(), seed=seed)
 
     def reason(self, prompt, seed=42, max_new_tokens=512):
         if not isinstance(prompt, str) or not 1 <= len(prompt.strip()) <= 32000:
@@ -1634,6 +1694,10 @@ class Poseidon:
         if type(seed) is not int or not 0 <= seed < 2**63:
             raise ValueError("Seed must be a nonnegative integer below 2^63.")
         with self.lock:
+            if mode == "creative":
+                return self.creative_synthesize(prompt, seed=seed)
+            if mode == "pantheon":
+                return self.pantheon_synthesize(prompt, seed=seed)
             if mode == "reason":
                 return self.reason(prompt, seed=seed, max_new_tokens=max_new_tokens or 512)
             if mode == "problem":
@@ -1656,10 +1720,14 @@ class Poseidon:
                 from .world_controls import rollout_with_decisions
                 _integer(max_steps, "max_steps", 1, 10000)
                 scarcity = _number(scarcity, "scarcity", .5, 4)
-                if planner not in ("policy", "mpc", "hybrid", "risk_aware", "uncertainty", "atlas", "contrast", "horizon", "odyssey", "helm", "odysseus", "aura", "metamorph", "chimera", "hyperion", "titan", "trident", "cognitive", "hyper", "poseidon_x", "nexus_omega"):
+                if planner not in ("policy", "mpc", "hybrid", "risk_aware", "uncertainty", "atlas", "contrast", "horizon", "odyssey", "helm", "odysseus", "aura", "metamorph", "chimera", "hyperion", "titan", "trident", "cognitive", "hyper", "poseidon_x", "nexus_omega", "pantheon"):
                     raise ValueError("Unknown survival planner.")
                 core = self.core()
-                if planner == "nexus_omega":
+                if planner == "pantheon":
+                    controller = self.pantheon(seed=seed)
+                    controller.reset(scarcity)
+                    backend_desc = "Supermix Poseidon Project PANTHEON 24-Pillar Unified Cognitive Synthesis Agent in TidePool"
+                elif planner == "nexus_omega":
                     controller = self.nexus_omega(seed=seed)
                     controller.reset()
                     backend_desc = "Supermix Poseidon Nexus-Omega Causal Epigenetic Autonomous Agent in TidePool"
@@ -1752,3 +1820,4 @@ class Poseidon:
             result = self.language.generate(prompt, history, memories, max_new_tokens=max_new_tokens or 512)
             result["memories"] = memories
             return result
+

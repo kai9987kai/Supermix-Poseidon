@@ -33,10 +33,22 @@ _MAX_NODES = 160
 _DIVISOR_TRIAL_LIMIT = 10**5
 _MAX_CANDIDATE_PAIRS = 20000
 
+def _normalize_implicit_mult(expr: str) -> str:
+    """Normalize implicit multiplication (e.g. 2x -> 2*x, 3(x+1) -> 3*(x+1), (x-1)(x+2) -> (x-1)*(x+2))."""
+    s = expr
+    s = re.sub(r"(\d+(?:\.\d+)?)\s*([xyzuvwXYZUVW])(?![a-zA-Z])", r"\1*\2", s)
+    s = re.sub(r"(\d+(?:\.\d+)?)\s*\(", r"\1*(", s)
+    s = re.sub(r"\)\s*(\d+(?:\.\d+)?)", r")*\1", s)
+    s = re.sub(r"\)\s*\(", r")*(", s)
+    s = re.sub(r"\)\s*([xyzuvwXYZUVW])(?![a-zA-Z])", r")*\1", s)
+    s = re.sub(r"\b([xyzuvwXYZUVW])\s*\(", r"\1*(", s)
+    return s
+
 def _parse(expression):
     expression = expression.strip()
     if len(expression) > 250:
         raise MathError("Expression is too long (250 characters maximum).")
+    expression = _normalize_implicit_mult(expression)
     expression = expression.replace("^", "**").replace("×", "*").replace("÷", "/")
     if not re.fullmatch(r"[0-9xXyYzZwWuUvV+*/().%\s-]+", expression):
         raise MathError("Use numbers, x, y (z, w, u, v in systems), parentheses, and + - * / ** % only.")
@@ -926,8 +938,768 @@ def _allows_nonlinear(expression):
     return "^" in expression or "**" in expression or "(" in expression
 
 
+# ---------------------------------------------------------------------------
+# 1. Exact Symbolic Polynomial Calculus (exact-symbolic-calculus)
+# ---------------------------------------------------------------------------
+
+_CALCULUS_FUNCS = ("diff", "integrate")
+_MATRIX_FUNCS = ("det", "trace", "rank", "inv", "eigenvalues")
+_NT_FUNCS = ("gcd", "lcm", "factor", "totient", "phi", "modinv", "crt")
+_RADICAL_FUNCS = ("sqrt",)
+_ALL_SPECIAL_FUNCS = _CALCULUS_FUNCS + _MATRIX_FUNCS + _NT_FUNCS + _RADICAL_FUNCS
+_MAX_MATRIX_DIM = 5
+_MAX_NT_INT = 10**12
+
+
+def _poly_diff(poly):
+    """Exact symbolic derivative d/dx of a sparse polynomial dict."""
+    return _poly_clean({k - 1: _bounded(k * v) for k, v in poly.items() if k >= 1})
+
+
+def _poly_integrate(poly):
+    """Exact symbolic indefinite integral of a sparse polynomial dict (constant term 0)."""
+    return _poly_clean({k + 1: _bounded(v / Fraction(k + 1)) for k, v in poly.items() if v != 0})
+
+
+def _const_rational(node):
+    """Evaluate a constant AST node into an exact bounded Fraction."""
+    a, b = _linear(node)
+    if a != 0:
+        raise MathError("Expected a constant numeric value, not an expression containing x.")
+    return _bounded(b)
+
+
+def _const_int(node):
+    """Evaluate a constant AST node into an exact integer bounded by _MAX_NT_INT."""
+    for sub in ast.walk(node):
+        if isinstance(sub, ast.Constant) and type(sub.value) is not int:
+            raise MathError("Number theory functions require exact integer arguments.")
+    val = _const_rational(node)
+    if val.denominator != 1:
+        raise MathError("Number theory functions require integer arguments.")
+    n = int(val.numerator)
+    if abs(n) > _MAX_NT_INT:
+        raise MathError(f"Integer magnitude exceeds maximum limit of {_MAX_NT_INT}.")
+    return n
+
+
+def _parse_call_ast(expression, allowed_names):
+    """Parse a function-call expression with AST and strict token/node whitelisting."""
+    expr = expression.strip()
+    if len(expr) > 250:
+        raise MathError("Expression is too long (250 characters maximum).")
+    norm = expr.replace("^", "**").replace("×", "*").replace("÷", "/")
+    if not re.fullmatch(r"[0-9a-zA-Z_+*/().%=,\[\]\s-]+", norm):
+        raise MathError("Invalid characters in mathematical function expression.")
+    try:
+        tree = ast.parse(norm, mode="eval")
+    except (SyntaxError, RecursionError, ValueError) as e:
+        raise MathError("Invalid function call syntax.") from e
+    if sum(1 for _ in ast.walk(tree)) > _MAX_NODES:
+        raise MathError("Expression is too complex.")
+    body = tree.body
+    if not isinstance(body, ast.Call) or not isinstance(body.func, ast.Name):
+        raise MathError("Expected a top-level mathematical function call.")
+    for node in ast.walk(body):
+        if isinstance(node, ast.Call) and node is not body:
+            raise MathError("Nested function calls are not supported.")
+        if isinstance(node, ast.Name) and node.id.lower() not in allowed_names:
+            raise MathError(f"Unsupported identifier '{node.id}'.")
+    return body
+
+
+def _run_diff(poly, order, at_val, expression):
+    curr = dict(poly)
+    step_checks = True
+    for _ in range(order):
+        nxt = _poly_diff(curr)
+        reintegrated = _poly_integrate(nxt)
+        expected_nonconst = {k: v for k, v in curr.items() if k >= 1}
+        if reintegrated != expected_nonconst:
+            step_checks = False
+        curr = nxt
+    deriv_deg = max(_poly_degree(curr), 0)
+    deriv_dense = _dense(curr, deriv_deg)
+    deriv_str = _poly_string(deriv_dense)
+    if at_val is not None:
+        val = _bounded(_horner(deriv_dense, at_val))
+        direct_val = _bounded(sum((v * (at_val ** k) for k, v in curr.items()), Fraction(0)))
+        verified = bool(step_checks and val == direct_val)
+        ans_str = _format(val)
+        return {
+            "text": f"Derivative ({deriv_str}) evaluated at x = {_format(at_val)}: {ans_str}\nCheck: symbolic derivative and point evaluation verified.",
+            "answer": ans_str,
+            "derivative": deriv_str,
+            "order": order,
+            "at": _format(at_val),
+            "verified": verified,
+            "backend": "exact-symbolic-calculus",
+            "expression": expression,
+        }
+    return {
+        "text": f"Derivative: {deriv_str}\nCheck: antiderivative of each differentiation step recovers all non-constant terms.",
+        "answer": deriv_str,
+        "derivative": deriv_str,
+        "order": order,
+        "verified": bool(step_checks),
+        "backend": "exact-symbolic-calculus",
+        "expression": expression,
+    }
+
+
+def solve_calculus(expression: str) -> dict:
+    """Symbolic differentiation and indefinite/definite integration of polynomials in x."""
+    expression = expression.strip()
+    if len(expression) > 250:
+        raise MathError("Expression is too long (250 characters maximum).")
+    m_ddx = re.match(r"^d(?:\^(\d+))?\s*/\s*dx(?:\^(\d+))?\s*(.+)$", expression, flags=re.I)
+    if m_ddx:
+        ord1, ord2, body_str = m_ddx.group(1), m_ddx.group(2), m_ddx.group(3).strip()
+        if (ord1 or ord2) and ord1 != ord2:
+            raise MathError("Mismatched derivative order in d^n/dx^n notation.")
+        order = int(ord1) if ord1 else 1
+        if not 0 <= order <= MAX_POLY_DEGREE:
+            raise MathError(f"Differentiation order must be between 0 and {MAX_POLY_DEGREE}.")
+        poly = _poly(_parse(body_str))
+        return _run_diff(poly, order, None, expression)
+
+    call = _parse_call_ast(expression, {"diff", "integrate", "x"})
+    fname = call.func.id.lower()
+    if fname == "diff":
+        if not 1 <= len(call.args) <= 4:
+            raise MathError("diff() requires (poly[, x[, order]]) arguments.")
+        poly = _poly(call.args[0])
+        if len(call.args) >= 2:
+            if not (isinstance(call.args[1], ast.Name) and call.args[1].id.lower() == "x"):
+                raise MathError("Differentiation variable must be x.")
+        order = 1
+        at_val = None
+        if len(call.args) >= 3:
+            ord_val = _const_rational(call.args[2])
+            if ord_val.denominator != 1 or not (0 <= ord_val <= MAX_POLY_DEGREE):
+                raise MathError(f"Differentiation order must be an integer between 0 and {MAX_POLY_DEGREE}.")
+            order = int(ord_val)
+        if len(call.args) == 4:
+            at_val = _const_rational(call.args[3])
+        for kw in call.keywords:
+            if kw.arg == "at":
+                if at_val is not None:
+                    raise MathError("Duplicate 'at' argument in diff().")
+                at_val = _const_rational(kw.value)
+            elif kw.arg == "order":
+                ord_val = _const_rational(kw.value)
+                if ord_val.denominator != 1 or not (0 <= ord_val <= MAX_POLY_DEGREE):
+                    raise MathError(f"Differentiation order must be an integer between 0 and {MAX_POLY_DEGREE}.")
+                order = int(ord_val)
+            else:
+                raise MathError(f"Unsupported keyword argument '{kw.arg}' in diff().")
+        return _run_diff(poly, order, at_val, expression)
+
+    if fname == "integrate":
+        if call.keywords or len(call.args) not in (1, 2, 4):
+            raise MathError("integrate() requires (poly, x) or (poly, x, a, b).")
+        poly = _poly(call.args[0])
+        if len(call.args) >= 2:
+            if not (isinstance(call.args[1], ast.Name) and call.args[1].id.lower() == "x"):
+                raise MathError("Integration variable must be x.")
+        antideriv = _poly_integrate(poly)
+        ad_deg = max(_poly_degree(antideriv), 0)
+        ad_dense = _dense(antideriv, ad_deg)
+        ad_str = _poly_string(ad_dense)
+        diff_ok = _poly_diff(antideriv) == poly
+        if len(call.args) in (1, 2):
+            ans_str = f"{ad_str} + C" if antideriv else "C"
+            return {
+                "text": f"Indefinite integral: {ans_str}\nCheck: d/dx({ad_str}) reproduces the integrand exactly.",
+                "answer": ans_str,
+                "antiderivative": ad_str,
+                "verified": bool(diff_ok),
+                "backend": "exact-symbolic-calculus",
+                "expression": expression,
+            }
+        a = _const_rational(call.args[2])
+        b = _const_rational(call.args[3])
+        fa = _bounded(_horner(ad_dense, a))
+        fb = _bounded(_horner(ad_dense, b))
+        val = _bounded(fb - fa)
+        direct_val = _bounded(
+            sum((v * (b ** (k + 1) - a ** (k + 1)) / Fraction(k + 1) for k, v in poly.items()), Fraction(0))
+        )
+        verified = bool(diff_ok and val == direct_val)
+        ans_str = _format(val)
+        return {
+            "text": f"Definite integral from {_format(a)} to {_format(b)}: {ans_str}\nCheck: F'(x) = f(x) and F({_format(b)}) - F({_format(a)}) = {ans_str}.",
+            "answer": ans_str,
+            "antiderivative": ad_str,
+            "lower": _format(a),
+            "upper": _format(b),
+            "verified": verified,
+            "backend": "exact-symbolic-calculus",
+            "expression": expression,
+        }
+    raise MathError(f"Unsupported calculus function '{fname}'.")
+
+
+# ---------------------------------------------------------------------------
+# 2. Exact Matrix & Linear Algebra (exact-fraction-linear-algebra)
+# ---------------------------------------------------------------------------
+
+def _parse_matrix_ast(node):
+    if not isinstance(node, (ast.List, ast.Tuple)) or not node.elts:
+        raise MathError("Matrix must be a non-empty 2D list of rows.")
+    rows = len(node.elts)
+    if rows > _MAX_MATRIX_DIM:
+        raise MathError(f"Matrix dimension exceeds maximum supported size of {_MAX_MATRIX_DIM}x{_MAX_MATRIX_DIM}.")
+    first_row = node.elts[0]
+    if not isinstance(first_row, (ast.List, ast.Tuple)) or not first_row.elts:
+        raise MathError("Matrix rows must be non-empty lists.")
+    cols = len(first_row.elts)
+    if cols > _MAX_MATRIX_DIM:
+        raise MathError(f"Matrix dimension exceeds maximum supported size of {_MAX_MATRIX_DIM}x{_MAX_MATRIX_DIM}.")
+    mat = []
+    for row_node in node.elts:
+        if not isinstance(row_node, (ast.List, ast.Tuple)) or len(row_node.elts) != cols:
+            raise MathError("Matrix must be rectangular (all rows must have the same length).")
+        mat.append([_const_rational(cell) for cell in row_node.elts])
+    return mat
+
+
+def _mat_mul(A, B):
+    m, k, n = len(A), len(A[0]), len(B[0])
+    return [
+        [_bounded(sum((A[i][p] * B[p][j] for p in range(k)), Fraction(0))) for j in range(n)]
+        for i in range(m)
+    ]
+
+
+def _mat_det_cofactor(A):
+    n = len(A)
+    if n == 1:
+        return _bounded(A[0][0])
+    if n == 2:
+        return _bounded(A[0][0] * A[1][1] - A[0][1] * A[1][0])
+    total = Fraction(0)
+    for col in range(n):
+        elem = A[0][col]
+        if elem == 0:
+            continue
+        minor = [row[:col] + row[col + 1:] for row in A[1:]]
+        cof = _mat_det_cofactor(minor)
+        total = _bounded(total + (elem * cof if col % 2 == 0 else -elem * cof))
+    return total
+
+
+def _mat_det_lu(A):
+    n = len(A)
+    M = [list(row) for row in A]
+    sign = 1
+    det = Fraction(1)
+    for col in range(n):
+        pivot_row = max(range(col, n), key=lambda r: abs(M[r][col]))
+        if M[pivot_row][col] == 0:
+            return Fraction(0)
+        if pivot_row != col:
+            M[col], M[pivot_row] = M[pivot_row], M[col]
+            sign = -sign
+        piv = M[col][col]
+        det = _bounded(det * piv)
+        for r in range(col + 1, n):
+            if M[r][col] != 0:
+                factor = M[r][col] / piv
+                M[r] = [_bounded(M[r][c] - factor * M[col][c]) for c in range(n)]
+    return _bounded(sign * det)
+
+
+def _mat_rref(A):
+    rows, cols = len(A), len(A[0])
+    M = [list(row) for row in A]
+    r = 0
+    for col in range(cols):
+        if r == rows:
+            break
+        best = max(range(r, rows), key=lambda i: abs(M[i][col]))
+        if M[best][col] == 0:
+            continue
+        M[r], M[best] = M[best], M[r]
+        piv = M[r][col]
+        M[r] = [_bounded(v / piv) for v in M[r]]
+        for i in range(rows):
+            if i != r and M[i][col] != 0:
+                factor = M[i][col]
+                M[i] = [_bounded(a - factor * b) for a, b in zip(M[i], M[r])]
+        r += 1
+    return r, M
+
+
+def _poly_mat_det(P):
+    """Exact determinant of a matrix of sparse polynomials in x."""
+    n = len(P)
+    if n == 1:
+        return P[0][0]
+    if n == 2:
+        return _poly_add(_poly_mul(P[0][0], P[1][1]), _poly_mul(P[0][1], P[1][0]), -1)
+    total = {}
+    for col in range(n):
+        elem = P[0][col]
+        if not elem:
+            continue
+        minor = [row[:col] + row[col + 1:] for row in P[1:]]
+        sub_det = _poly_mat_det(minor)
+        term = _poly_mul(elem, sub_det)
+        total = _poly_add(total, term, 1 if col % 2 == 0 else -1)
+    return total
+
+
+def _mat_char_poly(A):
+    """Return sparse polynomial det(x*I - A) for square matrix A."""
+    n = len(A)
+    P = []
+    for i in range(n):
+        row = []
+        for j in range(n):
+            if i == j:
+                row.append(_poly_clean({1: Fraction(1), 0: -A[i][j]}))
+            else:
+                row.append(_poly_clean({0: -A[i][j]}))
+        P.append(row)
+    return _poly_mat_det(P)
+
+
+def solve_matrix(expression: str) -> dict:
+    """Exact Fraction matrix operations: det, trace, rank, inv, eigenvalues."""
+    call = _parse_call_ast(expression, set(_MATRIX_FUNCS))
+    fname = call.func.id.lower()
+    if call.keywords or len(call.args) != 1:
+        raise MathError(f"{fname}() requires exactly one 2D matrix argument.")
+    A = _parse_matrix_ast(call.args[0])
+    rows, cols = len(A), len(A[0])
+
+    if fname == "rank":
+        r_row, _ = _mat_rref(A)
+        A_T = [[A[i][j] for i in range(rows)] for j in range(cols)]
+        r_col, _ = _mat_rref(A_T)
+        verified = r_row == r_col
+        return {
+            "text": f"rank(A) = {r_row}\nCheck: exact RREF row rank ({r_row}) equals column rank ({r_col}).",
+            "answer": str(r_row),
+            "rank": r_row,
+            "verified": verified,
+            "backend": "exact-fraction-linear-algebra",
+            "expression": expression.strip(),
+        }
+
+    if rows != cols:
+        raise MathError(f"{fname}() requires a square matrix (got {rows}x{cols}).")
+    n = rows
+
+    if fname == "det":
+        d_cof = _mat_det_cofactor(A)
+        d_lu = _mat_det_lu(A)
+        verified = d_cof == d_lu
+        ans_str = _format(d_cof)
+        return {
+            "text": f"det(A) = {ans_str}\nCheck: cofactor expansion and exact LU elimination agree.",
+            "answer": ans_str,
+            "determinant": ans_str,
+            "verified": verified,
+            "backend": "exact-fraction-linear-algebra",
+            "expression": expression.strip(),
+        }
+
+    if fname == "trace":
+        tr = _bounded(sum((A[i][i] for i in range(n)), Fraction(0)))
+        char_poly = _mat_char_poly(A)
+        verified = char_poly.get(n - 1, Fraction(0)) == -tr
+        ans_str = _format(tr)
+        return {
+            "text": f"trace(A) = {ans_str}\nCheck: diagonal sum matches characteristic polynomial coefficient.",
+            "answer": ans_str,
+            "trace": ans_str,
+            "verified": verified,
+            "backend": "exact-fraction-linear-algebra",
+            "expression": expression.strip(),
+        }
+
+    if fname == "inv":
+        det_val = _mat_det_cofactor(A)
+        if det_val == 0:
+            raise MathError("Matrix is singular and cannot be inverted.")
+        aug = [
+            list(A[i]) + [Fraction(1 if i == j else 0) for j in range(n)]
+            for i in range(n)
+        ]
+        r_aug, rref_aug = _mat_rref(aug)
+        if r_aug < n:
+            raise MathError("Matrix is singular and cannot be inverted.")
+        inv_mat = [row[n:] for row in rref_aug]
+        eye = [[Fraction(1 if i == j else 0) for j in range(n)] for i in range(n)]
+        verified = _mat_mul(A, inv_mat) == eye and _mat_mul(inv_mat, A) == eye
+        ans_str = "[[" + "], [".join(", ".join(_format(v) for v in row) for row in inv_mat) + "]]"
+        return {
+            "text": f"inv(A) = {ans_str}\nCheck: A * A^-1 = I and A^-1 * A = I verified exactly.",
+            "answer": ans_str,
+            "inverse": [[_format(v) for v in row] for row in inv_mat],
+            "determinant": _format(det_val),
+            "verified": verified,
+            "backend": "exact-fraction-linear-algebra",
+            "expression": expression.strip(),
+        }
+
+    if fname == "eigenvalues":
+        tr = _bounded(sum((A[i][i] for i in range(n)), Fraction(0)))
+        det_val = _mat_det_cofactor(A)
+        char_poly = _mat_char_poly(A)
+        char_coeffs = _dense(char_poly, n)
+        if n == 1:
+            eig = A[0][0]
+            ans_str = _format(eig)
+            return {
+                "text": f"Eigenvalues: {ans_str}\nCheck: trace = {ans_str}, det = {ans_str}.",
+                "answer": ans_str,
+                "eigenvalues": [ans_str],
+                "multiplicities": [1],
+                "characteristic_polynomial": _poly_string(char_coeffs),
+                "trace": _format(tr),
+                "determinant": _format(det_val),
+                "verified": bool(eig == tr and eig == det_val),
+                "backend": "exact-fraction-linear-algebra",
+                "expression": expression.strip(),
+            }
+        poly_res = _solve_high_degree(char_coeffs, f"{_poly_string(char_coeffs)} = 0")
+        vieta_trace_ok = -char_coeffs[n - 1] == tr
+        vieta_det_ok = ((-1) ** n) * char_coeffs[0] == det_val
+        roots_check_ok = True
+        try:
+            rat_roots = [Fraction(r) for r in poly_res["roots"]]
+            if sum(m for m in poly_res["multiplicities"]) == n:
+                eig_sum = sum((r * m for r, m in zip(rat_roots, poly_res["multiplicities"])), Fraction(0))
+                eig_prod = math.prod(r ** m for r, m in zip(rat_roots, poly_res["multiplicities"]))
+                roots_check_ok = (eig_sum == tr) and (eig_prod == det_val)
+        except ValueError:
+            # Non-rational (radical/complex) roots are already verified in _solve_high_degree via exact factorization
+            roots_check_ok = poly_res["verified"]
+        verified = bool(poly_res["verified"] and vieta_trace_ok and vieta_det_ok and roots_check_ok)
+        return {
+            "text": (
+                f"Eigenvalues: {poly_res['answer']}\n"
+                f"Characteristic polynomial: {_poly_string(char_coeffs)} = 0\n"
+                f"Check: sum(eigenvalues) = trace = {_format(tr)}, prod(eigenvalues) = det = {_format(det_val)}."
+            ),
+            "answer": poly_res["answer"],
+            "eigenvalues": poly_res["roots"],
+            "multiplicities": poly_res["multiplicities"],
+            "characteristic_polynomial": _poly_string(char_coeffs),
+            "trace": _format(tr),
+            "determinant": _format(det_val),
+            "verified": verified,
+            "backend": "exact-fraction-linear-algebra",
+            "expression": expression.strip(),
+        }
+    raise MathError(f"Unsupported matrix operation '{fname}'.")
+
+
+# ---------------------------------------------------------------------------
+# 3. Exact Number Theory & Modular Arithmetic (exact-number-theory)
+# ---------------------------------------------------------------------------
+
+def _egcd(a, b):
+    """Extended Euclidean Algorithm: returns (g, x, y) such that a*x + b*y = g = gcd(a, b) >= 0."""
+    old_r, r = a, b
+    old_s, s = 1, 0
+    old_t, t = 0, 1
+    while r != 0:
+        q = old_r // r
+        old_r, r = r, old_r - q * r
+        old_s, s = s, old_s - q * s
+        old_t, t = t, old_t - q * t
+    if old_r < 0:
+        return -old_r, -old_s, -old_t
+    return old_r, old_s, old_t
+
+
+def _is_prime(n):
+    if n < 2:
+        return False
+    if n in (2, 3):
+        return True
+    if n % 2 == 0 or n % 3 == 0:
+        return False
+    d = 5
+    while d * d <= n:
+        if n % d == 0 or n % (d + 2) == 0:
+            return False
+        d += 6
+    return True
+
+
+def _prime_factors(n):
+    """Return prime factorization of n >= 2 as [(p, e), ...] in ascending prime order."""
+    factors = []
+    m = n
+    for p in (2, 3):
+        if m % p == 0:
+            e = 0
+            while m % p == 0:
+                m //= p
+                e += 1
+            factors.append((p, e))
+    d = 5
+    while d * d <= m:
+        for step in (d, d + 2):
+            if m % step == 0:
+                e = 0
+                while m % step == 0:
+                    m //= step
+                    e += 1
+                factors.append((step, e))
+        d += 6
+    if m > 1:
+        factors.append((m, 1))
+    return factors
+
+
+def solve_number_theory(expression: str) -> dict:
+    """Exact number-theoretic operations: gcd, lcm, factor, totient/phi, modinv, crt."""
+    call = _parse_call_ast(expression, set(_NT_FUNCS))
+    fname = call.func.id.lower()
+    if call.keywords:
+        raise MathError(f"{fname}() does not accept keyword arguments.")
+
+    if fname in ("gcd", "lcm"):
+        if len(call.args) == 1 and isinstance(call.args[0], (ast.List, ast.Tuple)):
+            arg_nodes = call.args[0].elts
+        else:
+            arg_nodes = call.args
+        if len(arg_nodes) < 2:
+            raise MathError(f"{fname}() requires at least two integer arguments.")
+        nums = [_const_int(node) for node in arg_nodes]
+        if fname == "gcd":
+            g = nums[0]
+            coeffs = [1]
+            for num in nums[1:]:
+                g_next, s, t = _egcd(g, num)
+                coeffs = [c * s for c in coeffs] + [t]
+                g = g_next
+            bezout_sum = sum(c * a for c, a in zip(coeffs, nums))
+            divides_all = all(a % g == 0 for a in nums) if g > 0 else all(a == 0 for a in nums)
+            verified = bool(g >= 0 and bezout_sum == g and divides_all)
+            return {
+                "text": f"gcd({', '.join(str(x) for x in nums)}) = {g}\nCheck: divides all inputs and Bezout identity verified.",
+                "answer": str(g),
+                "gcd": g,
+                "verified": verified,
+                "backend": "exact-number-theory",
+                "expression": expression.strip(),
+            }
+        else:
+            L = math.lcm(*nums)
+            if L == 0:
+                verified = any(a == 0 for a in nums)
+            else:
+                multiples_ok = all(a != 0 and L % abs(a) == 0 for a in nums)
+                coprime_quotients = math.gcd(*(L // abs(a) for a in nums)) == 1
+                verified = bool(multiples_ok and coprime_quotients)
+            return {
+                "text": f"lcm({', '.join(str(x) for x in nums)}) = {L}\nCheck: common multiple with coprime quotients verified.",
+                "answer": str(L),
+                "lcm": L,
+                "verified": verified,
+                "backend": "exact-number-theory",
+                "expression": expression.strip(),
+            }
+
+    if fname == "factor":
+        if len(call.args) != 1:
+            raise MathError("factor(n) requires exactly one integer argument.")
+        n = _const_int(call.args[0])
+        if n < 2:
+            raise MathError("factor(n) requires an integer n >= 2.")
+        factors = _prime_factors(n)
+        prod_check = math.prod(p ** e for p, e in factors) == n
+        prime_check = all(_is_prime(p) and e >= 1 for p, e in factors)
+        order_check = all(factors[i][0] < factors[i + 1][0] for i in range(len(factors) - 1))
+        verified = bool(prod_check and prime_check and order_check)
+        ans_str = " * ".join(f"{p}" if e == 1 else f"{p}^{e}" for p, e in factors)
+        return {
+            "text": f"{n} = {ans_str}\nCheck: product of prime powers equals {n} and every factor is prime.",
+            "answer": ans_str,
+            "factors": {str(p): e for p, e in factors},
+            "verified": verified,
+            "backend": "exact-number-theory",
+            "expression": expression.strip(),
+        }
+
+    if fname in ("totient", "phi"):
+        if len(call.args) != 1:
+            raise MathError(f"{fname}(n) requires exactly one integer argument.")
+        n = _const_int(call.args[0])
+        if n < 1:
+            raise MathError(f"{fname}(n) requires a positive integer n >= 1.")
+        if n == 1:
+            return {
+                "text": "phi(1) = 1\nCheck: Euler totient base case verified.",
+                "answer": "1",
+                "totient": 1,
+                "verified": True,
+                "backend": "exact-number-theory",
+                "expression": expression.strip(),
+            }
+        factors = _prime_factors(n)
+        phi_val = math.prod((p ** (e - 1)) * (p - 1) for p, e in factors)
+        # Verify via rational product n * prod(1 - 1/p) and Gauss divisor-sum identity sum_{d|n} phi(d) = n
+        rat_phi = Fraction(n) * math.prod(Fraction(p - 1, p) for p, _ in factors)
+        gauss_sum = math.prod(
+            1 + sum((p ** (j - 1)) * (p - 1) for j in range(1, e + 1))
+            for p, e in factors
+        )
+        prod_ok = math.prod(p ** e for p, e in factors) == n and all(_is_prime(p) for p, _ in factors)
+        verified = bool(prod_ok and rat_phi == phi_val and gauss_sum == n)
+        return {
+            "text": f"phi({n}) = {phi_val}\nCheck: prime factorization product and Gauss divisor-sum identity sum_{{d|{n}}} phi(d) = {n} verified.",
+            "answer": str(phi_val),
+            "totient": phi_val,
+            "verified": verified,
+            "backend": "exact-number-theory",
+            "expression": expression.strip(),
+        }
+
+    if fname == "modinv":
+        if len(call.args) != 2:
+            raise MathError("modinv(a, m) requires exactly two integer arguments.")
+        a = _const_int(call.args[0])
+        m = _const_int(call.args[1])
+        if m < 2:
+            raise MathError("Modulus m in modinv(a, m) must be an integer >= 2.")
+        g, x, _ = _egcd(a % m, m)
+        if g != 1:
+            raise MathError(f"Modular inverse does not exist because gcd({a}, {m}) = {g} != 1.")
+        inv = x % m
+        verified = bool(0 < inv < m and (a * inv) % m == 1)
+        return {
+            "text": f"modinv({a}, {m}) = {inv}\nCheck: ({a} * {inv}) mod {m} = 1.",
+            "answer": str(inv),
+            "inverse": inv,
+            "modulus": m,
+            "verified": verified,
+            "backend": "exact-number-theory",
+            "expression": expression.strip(),
+        }
+
+    if fname == "crt":
+        pairs = []
+        if len(call.args) == 1 and isinstance(call.args[0], (ast.List, ast.Tuple)):
+            for item in call.args[0].elts:
+                if not isinstance(item, (ast.List, ast.Tuple)) or len(item.elts) != 2:
+                    raise MathError("crt() list elements must be (remainder, modulus) pairs.")
+                pairs.append((_const_int(item.elts[0]), _const_int(item.elts[1])))
+        elif all(isinstance(arg, (ast.List, ast.Tuple)) and len(arg.elts) == 2 for arg in call.args) and len(call.args) >= 1:
+            for item in call.args:
+                pairs.append((_const_int(item.elts[0]), _const_int(item.elts[1])))
+        elif len(call.args) >= 2 and len(call.args) % 2 == 0:
+            nums = [_const_int(arg) for arg in call.args]
+            pairs = [(nums[i], nums[i + 1]) for i in range(0, len(nums), 2)]
+        else:
+            raise MathError("crt() requires [(r1, m1), (r2, m2), ...] or (r1, m1, r2, m2, ...).")
+        if not pairs:
+            raise MathError("crt() requires at least one congruence pair.")
+        x = 0
+        M = 1
+        for r_i, m_i in pairs:
+            if m_i < 1:
+                raise MathError("CRT moduli must be positive integers.")
+            r_norm = r_i % m_i
+            g, s, _ = _egcd(M, m_i)
+            if (r_norm - x) % g != 0:
+                raise MathError("Chinese Remainder Theorem system has no solution (incompatible congruences).")
+            lcm_m = (M // g) * m_i
+            step = ((r_norm - x) // g) * s % (m_i // g)
+            x = (x + M * step) % lcm_m
+            M = lcm_m
+        expected_M = math.lcm(*(m_i for _, m_i in pairs))
+        verified = bool(0 <= x < M and M == expected_M and all(x % m_i == r_i % m_i for r_i, m_i in pairs))
+        return {
+            "text": f"x = {x} (mod {M})\nCheck: all {len(pairs)} congruences verified modulo lcm = {M}.",
+            "answer": str(x),
+            "solution": x,
+            "modulus": M,
+            "verified": verified,
+            "backend": "exact-number-theory",
+            "expression": expression.strip(),
+        }
+    raise MathError(f"Unsupported number theory function '{fname}'.")
+
+
+def solve_sqrt(expression: str) -> dict:
+    """Exact principal square root of non-negative rational numbers."""
+    call = _parse_call_ast(expression, {"sqrt"})
+    if call.keywords or len(call.args) != 1:
+        raise MathError("sqrt(n) requires exactly one numeric argument.")
+    val = _const_rational(call.args[0])
+    if val < 0:
+        raise MathError("Square root of a negative number is not a real number.")
+    num = val.numerator
+    den = val.denominator
+    r_num = math.isqrt(num)
+    r_den = math.isqrt(den)
+    if r_num * r_num == num and r_den * r_den == den:
+        res = Fraction(r_num, r_den)
+        ans_str = _format(res)
+        verified = bool(res * res == val)
+        return {
+            "text": f"sqrt({_format(val)}) = {ans_str}\nCheck: ({ans_str})^2 = {_format(val)} verified exactly.",
+            "answer": ans_str,
+            "root": ans_str,
+            "verified": verified,
+            "backend": "exact-radical-solver",
+            "expression": expression.strip(),
+        }
+    f_val = math.sqrt(float(val))
+    ans_str = f"{f_val:.6g}"
+    return {
+        "text": f"sqrt({_format(val)}) ≈ {ans_str}",
+        "answer": ans_str,
+        "root": ans_str,
+        "verified": False,
+        "backend": "numeric-radical-approximation",
+        "expression": expression.strip(),
+    }
+
+
+def _top_level_call_name(expression):
+    """If expression is a single top-level call fname(...), return fname.lower(), else None."""
+    m = re.match(r"^([a-zA-Z_][a-zA-Z0-9_]*)\s*\(", expression)
+    if not m:
+        return None
+    open_idx = m.end() - 1
+    depth = 0
+    for idx in range(open_idx, len(expression)):
+        ch = expression[idx]
+        if ch == "(":
+            depth += 1
+        elif ch == ")":
+            depth -= 1
+            if depth == 0:
+                return m.group(1).lower() if idx == len(expression) - 1 else None
+    return None
+
+
 def solve(expression):
     expression = expression.strip()
+    if len(expression) > 250:
+        raise MathError("Expression is too long (250 characters maximum).")
+    if re.match(r"^d(?:\^\d+)?\s*/\s*dx(?:\^\d+)?(?:\s+|\s*\()", expression, flags=re.I):
+        return solve_calculus(expression)
+    fname = _top_level_call_name(expression)
+    if fname is not None:
+        if fname in _CALCULUS_FUNCS:
+            return solve_calculus(expression)
+        if fname in _MATRIX_FUNCS:
+            return solve_matrix(expression)
+        if fname in _NT_FUNCS:
+            return solve_number_theory(expression)
+        if fname in _RADICAL_FUNCS:
+            return solve_sqrt(expression)
+        raise MathError(f"Unsupported function '{fname}'.")
     if ("," in expression or ";" in expression) and "=" in expression:
         return _solve_any_system(expression)
     if expression.count("=") == 1:
@@ -947,16 +1719,234 @@ def solve(expression):
         raise MathError("An expression with x requires an equation.")
     return {"text": f"{expression} = {_format(result)}", "answer": _format(result), "verified": True, "backend": "exact-rational-arithmetic", "expression": expression}
 
+
+def _extract_special_call(text):
+    """Extract a valid special math function call or d/dx (...) if present, else None."""
+    # Check d/dx (...) notation
+    m_ddx = re.search(r"\b(d(?:\^\d+)?\s*/\s*dx(?:\^\d+)?\s*\()", text, flags=re.I)
+    if m_ddx:
+        open_idx = m_ddx.end() - 1
+        depth = 0
+        for idx in range(open_idx, len(text)):
+            if text[idx] == "(":
+                depth += 1
+            elif text[idx] == ")":
+                depth -= 1
+                if depth == 0:
+                    inner = text[open_idx + 1:idx]
+                    if (
+                        inner.strip()
+                        and re.fullmatch(r"[0-9xX+*/().^\s×÷-]+", inner)
+                        and any(c.isdigit() or c in "xX" for c in inner)
+                    ):
+                        return text[m_ddx.start():idx + 1]
+                    break
+
+    pattern = r"\b(" + "|".join(_ALL_SPECIAL_FUNCS) + r")\s*\("
+    for m in re.finditer(pattern, text, flags=re.I):
+        open_idx = m.end() - 1
+        p_depth = 0
+        b_depth = 0
+        close_idx = None
+        for idx in range(open_idx, len(text)):
+            ch = text[idx]
+            if ch == "(":
+                p_depth += 1
+            elif ch == ")":
+                p_depth -= 1
+                if p_depth < 0:
+                    break
+                if p_depth == 0:
+                    close_idx = idx
+                    break
+            elif ch == "[":
+                b_depth += 1
+            elif ch == "]":
+                b_depth -= 1
+                if b_depth < 0:
+                    break
+        if close_idx is None or p_depth != 0 or b_depth != 0:
+            continue
+        inner = text[open_idx + 1:close_idx]
+        if not inner.strip():
+            continue
+        if not re.fullmatch(r"[0-9a-zA-Z_+*/().%=,\[\]\s^×÷-]+", inner):
+            continue
+        words = [w.lower() for w in re.findall(r"[A-Za-z_]+", inner)]
+        if any(w not in ("x", "at", "order") for w in words):
+            continue
+        if not (any(c.isdigit() for c in inner) or "x" in words):
+            continue
+        candidate = text[m.start():close_idx + 1]
+        return candidate
+    return None
+
+
 def extract_math(prompt):
-    text = prompt.strip().rstrip("?.")
-    text = re.sub(r"^(?:please\s+)?(?:calculate|compute|solve|evaluate|what is|what's)\s+", "", text, flags=re.I)
-    if not re.fullmatch(r"[0-9xXyYzZwWuUvV+*/().%=,;\s^×÷-]+", text) or not any(c.isdigit() for c in text):
+    text = prompt.strip().rstrip("?.!")
+    special = _extract_special_call(text)
+    if special is not None:
+        return special
+
+    # 1. Percentage calculation: "What is 15% of 240?"
+    m_pct = re.match(
+        r"^(?:(?:please\s+)?(?:what\s+is|what's|calculate|compute|find|evaluate)\s+)?(\d+(?:\.\d+)?)\s*%\s+of\s+(\d+(?:\.\d+)?)$",
+        text,
+        flags=re.I,
+    )
+    if m_pct:
+        return f"({m_pct.group(1)}/100) * {m_pct.group(2)}"
+
+    # 2. Exponentiation: "What is 2 to the power of 10?"
+    m_pow = re.match(
+        r"^(?:(?:please\s+)?(?:what\s+is|what's|calculate|compute|find|evaluate)\s+)?(\d+(?:\.\d+)?)\s+to\s+the\s+(?:power\s+of\s+|power\s+)?(\d+(?:\.\d+)?)$",
+        text,
+        flags=re.I,
+    )
+    if m_pow:
+        return f"({m_pow.group(1)})^({m_pow.group(2)})"
+
+    # 3. Square root: "What is the square root of 144?"
+    m_sqrt = re.match(
+        r"^(?:(?:please\s+)?(?:what\s+is|what's|calculate|compute|find|evaluate)\s+)?(?:the\s+)?square\s+root\s+of\s+(\d+(?:\.\d+)?)$",
+        text,
+        flags=re.I,
+    )
+    if m_sqrt:
+        return f"sqrt({m_sqrt.group(1)})"
+
+    # 4. Derivative: "What is the derivative of x^3 - 4x?"
+    m_diff = re.match(
+        r"^(?:(?:please\s+)?(?:what\s+is|what's|calculate|compute|find|evaluate)\s+)?(?:the\s+)?derivative\s+of\s+([0-9a-zA-Z_+*/().^\s×÷-]+?)(?:\s+with\s+respect\s+to\s+([a-zA-Z]))?(?:\s+at\s+([0-9.-]+))?$",
+        text,
+        flags=re.I,
+    )
+    if m_diff:
+        poly_str = _normalize_implicit_mult(m_diff.group(1).strip())
+        var = m_diff.group(2) or "x"
+        at_val = m_diff.group(3)
+        if re.fullmatch(r"[0-9xX+*/().^\s×÷-]+", poly_str) and any(c.isdigit() or c in "xX" for c in poly_str):
+            if at_val:
+                return f"diff({poly_str}, {var}, at={at_val})"
+            return f"diff({poly_str}, {var})"
+
+    # 5. Definite and indefinite integral: "Find the integral of 2x from 0 to 3"
+    m_int_def = re.match(
+        r"^(?:(?:please\s+)?(?:what\s+is|what's|calculate|compute|find|evaluate)\s+)?(?:the\s+)?integral\s+of\s+([0-9a-zA-Z_+*/().^\s×÷-]+?)\s+from\s+([0-9.-]+)\s+to\s+([0-9.-]+)$",
+        text,
+        flags=re.I,
+    )
+    if m_int_def:
+        poly_str = _normalize_implicit_mult(m_int_def.group(1).strip())
+        low = m_int_def.group(2).strip()
+        high = m_int_def.group(3).strip()
+        if re.fullmatch(r"[0-9xX+*/().^\s×÷-]+", poly_str) and any(c.isdigit() or c in "xX" for c in poly_str):
+            return f"integrate({poly_str}, x, {low}, {high})"
+
+    m_int_indef = re.match(
+        r"^(?:(?:please\s+)?(?:what\s+is|what's|calculate|compute|find|evaluate)\s+)?(?:the\s+)?integral\s+of\s+([0-9a-zA-Z_+*/().^\s×÷-]+?)(?:\s+with\s+respect\s+to\s+([a-zA-Z]))?$",
+        text,
+        flags=re.I,
+    )
+    if m_int_indef:
+        poly_str = _normalize_implicit_mult(m_int_indef.group(1).strip())
+        var = m_int_indef.group(2) or "x"
+        if re.fullmatch(r"[0-9xX+*/().^\s×÷-]+", poly_str) and any(c.isdigit() or c in "xX" for c in poly_str):
+            return f"integrate({poly_str}, {var})"
+
+    # 6. Greatest common divisor: "What is the greatest common divisor of 84 and 36?"
+    m_gcd = re.match(
+        r"^(?:(?:please\s+)?(?:what\s+is|what's|calculate|compute|find|evaluate)\s+)?(?:the\s+)?(?:greatest\s+common\s+divisor|gcd)\s+of\s+([0-9,\s\band\b]+)$",
+        text,
+        flags=re.I,
+    )
+    if m_gcd:
+        nums = re.findall(r"\d+", m_gcd.group(1))
+        if len(nums) >= 2:
+            return f"gcd({', '.join(nums)})"
+
+    # 7. Least common multiple: "What is the least common multiple of 4, 6 and 10?"
+    m_lcm = re.match(
+        r"^(?:(?:please\s+)?(?:what\s+is|what's|calculate|compute|find|evaluate)\s+)?(?:the\s+)?(?:least\s+common\s+multiple|lcm)\s+of\s+([0-9,\s\band\b]+)$",
+        text,
+        flags=re.I,
+    )
+    if m_lcm:
+        nums = re.findall(r"\d+", m_lcm.group(1))
+        if len(nums) >= 2:
+            return f"lcm({', '.join(nums)})"
+
+    # 8. Factorization: "Factorize 1001" or "prime factorization of 1001"
+    m_fac = re.match(
+        r"^(?:(?:please\s+)?(?:what\s+is|what's|calculate|compute|find|evaluate)\s+)?(?:factorize|prime\s+factorization\s+of|factor)\s+(\d+)$",
+        text,
+        flags=re.I,
+    )
+    if m_fac:
+        return f"factor({m_fac.group(1)})"
+
+    # 9. Natural-language matrix operations: "What is the determinant of [[2, 1], [5, 3]]?"
+    m_mat = re.match(
+        r"^(?:(?:please\s+)?(?:what\s+is|what's|calculate|compute|find|evaluate)\s+)?(?:the\s+)?(determinant|inverse|trace|rank|eigenvalues)\s+of\s+(\[\[.*?\]\])$",
+        text,
+        flags=re.I,
+    )
+    if m_mat:
+        op_map = {
+            "determinant": "det",
+            "inverse": "inv",
+            "trace": "trace",
+            "rank": "rank",
+            "eigenvalues": "eigenvalues",
+        }
+        return f"{op_map[m_mat.group(1).lower()]}({m_mat.group(2).strip()})"
+
+    # 10. Word arithmetic: "Calculate 7 times 8 plus 6"
+    cleaned_arith = re.sub(
+        r"^(?:please\s+)?(?:calculate|compute|evaluate|what\s+is|what's|find|solve)\s+",
+        "",
+        text,
+        flags=re.I,
+    ).strip()
+    words = re.findall(r"[a-zA-Z]+", cleaned_arith.lower())
+    arith_words = {"times", "multiplied", "by", "plus", "minus", "divided", "over"}
+    if words and all(w in arith_words for w in words):
+        expr_trans = re.sub(r"\bmultiplied\s+by\b", "*", cleaned_arith, flags=re.I)
+        expr_trans = re.sub(r"\btimes\b", "*", expr_trans, flags=re.I)
+        expr_trans = re.sub(r"\bdivided\s+by\b", "/", expr_trans, flags=re.I)
+        expr_trans = re.sub(r"\bover\b", "/", expr_trans, flags=re.I)
+        expr_trans = re.sub(r"\bplus\b", "+", expr_trans, flags=re.I)
+        expr_trans = re.sub(r"\bminus\b", "-", expr_trans, flags=re.I)
+        expr_trans = _normalize_implicit_mult(expr_trans.strip())
+        if re.fullmatch(r"[0-9+*/().%\s-]+", expr_trans) and any(c.isdigit() for c in expr_trans):
+            return expr_trans
+
+    # 11. "If <eq>, what is <var>?"
+    m_if = re.match(
+        r"^(?:if\s+)?(.+?)(?:,\s*(?:what\s+is|what's|find|solve\s+for|calculate)\s+([a-zA-Z]))$",
+        text,
+        flags=re.I,
+    )
+    if m_if and "=" in m_if.group(1):
+        cand = _normalize_implicit_mult(m_if.group(1).strip())
+        if re.fullmatch(r"[0-9xXyYzZwWuUvV+*/().%=,;\s^×÷-]+", cand) and any(c.isdigit() for c in cand):
+            return cand
+
+    # 12. System equations joined by "and" (e.g. "Solve x + y = 10 and x - y = 2")
+    m_sys_and = re.sub(r"\s+and\s+(?=[^=]+=[^=]+)", ", ", cleaned_arith, flags=re.I)
+    m_sys_and = _normalize_implicit_mult(m_sys_and.strip())
+    if "," in m_sys_and and "=" in m_sys_and:
+        if re.fullmatch(r"[0-9xXyYzZwWuUvV+*/().%=,;\s^×÷-]+", m_sys_and) and any(c.isdigit() for c in m_sys_and):
+            return m_sys_and
+
+    # 13. Fall back to standard extraction
+    cand_text = _normalize_implicit_mult(cleaned_arith.strip())
+    if not re.fullmatch(r"[0-9xXyYzZwWuUvV+*/().%=,;\s^×÷-]+", cand_text) or not any(c.isdigit() for c in cand_text):
         return None
-    if re.search(r"[zZwWuUvV]", text):
-        # Extra system variables only count inside equations, as standalone one-letter names,
-        # so short words or text-speak ("u", "vw") are not mistaken for math.
-        if "=" not in text:
+    if re.search(r"[zZwWuUvV]", cand_text):
+        if "=" not in cand_text:
             return None
-        if any(len(run) > 1 for run in re.findall(r"[A-Za-z]+", text)):
+        if any(len(run) > 1 for run in re.findall(r"[A-Za-z]+", cand_text)):
             return None
-    return text
+    return cand_text
+

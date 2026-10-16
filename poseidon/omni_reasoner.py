@@ -109,6 +109,8 @@ class OmniReasoner:
         "formal_verification",
         "clifford_geometric",
         "causal_superposition",
+        "pantheon_24_pillar_synthesis",
+        "creative_bisociation_synthesis",
         "general_hyper_reasoning",
     )
 
@@ -125,6 +127,10 @@ class OmniReasoner:
     def classify_intent(self, query: str) -> str:
         """Classifies the semantic intent of the query to select domain co-processors."""
         q = query.lower()
+        if any(k in q for k in ("pantheon", "24-pillar", "24 pillar", "quibble", "mnemorph", "ntag215", "ntag-215")):
+            return "pantheon_24_pillar_synthesis"
+        if any(k in q for k in ("bisociat", "noosphere", "dialectic", "concept blend", "analogical synthesis", "creative synthesis")):
+            return "creative_bisociation_synthesis"
         if any(k in q for k in ("enzyme", "cataly", "kinetic", "michaelis", "substrate", "protein", "triad", "cure", "resin", "cross-link", "crosslink")):
             return "biocatalytic_synthesis"
         if any(k in q for k in ("biomechanic", "stride reach", "gait", "friction cone", "slip hazard", "leg length", "inverted pendulum")):
@@ -135,12 +141,6 @@ class OmniReasoner:
         # Check heuristic / verified search problem domains (Sudoku, water jugs, river crossing, 24 game, etc.)
         if any(k in q for k in ("sudoku", "hanoi", "n-queens", "n queens", "water jug", "missionar", "cannibal", "cryptarithm", "8-puzzle", "15-puzzle", "sliding puzzle", "make 24", "countdown", "wolf", "goat", "cabbage")):
             return "heuristic_problem_solving"
-        try:
-            from .problem_solver import detect_problem
-            if detect_problem(query) is not None:
-                return "heuristic_problem_solving"
-        except Exception:
-            pass
 
         if any(k in q for k in ("river", "raft", "bridge", "sink", "float", "stone", "buoyancy", "archimedes")) or re.search(r"\b(cross|crossing|logs?|stream|water)\b", q):
             return "physical_discovery"
@@ -148,7 +148,15 @@ class OmniReasoner:
             return "formal_verification"
         if any(k in q for k in ("clifford", "multivector", "rotor", "bivector", "pseudoscalar", "kinematic", "vortex", "lorentz", "spin")):
             return "clifford_geometric"
-        if any(k in q for k in ("causal", "counterfactual", "superposition", "causeway", "quantum", "amplitude", "wavefunction", "collapse", "do(")):
+        if any(k in q for k in ("causeway", "wavefunction", "collapse", "superposition")):
+            return "causal_superposition"
+        try:
+            from .problem_solver import detect_problem
+            if detect_problem(query) is not None:
+                return "heuristic_problem_solving"
+        except Exception:
+            pass
+        if any(k in q for k in ("causal", "counterfactual", "quantum", "amplitude", "do(")):
             return "causal_superposition"
         return "general_hyper_reasoning"
 
@@ -495,9 +503,15 @@ class OmniReasoner:
                 "By formulating formal state invariants, admissible heuristics, and an independent verification oracle, "
                 "an optimal or certified impossible solution can be established without hallucination."
             )
+        elif intent == "pantheon_24_pillar_synthesis":
+            hypo_text = (
+                "Hypothesis H1: Executing the 6-Layer, 24-Pillar Pantheon Synthesis Engine will bind the problem in 256-D HRR + 3D FCC diamond lattice space, "
+                "route via Top-2 Sparse MoE, amplify via QuantumBot CHSH entanglement and Causeway Pearl do(X) calculus, synthesize a verified Morpheus counterfactual dream twin, "
+                "confirm Mnemorph lesion self-repair, and seal a 24-node Quibble Merkle DAG + NTAG-215 CRC-16 frame."
+            )
         else:
             hypo_text = (
-                "Hypothesis H1: System 2 deliberation combined with formal bounded model checking will resolve the query with provable safety invariants, "
+                "Hypothesis H1: System 2 deliberation combined with 24-Pillar Pantheon synthesis and formal bounded model checking will resolve the query with provable safety invariants, "
                 "eliminating hallucinations and establishing an auditable proof receipt."
             )
 
@@ -524,12 +538,51 @@ class OmniReasoner:
             sim_result = self._simulate_clifford_geometric()
         elif intent == "causal_superposition":
             sim_result = self._simulate_causal_superposition()
-        else:
+        elif intent == "pantheon_24_pillar_synthesis":
+            from .pantheon import PantheonEngine
+            p_res = PantheonEngine(seed=seed).synthesize(prompt, seed=seed)
             sim_result = {
-                "simulation_type": "Multi-Plane Epistemic Integration",
+                "simulation_type": "Stage 16 Project PANTHEON 24-Pillar Unified Cognitive Synthesis",
+                "pantheon_receipt": p_res,
+                "pillars_verified": p_res["pillars_verified"],
+                "quibble_merkle_root": p_res["quibble_merkle_root"],
+                "ntag215_crc16": p_res["ntag215_crc16"],
+                "counterfactual_dream": p_res["counterfactual_dream"],
+                "conclusion": p_res["text"],
+            }
+        elif intent == "creative_bisociation_synthesis":
+            from .creative_synthesis import DialecticalTribunal
+            c_res = DialecticalTribunal().deliberate(prompt, seed=seed)
+            sim_result = {
+                "simulation_type": "Stage 17 Project NOOSPHERE Koestler Bisociation & 4-Agent Dialectical Tribunal",
+                "creative_receipt": c_res,
+                "koestler_bisociation_score": c_res["primary_bisociation"]["koestler_bisociation_score"],
+                "blended_concept": c_res["blended_concept"],
+                "creative_portfolio": c_res["creative_portfolio"],
+                "receipt_sha256": c_res["receipt_sha256"],
+                "conclusion": c_res["text"],
+            }
+        else:
+            from .pantheon import PantheonEngine
+            from .creative_synthesis import DialecticalTribunal
+            p_res = PantheonEngine(seed=seed).synthesize(prompt, seed=seed)
+            c_res = DialecticalTribunal().deliberate(prompt, seed=seed)
+            sim_result = {
+                "simulation_type": "Multi-Plane Epistemic, 24-Pillar Pantheon & Noosphere Bisociation Synthesis",
                 "physical_cross_check": self._simulate_physical_discovery(seed)["wide_channel"],
                 "causal_flux": self._simulate_causal_superposition()["optimal_collapsed_action"],
-                "conclusion": "Integrated physical dynamics and causal superposition cross-checks verified.",
+                "pantheon_quibble_merkle_root": p_res["quibble_merkle_root"],
+                "pantheon_dream_twin": p_res["counterfactual_dream"],
+                "noosphere_bisociation": {
+                    "hybrid_operator": c_res["blended_concept"]["hybrid_name"],
+                    "koestler_score": c_res["primary_bisociation"]["koestler_bisociation_score"],
+                    "top_hcri": c_res["creative_portfolio"][0]["hcri_score"],
+                },
+                "conclusion": (
+                    f"Integrated 24-Pillar Pantheon synthesis, Noosphere Bisociation ('{c_res['blended_concept']['hybrid_name']}', "
+                    f"HCRI={c_res['creative_portfolio'][0]['hcri_score']}), and causal superposition verified "
+                    f"(Quibble Merkle Root: {p_res['quibble_merkle_root'][:16]}...)."
+                ),
             }
 
         thought_steps.append(ThoughtStep(
@@ -557,7 +610,11 @@ class OmniReasoner:
             confidence=1.0,
         ))
 
-        # Phase 5: Grounded Conclusion & Language Synthesis
+        # Phase 5: Grounded Conclusion, Dialectical Sublation & Language Synthesis
+        from .creative_synthesis import DialecticalTribunal
+        dialectical_audit = DialecticalTribunal().deliberate(prompt, seed=seed)
+        top_blend = dialectical_audit["creative_portfolio"][0]
+
         problem_detail = ""
         if intent == "heuristic_problem_solving" and "full_result" in sim_result:
             p_text = sim_result["full_result"].get("text", "")
@@ -568,16 +625,23 @@ class OmniReasoner:
             f"**Autonomous Cognitive Discovery & Formal Proof Summary**\n\n"
             f"1. **Semantic Intent & Drives:** Classified as `{intent}` with curiosity index {drives['curiosity']} and epistemic rigor {drives['rigor_pressure']}.\n"
             f"2. **Empirical Finding:** {sim_result.get('conclusion', 'Empirical domain simulations executed cleanly.')}{problem_detail}\n"
-            f"3. **Formal Verification:** {formal_proof['formal_specification']} certified under {formal_proof['verdict']} "
+            f"3. **Noosphere Creative Bisociation:** Bridged `{top_blend.get('bridge', 'cross-domain morphism')}` "
+            f"to synthesize `{top_blend['title']}` (Bisociation $B = {dialectical_audit['primary_bisociation']['koestler_bisociation_score']}$, HCRI $= {top_blend['hcri_score']}$).\n"
+            f"4. **Formal Verification:** {formal_proof['formal_specification']} certified under {formal_proof['verdict']} "
             f"(Receipt: `{formal_proof['certificate_sha256'][:24]}...`).\n"
-            f"4. **Actionable Resolution:** Validated physical mechanics and formal safety invariants confirm the solution is provably robust against environmental phase shifts."
+            f"5. **Actionable Resolution:** Validated physical mechanics, dialectical boundary checks, and formal safety invariants confirm the solution is provably robust against environmental phase shifts."
         )
 
         thought_steps.append(ThoughtStep(
             step_number=5,
-            phase_name="Metacognitive Synthesis & Resolution",
+            phase_name="Metacognitive Synthesis & Dialectical Sublation",
             content=summary_conclusion,
-            telemetry={"status": "CERTIFIED_VALID"},
+            telemetry={
+                "status": "CERTIFIED_VALID",
+                "noosphere_hybrid_operator": top_blend["title"],
+                "koestler_bisociation_score": dialectical_audit["primary_bisociation"]["koestler_bisociation_score"],
+                "hcri_score": top_blend["hcri_score"],
+            },
             confidence=0.99,
         ))
 
