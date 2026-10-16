@@ -182,6 +182,30 @@ def make_handler(runtime, port):
                 except Exception as error:
                     self.send_json(500, {"error": str(error), "type": type(error).__name__})
                 return
+            if path == "/api/proof/status":
+                try:
+                    self.send_json(200, runtime.proof_status())
+                except Exception as error:
+                    self.send_json(500, {"error": str(error), "type": type(error).__name__})
+                return
+            if path == "/api/creativity/status":
+                try:
+                    self.send_json(200, runtime.creativity_status())
+                except Exception as error:
+                    self.send_json(500, {"error": str(error), "type": type(error).__name__})
+                return
+            if path == "/api/creativity/matrices":
+                try:
+                    self.send_json(200, runtime.creativity_matrices())
+                except Exception as error:
+                    self.send_json(500, {"error": str(error), "type": type(error).__name__})
+                return
+            if path == "/api/creativity/principles":
+                try:
+                    self.send_json(200, runtime.creativity_principles())
+                except Exception as error:
+                    self.send_json(500, {"error": str(error), "type": type(error).__name__})
+                return
             if path in ("/", "/index.html", "/style.css", "/app.js"):
                 file = WEB/("index.html" if path in ("/", "/index.html") else path[1:])
             elif path.startswith("/artifacts/"):
@@ -465,6 +489,48 @@ def make_handler(runtime, port):
                         falsification_criteria=falsification_criteria,
                         novel_predictions=novel_predictions,
                         prior=prior,
+                    )
+                    self.send_json(200, res)
+                except (ValueError, TypeError) as error:
+                    self.send_json(400, {"error": str(error)})
+                except Exception as error:
+                    self.send_json(500, {"error": str(error), "type": type(error).__name__})
+                return
+            if path == "/api/proof/prove":
+                try:
+                    theorem = payload.get("theorem", "")
+                    premises = payload.get("premises")
+                    goal = payload.get("goal")
+                    lhs = payload.get("lhs")
+                    rhs = payload.get("rhs")
+                    induction_key = payload.get("induction_key")
+                    res = runtime.proof_prove(
+                        theorem=theorem,
+                        premises=premises,
+                        goal=goal,
+                        lhs=lhs,
+                        rhs=rhs,
+                        induction_key=induction_key,
+                    )
+                    self.send_json(200, res)
+                except (ValueError, TypeError) as error:
+                    self.send_json(400, {"error": str(error)})
+                except Exception as error:
+                    self.send_json(500, {"error": str(error), "type": type(error).__name__})
+                return
+            if path == "/api/creativity/invent":
+                try:
+                    problem = payload.get("problem", "")
+                    domain_a = payload.get("domain_a", "quantum_mechanics")
+                    domain_b = payload.get("domain_b", "distributed_consensus")
+                    imp = payload.get("improving_param", "speed")
+                    det = payload.get("deteriorating_param", "precision")
+                    res = runtime.creativity_invent(
+                        problem=problem,
+                        domain_a=domain_a,
+                        domain_b=domain_b,
+                        improving_param=imp,
+                        deteriorating_param=det,
                     )
                     self.send_json(200, res)
                 except (ValueError, TypeError) as error:

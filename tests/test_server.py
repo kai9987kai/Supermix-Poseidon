@@ -403,3 +403,74 @@ def test_hypothesis_server_endpoints(server):
     }))
     assert resp["id"].startswith("hyp-")
 
+
+def test_proof_server_endpoints(server):
+    url, _ = server
+
+    # 1. GET /api/proof/status
+    stat = json.load(urlopen(url + "/api/proof/status"))
+    assert stat["ready"] is True
+    assert stat["natural_deduction"] is True
+    assert stat["mathematical_induction"] is True
+
+    # 2. POST /api/proof/prove with algebraic identity
+    res_alg = json.load(post(url + "/api/proof/prove", {
+        "lhs": "(a - b) * (a + b)",
+        "rhs": "a^2 - b^2",
+    }))
+    assert res_alg["proved"] is True
+    assert res_alg["certificate"]["is_valid"] is True
+
+    # 3. POST /api/proof/prove with natural deduction
+    res_prop = json.load(post(url + "/api/proof/prove", {
+        "premises": ["P", "P -> Q"],
+        "goal": "Q",
+    }))
+    assert res_prop["proved"] is True
+    assert res_prop["goal"] == "Q"
+
+    # 4. POST /api/respond with mode="proof"
+    resp = json.load(post(url + "/api/respond", {
+        "prompt": "(x + 1)^2 == x^2 + 2*x + 1",
+        "mode": "proof",
+    }))
+    assert resp["proved"] is True
+
+
+def test_creativity_server_endpoints(server):
+    url, _ = server
+
+    # 1. GET /api/creativity/status
+    stat = json.load(urlopen(url + "/api/creativity/status"))
+    assert stat["ready"] is True
+    assert stat["koestler_bisociation"] is True
+    assert stat["triz_contradiction_engine"] is True
+
+    # 2. GET /api/creativity/matrices
+    matrices = json.load(urlopen(url + "/api/creativity/matrices"))
+    assert len(matrices) >= 8
+
+    # 3. GET /api/creativity/principles
+    principles = json.load(urlopen(url + "/api/creativity/principles"))
+    assert len(principles) >= 11
+
+    # 4. POST /api/creativity/invent
+    res_inv = json.load(post(url + "/api/creativity/invent", {
+        "problem": "Fault-tolerant swarm coordination under adversarial conditions",
+        "domain_a": "quantum_mechanics",
+        "domain_b": "distributed_consensus",
+        "improving_param": "speed",
+        "deteriorating_param": "precision",
+    }))
+    assert "Project DA VINCI" in res_inv["title"]
+    assert res_inv["pareto_score"] > 0.8
+    assert res_inv["triz_resolution"]["contradiction_resolved"] is True
+
+    # 5. POST /api/respond with mode="invent"
+    resp = json.load(post(url + "/api/respond", {
+        "prompt": "Scalable neural-symbolic memory consolidation",
+        "mode": "invent",
+    }))
+    assert "Project DA VINCI" in resp["title"]
+
+

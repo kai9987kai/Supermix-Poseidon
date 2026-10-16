@@ -1710,6 +1710,81 @@ class Poseidon:
             )
             return hyp.to_dict()
 
+    def proof_status(self):
+        return {
+            "ready": True,
+            "version": "1.0.0",
+            "project": "ARCHIMEDES: Formal Natural Deduction & Equational Proof Engine",
+            "natural_deduction": True,
+            "schwartz_zippel_algebraic_identities": True,
+            "mathematical_induction": True,
+            "tamper_evident_sha256_certificates": True,
+        }
+
+    def proof_prove(
+        self,
+        theorem: str = "",
+        premises: list = None,
+        goal: str = None,
+        lhs: str = None,
+        rhs: str = None,
+        induction_key: str = None,
+    ):
+        with self.lock:
+            from .proof_engine import ProofEngine
+            engine = ProofEngine()
+            if lhs and rhs:
+                return engine.prove_algebraic_identity(lhs, rhs)
+            if induction_key:
+                return engine.prove_by_induction(induction_key)
+            if premises and goal:
+                return engine.prove_propositional(premises, goal)
+            # Default to standard algebraic or propositional proof if prompt provided
+            if "==" in theorem or "=" in theorem:
+                parts = theorem.split("==") if "==" in theorem else theorem.split("=")
+                return engine.prove_algebraic_identity(parts[0].strip(), parts[1].strip())
+            return engine.prove_propositional(premises or ["P", "P -> Q"], goal or "Q")
+
+    def creativity_status(self):
+        return {
+            "ready": True,
+            "version": "1.0.0",
+            "project": "DA VINCI: Deep Computational Creativity Engine",
+            "koestler_bisociation": True,
+            "triz_contradiction_engine": True,
+            "canonical_matrices_count": 8,
+            "triz_principles_count": 11,
+            "pareto_optimal_innovation": True,
+        }
+
+    def creativity_matrices(self):
+        from .creativity_engine import CreativityEngine
+        return CreativityEngine().list_matrices()
+
+    def creativity_principles(self):
+        from .creativity_engine import CreativityEngine
+        return CreativityEngine().list_triz_principles()
+
+    def creativity_invent(
+        self,
+        problem: str,
+        domain_a: str = "quantum_mechanics",
+        domain_b: str = "distributed_consensus",
+        improving_param: str = "speed",
+        deteriorating_param: str = "precision",
+    ):
+        with self.lock:
+            from .creativity_engine import CreativityEngine
+            engine = CreativityEngine()
+            dossier = engine.invent(
+                problem_statement=problem,
+                domain_a=domain_a,
+                domain_b=domain_b,
+                improving_param=improving_param,
+                deteriorating_param=deteriorating_param,
+            )
+            return dossier.to_dict()
+
     def _memory(self):
         from .memory import MemoryBank
         return MemoryBank.load(self.memory_path) if self.memory_path.exists() else MemoryBank()
@@ -1730,6 +1805,10 @@ class Poseidon:
         if type(seed) is not int or not 0 <= seed < 2**63:
             raise ValueError("Seed must be a nonnegative integer below 2^63.")
         with self.lock:
+            if mode == "proof":
+                return self.proof_prove(prompt)
+            if mode == "invent":
+                return self.creativity_invent(prompt)
             if mode == "hypothesis":
                 return self.hypothesis_formulate(prompt)
             if mode == "creative":

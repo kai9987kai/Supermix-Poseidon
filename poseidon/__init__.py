@@ -67,5 +67,21 @@ from .hypothesis_engine import (
     FalsificationOutcome,
     HypothesisEngine,
 )
+from .proof_engine import (
+    ProofStep,
+    ProofCertificate,
+    ProofEngine,
+    verify_proof_step,
+    verify_algebraic_identity,
+)
+from .creativity_engine import (
+    ConceptualMatrix,
+    BisociativeSynthesis,
+    TRIZResolution,
+    InventiveInventionDossier,
+    CreativityEngine,
+    CANONICAL_MATRICES,
+    TRIZ_PRINCIPLES,
+)
 
 _SOURCE_SNAPSHOT = _capture_sources()

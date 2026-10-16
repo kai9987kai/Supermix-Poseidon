@@ -161,10 +161,10 @@ def test_problem_solver_unknown():
         solve_problem("What is the capital of France?")
 
 
-def test_problem_solver_30_capabilities():
+def test_problem_solver_35_capabilities():
     solver = ProblemSolver()
     caps = solver.capabilities()
-    assert len(caps) == 30
+    assert len(caps) == 35
     domains = [c["domain"] for c in caps]
     assert "logic_knights_knaves" in domains
     assert "knapsack" in domains
@@ -173,6 +173,11 @@ def test_problem_solver_30_capabilities():
     assert "pocket_cube" in domains
     assert "markov_decision_process" in domains
     assert "quantum_information" in domains
+    assert "topological_data_analysis" in domains
+    assert "computational_genomics_crispr" in domains
+    assert "optimal_transport_wasserstein" in domains
+    assert "astrodynamics_orbital_maneuver" in domains
+    assert "neuro_symbolic_hopfield_energy" in domains
     assert "causal_do_calculus" in domains
     assert "evolutionary_ecology" in domains
     assert "signal_channel_modulation" in domains
@@ -522,5 +527,55 @@ def test_queuing_theory_mm1_and_mmc():
     assert res_c["system_type"] == "M/M/2"
     assert abs(res_c["traffic_intensity"] - 0.8) < 1e-6
     assert res_c["erlang_c_delay_probability"] > 0
+
+
+def test_topological_data_analysis_vietoris_rips():
+    prompt = "Compute Vietoris-Rips persistent homology, Betti numbers, and Euler characteristic with points: (0,0), (2,0), (2,2), (0,2) at filtration epsilon=2.1."
+    res = solve_problem(prompt)
+    assert res["domain"] == "topological_data_analysis"
+    assert res["verified"] is True
+    assert res["betti_0"] == 1
+    assert res["betti_1"] == 1
+    assert res["euler_characteristic"] == 0
+
+
+def test_computational_genomics_crispr_sgrna():
+    prompt = "Design CRISPR-Cas9 sgRNA protospacer and identify PAM sequence for target DNA sequence ATGCGATCGATCGATCGATCGATCGG."
+    res = solve_problem(prompt)
+    assert res["domain"] == "computational_genomics_crispr"
+    assert res["verified"] is True
+    assert len(res["optimal_sgrna"]["protospacer"]) == 20
+    assert res["optimal_sgrna"]["pam"].endswith("GG")
+    assert 0 < res["optimal_sgrna"]["gc_percent"] < 100
+
+
+def test_optimal_transport_wasserstein_and_sinkhorn():
+    prompt = "Calculate Monge-Kantorovich optimal transport, exact 1D Wasserstein distance, and Sinkhorn coupling matrix with regularization=0.1."
+    res = solve_problem(prompt)
+    assert res["domain"] == "optimal_transport_wasserstein"
+    assert res["verified"] is True
+    assert abs(res["wasserstein_1_exact"] - 0.30) < 1e-4
+    assert res["marginal_residual"] < 1e-4
+    assert len(res["coupling_matrix"]) == 4
+
+
+def test_astrodynamics_hohmann_transfer():
+    prompt = "Calculate Hohmann transfer delta-v burns and orbital maneuver from r1=7000 km to r2=42164 km."
+    res = solve_problem(prompt)
+    assert res["domain"] == "astrodynamics_orbital_maneuver"
+    assert res["verified"] is True
+    assert res["total_delta_v_kms"] > 3.0
+    assert res["transfer_time_hours"] > 4.0
+    assert res["vis_viva_residual"] < 1e-9
+
+
+def test_hopfield_ising_associative_attractor():
+    prompt = "Simulate Hebbian Hopfield network associative memory and verify Ising model Lyapunov energy monotonicity."
+    res = solve_problem(prompt)
+    assert res["domain"] == "neuro_symbolic_hopfield_energy"
+    assert res["verified"] is True
+    assert res["recalled_pattern_index"] == 0
+    assert res["final_energy"] <= res["initial_energy"]
+
 
 

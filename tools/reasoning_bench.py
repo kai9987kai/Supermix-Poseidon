@@ -64,6 +64,11 @@ CASES = [
     ("p15", "problem", "Carnot heat engine thermal efficiency and work with Th=600K, Tc=300K, Qh=1000J", ["0.5000", "500.00"]),
     ("p16", "problem", "Spectral graph partition Fiedler algebraic connectivity and Cheeger conductance for dumbbell graph", ["0.4384", "0.1429"]),
     ("p17", "problem", "Kendall M/M/1 queuing system waiting time and queue length with arrival rate lambda=4.0 and service rate mu=5.0", ["4.000", "1.0000"]),
+    ("p18", "problem", "Vietoris-Rips persistent homology Betti numbers with points: (0,0), (2,0), (2,2), (0,2) at filtration epsilon=2.1", ["beta_0 = 1", "beta_1 = 1"]),
+    ("p19", "problem", "CRISPR-Cas9 sgRNA protospacer design and PAM sequence for target DNA sequence ATGCGATCGATCGATCGATCGATCGG", ["CGATCGATCGATCGATCGAT", "CGG"]),
+    ("p20", "problem", "Monge-Kantorovich optimal transport and exact 1D Wasserstein distance with regularization=0.1", ["0.3000"]),
+    ("p21", "problem", "Hohmann transfer orbital maneuver delta-v from r1=7000 km to r2=42164 km", ["3.77", "km/s"]),
+    ("p22", "problem", "Hebbian Hopfield network associative memory and Ising model Lyapunov energy", ["attractor", "-5.000"]),
 ]
 
 
