@@ -1999,7 +1999,7 @@ class QuantumInformationSolver:
     @classmethod
     def detect(cls, prompt: str) -> Optional[Dict[str, Any]]:
         if re.search(
-            r"\b(anyons?|fibonacci anyon|f-matrix|r-matrix|pentagon identity|hexagon identity|braid group|anyon braiding)\b",
+            r"\b(anyons?|fibonacci anyon|f-matrix|r-matrix|pentagon identity|hexagon identity|braid group|anyon braiding|causal dynamical triangulations?|\bcdt\b|regge calculus|spacetime foliation)\b",
             prompt,
             re.I,
         ):
@@ -7059,6 +7059,340 @@ class OpenGameNashOpticsSolver:
 
 
 # ---------------------------------------------------------------------------
+# 61. Causal Dynamical Triangulations (CDT) & Regge Spacetime Solver
+# ---------------------------------------------------------------------------
+
+class CausalDynamicalTriangulationSolver:
+    name = "causal_dynamical_triangulations"
+    description = "Causal Dynamical Triangulations (CDT) spacetime foliation, Lorentzian Regge action, and deficit angle curvature"
+
+    @classmethod
+    def detect(cls, prompt: str) -> Optional[Dict[str, Any]]:
+        if not re.search(r"\b(causal dynamical triangulations?|\bcdt\b|regge calculus|deficit angle|quantum spacetime|lorentzian regge|spacetime foliation)\b", prompt, re.I):
+            return None
+
+        m_t = re.search(r"(?:time[-_ ]?slices?|slices?|t)\s*[:=]\s*(\d+)", prompt, re.I)
+        m_s = re.search(r"(?:spatial[-_ ]?nodes?|spatial[-_ ]?vertices?|nodes?|n)\s*[:=]\s*(\d+)", prompt, re.I)
+        m_l = re.search(r"(?:lambda|cosmological[-_ ]?constant)\s*[:=]\s*([0-9.]+)", prompt, re.I)
+        m_g = re.search(r"(?:newton[-_ ]?coupling|gravitational[-_ ]?coupling|g)\s*[:=]\s*([0-9.]+)", prompt, re.I)
+
+        return {
+            "time_slices": int(m_t.group(1)) if m_t else 4,
+            "spatial_nodes": int(m_s.group(1)) if m_s else 4,
+            "cosmological_constant": float(m_l.group(1).rstrip(".")) if m_l else 0.5,
+            "gravitational_coupling": float(m_g.group(1).rstrip(".")) if m_g else 1.0,
+        }
+
+    def solve(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        from .chronos import CausalDynamicalTriangulationsEngine
+        t_slices = params.get("time_slices", 4)
+        n_spatial = params.get("spatial_nodes", 4)
+        lam = params.get("cosmological_constant", 0.5)
+        g_c = params.get("gravitational_coupling", 1.0)
+
+        trace = [
+            _trace("init", f"Foliating 1+1D Lorentzian simplicial manifold with T={t_slices} proper time slices and N_spatial={n_spatial}."),
+            _trace("triangulate", "Decomposing causal spacetime slabs into (2,1) and (1,2) simplicial building blocks."),
+        ]
+
+        engine = CausalDynamicalTriangulationsEngine(time_slices=t_slices, spatial_nodes_per_slice=n_spatial)
+        res = engine.evaluate_triangulation(
+            time_slices=t_slices,
+            spatial_nodes=n_spatial,
+            cosmological_constant=lam,
+            gravitational_coupling=g_c,
+        )
+
+        trace.append(_trace("regge", f"Computed Lorentzian Regge action S_Regge={res['lorentzian_regge_action']:.4f} and deficit angle {res['deficit_angle_curvature']:.4e} rad."))
+        verified = res["verified"]
+
+        text = (
+            f"Causal Dynamical Triangulations (CDT Spacetime Foliation):\n"
+            f"- Vertices N0: {res['total_vertices_n0']} | Edges N1: {res['total_edges_n1']} | Simplices N2: {res['total_simplices_n2']}\n"
+            f"- Euler Characteristic χ: {res['euler_characteristic']} (Torus Topology)\n"
+            f"- Lorentzian Regge Action: {res['lorentzian_regge_action']:.4f}\n"
+            f"- Deficit Angle Curvature: {res['deficit_angle_curvature']:.4e} rad\n"
+            f"- Spatial Volume Profile V(t): {res['volume_profile']} (Mean: {res['mean_spatial_volume']:.1f})\n"
+            f"- Quantum Spacetime Consistency: {'PASS' if verified else 'FAIL'}"
+        )
+
+        return {
+            "domain": self.name,
+            "text": text,
+            "answer": f"S_Regge = {res['lorentzian_regge_action']:.4f}, χ = {res['euler_characteristic']}",
+            "euler_characteristic": res["euler_characteristic"],
+            "total_vertices": res["total_vertices_n0"],
+            "total_simplices": res["total_simplices_n2"],
+            "lorentzian_regge_action": res["lorentzian_regge_action"],
+            "volume_profile": res["volume_profile"],
+            "verified": verified,
+            "backend": "lorentzian-regge-cdt-quantum-spacetime-engine",
+            "reasoning_trace": trace,
+            "insight": "Causal Dynamical Triangulations recover a 4D semi-classical spacetime path integral by imposing strict causal foliation, suppressing acausal topology changes while preserving diffeomorphism invariance.",
+        }
+
+
+# ---------------------------------------------------------------------------
+# 62. Noncommutative Spectral Geometry & Connes Triple Solver
+# ---------------------------------------------------------------------------
+
+class NoncommutativeSpectralGeometrySolver:
+    name = "noncommutative_spectral_geometry"
+    description = "Connes spectral triple (A, H, D), spectral distance metric, and Chamseddine-Connes spectral action"
+
+    @classmethod
+    def detect(cls, prompt: str) -> Optional[Dict[str, Any]]:
+        if not re.search(r"\b(noncommutative geometry|non-commutative geometry|spectral triple|connes distance|dirac operator|spectral action|alain connes)\b", prompt, re.I):
+            return None
+
+        m_n = re.search(r"(?:nodes?|points?|n)\s*[:=]\s*(\d+)", prompt, re.I)
+        m_c = re.findall(r"(?:coupling|d_ij|c)\s*[:=]\s*([0-9.]+)", prompt, re.I)
+
+        nodes = int(m_n.group(1)) if m_n else 3
+        couplings = [float(x.rstrip(".")) for x in m_c if x.rstrip(".")] if m_c else [1.0, 2.0]
+
+        return {
+            "node_count": nodes,
+            "couplings": couplings,
+        }
+
+    def solve(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        from .chronos import NoncommutativeSpectralGeometryEngine
+        nodes = params.get("node_count", 3)
+        couplings = params.get("couplings", [1.0, 2.0])
+
+        trace = [
+            _trace("init", f"Constructing Connes spectral triple (A, H, D) over discrete space with {nodes} points and couplings {couplings}."),
+            _trace("dirac", "Setting up self-adjoint Dirac operator D and evaluating operator commutators [D, a]."),
+        ]
+
+        engine = NoncommutativeSpectralGeometryEngine()
+        res = engine.evaluate_spectral_triple(node_count=nodes, dirac_couplings=couplings)
+
+        trace.append(_trace("distance", f"Computed Connes spectral distances: {res['connes_spectral_distances']}."))
+        verified = res["verified"]
+
+        dist_str = ", ".join(f"{k} = {v:.3f}" for k, v in res["connes_spectral_distances"].items())
+        text = (
+            f"Noncommutative Spectral Geometry (Connes Spectral Triple):\n"
+            f"- Hilbert Dimension: {res['node_count']} | Tr(D): {res['trace_dirac']:.2f}\n"
+            f"- Spectral Action Tr(D²): {res['spectral_action_tr_d2']:.4f}\n"
+            f"- Connes Spectral Distances: {dist_str}\n"
+            f"- Triangle Inequality Preservation: {'PASS' if res['triangle_inequality_preserved'] else 'FAIL'}\n"
+            f"- Spectral Verification: {'PASS' if verified else 'FAIL'}"
+        )
+
+        return {
+            "domain": self.name,
+            "text": text,
+            "answer": f"Tr(D²) = {res['spectral_action_tr_d2']:.4f}, {dist_str}",
+            "spectral_action_tr_d2": res["spectral_action_tr_d2"],
+            "connes_distances": res["connes_spectral_distances"],
+            "triangle_preserved": res["triangle_inequality_preserved"],
+            "verified": verified,
+            "backend": "connes-spectral-triple-noncommutative-engine",
+            "reasoning_trace": trace,
+            "insight": "Connes spectral geometry generalizes Riemannian geometry to non-commutative algebras, deriving geodesic distance purely algebraically from Dirac operator resolvents.",
+        }
+
+
+# ---------------------------------------------------------------------------
+# 63. Tropical Algebraic Geometry & Amoeba Hypersurface Solver
+# ---------------------------------------------------------------------------
+
+class TropicalAlgebraicGeometrySolver:
+    name = "tropical_algebraic_geometry"
+    description = "Tropical max-plus/min-plus semiring algebra, tropical hypersurface corner locus, and amoeba spine evaluation"
+
+    @classmethod
+    def detect(cls, prompt: str) -> Optional[Dict[str, Any]]:
+        if not re.search(r"\b(tropical algebra|tropical geometry|max-plus|min-plus|tropical polynomial|corner locus|tropical hypersurface|\bamoeba\b)\b", prompt, re.I):
+            return None
+
+        m_x = re.search(r"(?:eval|x|at)\s*[:=]\s*([0-9.-]+)", prompt, re.I)
+        eval_point = float(m_x.group(1)) if m_x else 2.0
+
+        monomials: List[Tuple[float, float]] = []
+        matches = re.findall(r"([0-9.-]+)\s*\+\s*([0-9.-]+)\s*\*?\s*x", prompt, re.I)
+        for c_str, a_str in matches:
+            monomials.append((float(c_str), float(a_str)))
+
+        if not monomials:
+            monomials = [(0.0, 2.0), (3.0, 1.0), (5.0, 0.0)]
+
+        return {
+            "monomials": monomials,
+            "eval_point": eval_point,
+        }
+
+    def solve(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        from .chronos import TropicalAlgebraicGeometryEngine
+        monomials = params.get("monomials", [(0.0, 2.0), (3.0, 1.0), (5.0, 0.0)])
+        x_eval = params.get("eval_point", 2.0)
+
+        trace = [
+            _trace("init", f"Evaluating tropical polynomial F(x) = max_i (c_i + a_i*x) with monomials {monomials} at x={x_eval}."),
+            _trace("corner", "Solving for corner locus where distinct monomial linear functionals intersect."),
+        ]
+
+        engine = TropicalAlgebraicGeometryEngine()
+        res = engine.evaluate_tropical_polynomial(monomials=monomials, eval_point=x_eval)
+
+        trace.append(_trace("roots", f"Found tropical roots (corner locus): {res['corner_locus_roots']}."))
+        verified = res["verified"]
+
+        poly_str = " ⊕ ".join(f"({c:.1f} ⊙ x^{a:.1f})" for c, a in monomials)
+        text = (
+            f"Tropical Algebraic Geometry (Max-Plus Semiring):\n"
+            f"- Tropical Polynomial: F(x) = {poly_str}\n"
+            f"- Value at x={x_eval}: {res['tropical_value']:.4f}\n"
+            f"- Corner Locus (Tropical Roots): {res['corner_locus_roots']}\n"
+            f"- Tropical Linear Solution (A ⊙ x = b): {res['tropical_linear_solution']}\n"
+            f"- Idempotent Semiring Axioms: {'PASS' if verified else 'FAIL'}"
+        )
+
+        return {
+            "domain": self.name,
+            "text": text,
+            "answer": f"F({x_eval}) = {res['tropical_value']:.4f}, Roots = {res['corner_locus_roots']}",
+            "tropical_value": res["tropical_value"],
+            "corner_locus_roots": res["corner_locus_roots"],
+            "tropical_linear_solution": res["tropical_linear_solution"],
+            "verified": verified,
+            "backend": "tropical-max-plus-amoeba-geometry-engine",
+            "reasoning_trace": trace,
+            "insight": "Tropical geometry is the piecewise-linear shadow of algebraic geometry in the logarithmic limit t -> 0, where addition becomes maximum and multiplication becomes addition.",
+        }
+
+
+# ---------------------------------------------------------------------------
+# 64. Stiefel & Grassmannian Riemannian Manifold Optimization Solver
+# ---------------------------------------------------------------------------
+
+class StiefelGrassmannianSolver:
+    name = "stiefel_grassmannian_optimization"
+    description = "Riemannian optimization on Stiefel St(p, n) and Grassmannian Gr(p, n) manifolds via Cayley/QR retractions"
+
+    @classmethod
+    def detect(cls, prompt: str) -> Optional[Dict[str, Any]]:
+        if not re.search(r"\b(stiefel manifold|grassmannian manifold|\bstiefel\b|\bgrassmannian\b|riemannian optimization|cayley retraction|orthonormal frame optimization)\b", prompt, re.I):
+            return None
+
+        m_n = re.search(r"(?:ambient|n)\s*[:=]\s*(\d+)", prompt, re.I)
+        m_p = re.search(r"(?:columns?|rank|p)\s*[:=]\s*(\d+)", prompt, re.I)
+        m_it = re.search(r"(?:iterations?|iters?|steps?)\s*[:=]\s*(\d+)", prompt, re.I)
+
+        return {
+            "n": int(m_n.group(1)) if m_n else 3,
+            "p": int(m_p.group(1)) if m_p else 2,
+            "iterations": int(m_it.group(1)) if m_it else 5,
+        }
+
+    def solve(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        from .chronos import StiefelGrassmannianOptimizationEngine
+        n = params.get("n", 3)
+        p = params.get("p", 2)
+        iters = params.get("iterations", 5)
+
+        trace = [
+            _trace("init", f"Formulating optimization on Stiefel manifold St({p}, {n}) = {{X in R^({n}x{p}) | X^T X = I_{p}}}."),
+            _trace("gradient", "Computing Riemannian gradient grad_R f(X) = grad_E f - X sym(X^T grad_E f)."),
+        ]
+
+        engine = StiefelGrassmannianOptimizationEngine()
+        res = engine.optimize_rayleigh_stiefel(n=n, p=p, iterations=iters, step_size=0.1)
+
+        trace.append(_trace("retraction", f"Applied QR/Cayley retraction. Orthogonality residual = {res['orthogonality_residual']:.2e}."))
+        verified = res["verified"]
+
+        text = (
+            f"Riemannian Manifold Optimization (Stiefel & Grassmannian):\n"
+            f"- Manifold: {res['manifold']} (Orthogonal Frames)\n"
+            f"- Initial Objective: {res['initial_objective']:.4f}\n"
+            f"- Optimized Objective: {res['optimized_objective']:.4f}\n"
+            f"- Orthogonality Residual ||X^T X - I_p||: {res['orthogonality_residual']:.2e}\n"
+            f"- Grassmann Geodesic Distance d_Gr(U, V): {res['grassmann_geodesic_distance']:.4f} rad\n"
+            f"- Isometric Invariance: {'PASS' if verified else 'FAIL'}"
+        )
+
+        return {
+            "domain": self.name,
+            "text": text,
+            "answer": f"Objective = {res['optimized_objective']:.4f}, Ortho Resid = {res['orthogonality_residual']:.2e}",
+            "initial_objective": res["initial_objective"],
+            "optimized_objective": res["optimized_objective"],
+            "orthogonality_residual": res["orthogonality_residual"],
+            "grassmann_distance": res["grassmann_geodesic_distance"],
+            "verified": verified,
+            "backend": "stiefel-grassmannian-riemannian-geometry-engine",
+            "reasoning_trace": trace,
+            "insight": "Riemannian optimization on the Stiefel manifold ensures exact orthonormality at every step via retraction mappings, eliminating numerical drift without Lagrange multiplier penalty tuning.",
+        }
+
+
+# ---------------------------------------------------------------------------
+# 65. Coalgebraic Stream Automata & Bisimulation Metric Solver
+# ---------------------------------------------------------------------------
+
+class CoalgebraicBisimulationSolver:
+    name = "coalgebraic_bisimulation_metric"
+    description = "Coalgebraic behavioral equivalence, Ferns-Panangaden quantitative bisimulation pseudometric, and Wasserstein optimal transport"
+
+    @classmethod
+    def detect(cls, prompt: str) -> Optional[Dict[str, Any]]:
+        if not re.search(r"\b(coalgebraic bisimulation|behavioral pseudometric|quantitative bisimulation|ferns-panangaden|bisimulation metric|stream coalgebra)\b", prompt, re.I):
+            return None
+
+        m_g = re.search(r"(?:gamma|discount)\s*[:=]\s*([0-9.]+)", prompt, re.I)
+        m_it = re.search(r"(?:iterations?|iters?)\s*[:=]\s*(\d+)", prompt, re.I)
+
+        return {
+            "discount": float(m_g.group(1)) if m_g else 0.8,
+            "iterations": int(m_it.group(1)) if m_it else 10,
+        }
+
+    def solve(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        from .chronos import CoalgebraicBisimulationEngine
+        discount = params.get("discount", 0.8)
+        iters = params.get("iterations", 10)
+
+        trace = [
+            _trace("init", f"Constructing stream coalgebra (S, <o, t>) with discount factor gamma={discount}."),
+            _trace("fixed_point", "Iterating Ferns-Panangaden Kantorovich-Wasserstein fixed point mapping T(d)."),
+        ]
+
+        engine = CoalgebraicBisimulationEngine()
+        res = engine.evaluate_behavioral_pseudometric(discount=discount, iterations=iters)
+
+        trace.append(_trace("distances", f"Converged behavioral pseudometrics: d(s0, s1)={res['dist_s0_s1']:.4f}, d(s0, s2)={res['dist_s0_s2']:.4f}."))
+        verified = res["verified"]
+
+        text = (
+            f"Coalgebraic Stream Automata & Quantitative Bisimulation:\n"
+            f"- Discount Factor γ: {res['discount_factor']:.2f} | Iterations: {res['iterations']}\n"
+            f"- Behavioral Distance d(s0, s1): {res['dist_s0_s1']:.4f} (Homologous Cluster)\n"
+            f"- Behavioral Distance d(s0, s2): {res['dist_s0_s2']:.4f} (Divergent Behavioral State)\n"
+            f"- Behavioral Distance d(s1, s2): {res['dist_s1_s2']:.4f}\n"
+            f"- Triangle Inequality Preservation: {'PASS' if res['triangle_inequality_preserved'] else 'FAIL'}\n"
+            f"- Coalgebraic Verification: {'PASS' if verified else 'FAIL'}"
+        )
+
+        return {
+            "domain": self.name,
+            "text": text,
+            "answer": f"d(s0, s1) = {res['dist_s0_s1']:.4f}, d(s0, s2) = {res['dist_s0_s2']:.4f}",
+            "dist_s0_s1": res["dist_s0_s1"],
+            "dist_s0_s2": res["dist_s0_s2"],
+            "dist_s1_s2": res["dist_s1_s2"],
+            "triangle_preserved": res["triangle_inequality_preserved"],
+            "verified": verified,
+            "backend": "coalgebraic-wasserstein-bisimulation-engine",
+            "reasoning_trace": trace,
+            "insight": "Coalgebraic bisimulation metrics quantify the exact behavioural divergence of infinite-horizon stochastic systems by coupling state distributions via optimal transport.",
+        }
+
+
+# ---------------------------------------------------------------------------
 # Dispatcher
 # ---------------------------------------------------------------------------
 
@@ -7087,6 +7421,9 @@ class ProblemSolver:
             NeuralGraftRoutingSolver(), VirtualLesionCausalSolver(),
             GaugeFieldHolonomySolver(), JarzynskiFluctuationSolver(), SymplecticContactMechanicsSolver(),
             CategoricalLensSolver(), OpenGameNashOpticsSolver(),
+            CausalDynamicalTriangulationSolver(), NoncommutativeSpectralGeometrySolver(),
+            TropicalAlgebraicGeometrySolver(), StiefelGrassmannianSolver(),
+            CoalgebraicBisimulationSolver(),
         ]
 
     def capabilities(self) -> List[Dict[str, str]]:

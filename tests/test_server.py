@@ -635,3 +635,38 @@ def test_aether_server_endpoints(server):
     assert resp["verified"] is True
 
 
+def test_chronos_server_endpoints(server):
+    url, _ = server
+
+    # 1. GET /api/chronos/status
+    stat = json.load(urlopen(url + "/api/chronos/status"))
+    assert stat["ready"] is True
+    assert stat["version"] == "v3.6.0-CHRONOS-65"
+    assert stat["subsystems"]["causal_dynamical_triangulations"] is True
+    assert stat["subsystems"]["noncommutative_spectral_geometry"] is True
+    assert stat["subsystems"]["tropical_algebraic_geometry"] is True
+    assert stat["subsystems"]["stiefel_grassmannian_optimization"] is True
+    assert stat["subsystems"]["coalgebraic_bisimulation_metric"] is True
+    assert stat["total_verified_domains"] == 65
+
+    # 2. POST /api/chronos/synthesize
+    res_ch = json.load(post(url + "/api/chronos/synthesize", {
+        "seed": 42,
+    }))
+    assert res_ch["project"] == "CHRONOS"
+    assert res_ch["verified"] is True
+    assert res_ch["causal_dynamical_triangulation"]["time_slices"] == 4
+    assert res_ch["spectral_geometry"]["spectral_action_tr_d2"] >= 0.0
+    assert res_ch["stiefel_optimization"]["orthogonality_residual"] < 1e-12
+    assert res_ch["coalgebraic_bisimulation"]["dist_s0_s1"] < res_ch["coalgebraic_bisimulation"]["dist_s0_s2"]
+    assert len(res_ch["receipt_sha256"]) == 64
+
+    # 3. POST /api/respond with mode="chronos"
+    resp = json.load(post(url + "/api/respond", {
+        "prompt": "Synthesize Project CHRONOS",
+        "mode": "chronos",
+    }))
+    assert resp["project"] == "CHRONOS"
+    assert resp["verified"] is True
+
+

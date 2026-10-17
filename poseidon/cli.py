@@ -43,6 +43,7 @@ def main():
         "hyperborea",
         "neurograft",
         "aether",
+        "chronos",
     ])
     p.add_argument("prompt", nargs="?", default="")
     p.add_argument("--root", default=".")

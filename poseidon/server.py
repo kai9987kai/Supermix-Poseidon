@@ -236,6 +236,12 @@ def make_handler(runtime, port):
                 except Exception as error:
                     self.send_json(500, {"error": str(error), "type": type(error).__name__})
                 return
+            if path == "/api/chronos/status":
+                try:
+                    self.send_json(200, runtime.chronos_status())
+                except Exception as error:
+                    self.send_json(500, {"error": str(error), "type": type(error).__name__})
+                return
             if path in ("/", "/index.html", "/style.css", "/app.js"):
                 file = WEB/("index.html" if path in ("/", "/index.html") else path[1:])
             elif path.startswith("/artifacts/"):
@@ -654,6 +660,14 @@ def make_handler(runtime, port):
                     self.send_json(200, res)
                 except (ValueError, TypeError) as error:
                     self.send_json(400, {"error": str(error)})
+                except Exception as error:
+                    self.send_json(500, {"error": str(error), "type": type(error).__name__})
+                return
+            if path == "/api/chronos/synthesize":
+                try:
+                    seed = int(payload.get("seed", 42))
+                    res = runtime.chronos_synthesize(seed=seed)
+                    self.send_json(200, res)
                 except Exception as error:
                     self.send_json(500, {"error": str(error), "type": type(error).__name__})
                 return

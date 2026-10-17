@@ -161,10 +161,10 @@ def test_problem_solver_unknown():
         solve_problem("What is the capital of France?")
 
 
-def test_problem_solver_60_capabilities():
+def test_problem_solver_65_capabilities():
     solver = ProblemSolver()
     caps = solver.capabilities()
-    assert len(caps) == 60
+    assert len(caps) == 65
     domains = [c["domain"] for c in caps]
     assert "logic_knights_knaves" in domains
     assert "knapsack" in domains
@@ -183,6 +183,16 @@ def test_problem_solver_60_capabilities():
     assert "optimal_transport_wasserstein" in domains
     assert "astrodynamics_orbital_maneuver" in domains
     assert "neuro_symbolic_hopfield_energy" in domains
+    assert "gauge_field_holonomy" in domains
+    assert "jarzynski_fluctuation_thermodynamics" in domains
+    assert "symplectic_contact_mechanics" in domains
+    assert "categorical_bidirectional_lens" in domains
+    assert "open_game_nash_optics" in domains
+    assert "causal_dynamical_triangulations" in domains
+    assert "noncommutative_spectral_geometry" in domains
+    assert "tropical_algebraic_geometry" in domains
+    assert "stiefel_grassmannian_optimization" in domains
+    assert "coalgebraic_bisimulation_metric" in domains
     assert "causal_do_calculus" in domains
     assert "evolutionary_ecology" in domains
     assert "signal_channel_modulation" in domains
@@ -886,5 +896,52 @@ def test_open_game_nash_optics():
     assert res["verified"] is True
     assert res["num_pure_equilibria"] >= 1
     assert res["has_pure_equilibrium"] is True
+
+
+def test_causal_dynamical_triangulations():
+    prompt = "Compute Causal Dynamical Triangulations CDT quantum spacetime foliation with time_slices=4, spatial_nodes=4, lambda=0.5."
+    res = solve_problem(prompt)
+    assert res["domain"] == "causal_dynamical_triangulations"
+    assert res["verified"] is True
+    assert res["euler_characteristic"] == 0
+    assert res["total_simplices"] == 32
+    assert len(res["volume_profile"]) == 4
+
+
+def test_noncommutative_spectral_geometry():
+    prompt = "Analyze Alain Connes spectral triple noncommutative geometry with nodes=3 and coupling c=1.5."
+    res = solve_problem(prompt)
+    assert res["domain"] == "noncommutative_spectral_geometry"
+    assert res["verified"] is True
+    assert res["spectral_action_tr_d2"] > 0
+    assert res["triangle_preserved"] is True
+
+
+def test_tropical_algebraic_geometry():
+    prompt = "Evaluate tropical algebra max-plus polynomial 0 + 2*x and 3 + 1*x and 5 + 0*x at x=2.0 with corner locus roots."
+    res = solve_problem(prompt)
+    assert res["domain"] == "tropical_algebraic_geometry"
+    assert res["verified"] is True
+    assert res["tropical_value"] == 5.0
+    assert len(res["corner_locus_roots"]) > 0
+
+
+def test_stiefel_grassmannian_optimization():
+    prompt = "Run Riemannian optimization on Stiefel manifold St(2, 3) with ambient n=3 and rank p=2 for iterations=5."
+    res = solve_problem(prompt)
+    assert res["domain"] == "stiefel_grassmannian_optimization"
+    assert res["verified"] is True
+    assert res["orthogonality_residual"] < 1e-9
+    assert res["optimized_objective"] >= res["initial_objective"] - 1e-9
+
+
+def test_coalgebraic_bisimulation_metric():
+    prompt = "Compute coalgebraic bisimulation metric quantitative behavioral pseudometric with gamma=0.8 and iterations=8."
+    res = solve_problem(prompt)
+    assert res["domain"] == "coalgebraic_bisimulation_metric"
+    assert res["verified"] is True
+    assert res["dist_s0_s1"] < res["dist_s0_s2"]
+    assert res["triangle_preserved"] is True
+
 
 

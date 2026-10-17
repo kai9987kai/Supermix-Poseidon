@@ -129,6 +129,8 @@ class OmniReasoner:
     def classify_intent(self, query: str) -> str:
         """Classifies the semantic intent of the query to select domain co-processors."""
         q = query.lower()
+        if any(k in q for k in ("chronos", "causal dynamical triangulation", "cdt", "regge calculus", "noncommutative geometry", "spectral triple", "connes", "tropical algebra", "tropical geometry", "stiefel", "grassmannian", "coalgebraic", "bisimulation metric")):
+            return "chronos_quantum_geometry"
         if any(k in q for k in ("aether", "gauge field", "wilson loop", "yang-mills", "jarzynski", "crooks fluctuation", "fisher-rao", "symplectic contact", "stormer-verlet", "open game", "categorical lens")):
             return "aether_gauge_thermo"
         if any(k in q for k in ("neurograft", "connectome", "liquid time", "ltc", "monoamin", "graft route", "virtual lesion", "synaptic dyad")):
@@ -425,6 +427,34 @@ class OmniReasoner:
             ),
         }
 
+    def _simulate_chronos(self, seed: int = 42) -> Dict[str, Any]:
+        """Runs Stage 25 Project CHRONOS Causal Dynamical Triangulations, Noncommutative Geometry, Tropical Algebra, Stiefel & Bisimulation Synthesis."""
+        from .chronos import ChronosEngine
+        engine = ChronosEngine()
+        res = engine.synthesize(seed=seed)
+        return {
+            "simulation_type": "Stage 25 Project CHRONOS Quantum Spacetime, Noncommutative Spectral Geometry, Tropical Algebra & Coalgebraic Bisimulation",
+            "chronos_receipt": res,
+            "euler_characteristic": res["causal_dynamical_triangulation"]["euler_characteristic"],
+            "regge_action": res["causal_dynamical_triangulation"]["lorentzian_regge_action"],
+            "spectral_action_tr_d2": res["spectral_geometry"]["spectral_action_tr_d2"],
+            "tropical_value": res["tropical_algebra"]["tropical_value"],
+            "corner_roots": res["tropical_algebra"]["corner_locus_roots"],
+            "stiefel_objective": res["stiefel_optimization"]["optimized_objective"],
+            "stiefel_residual": res["stiefel_optimization"]["orthogonality_residual"],
+            "bisim_dist_s0_s1": res["coalgebraic_bisimulation"]["dist_s0_s1"],
+            "bisim_dist_s0_s2": res["coalgebraic_bisimulation"]["dist_s0_s2"],
+            "receipt_sha256": res["receipt_sha256"],
+            "conclusion": (
+                f"Project CHRONOS synthesized: CDT Euler χ={res['causal_dynamical_triangulation']['euler_characteristic']}, "
+                f"Regge action S={res['causal_dynamical_triangulation']['lorentzian_regge_action']:.2f}, "
+                f"Connes spectral action Tr(D²)={res['spectral_geometry']['spectral_action_tr_d2']:.2f}, "
+                f"Tropical value={res['tropical_algebra']['tropical_value']:.2f}, "
+                f"Stiefel objective={res['stiefel_optimization']['optimized_objective']:.4f} (resid={res['stiefel_optimization']['orthogonality_residual']:.2e}), "
+                f"Coalgebraic bisimulation d(s0, s1)={res['coalgebraic_bisimulation']['dist_s0_s1']:.4f}."
+            ),
+        }
+
     def _simulate_biocatalytic_synthesis(self, seed: int) -> Dict[str, Any]:
         """Runs Multimodal Enzyme Generator with Michaelis-Menten kinetics."""
         chosen = self.enzyme_gen.generate_catalyst_for_substrate(
@@ -640,6 +670,14 @@ class OmniReasoner:
                 "will maintain strict gauge invariance, satisfy thermodynamic fluctuation theorems, "
                 "preserve phase-space differential 2-forms, and yield optic Nash equilibrium fixpoints."
             )
+        elif intent == "chronos_quantum_geometry":
+            hypo_text = (
+                "Hypothesis H1: Discrete quantum spacetime triangulation (Lorentzian CDT) combined with "
+                "Connes noncommutative spectral geometry, tropical max-plus semiring corner loci, "
+                "Stiefel manifold Riemannian geodesic retractions, and coalgebraic behavioral bisimulation "
+                "will maintain causal foliation topology, preserve operator spectral distances, "
+                "and bound infinite-horizon stochastic trace divergence via optimal transport."
+            )
         else:
             hypo_text = (
                 "Hypothesis H1: System 2 deliberation combined with 24-Pillar Pantheon synthesis and formal bounded model checking will resolve the query with provable safety invariants, "
@@ -699,6 +737,8 @@ class OmniReasoner:
             sim_result = self._simulate_neurograft(seed)
         elif intent == "aether_gauge_thermo":
             sim_result = self._simulate_aether(seed)
+        elif intent == "chronos_quantum_geometry":
+            sim_result = self._simulate_chronos(seed)
         else:
             from .pantheon import PantheonEngine
             from .creative_synthesis import DialecticalTribunal
@@ -707,6 +747,7 @@ class OmniReasoner:
             from .hyperborea import HyperboreaEngine
             from .neurograft import NeurograftEngine
             from .aether import AetherEngine
+            from .chronos import ChronosEngine
             p_res = PantheonEngine(seed=seed).synthesize(prompt, seed=seed)
             c_res = DialecticalTribunal().deliberate(prompt, seed=seed)
             a_res = AthenaeumEngine().synthesize(budget_rollouts=12)
@@ -714,8 +755,9 @@ class OmniReasoner:
             hb_res = HyperboreaEngine().synthesize()
             ng_res = NeurograftEngine(seed=seed).synthesize(horizon=3)
             ae_res = AetherEngine(seed=seed).synthesize()
+            ch_res = ChronosEngine().synthesize(seed=seed)
             sim_result = {
-                "simulation_type": "Multi-Plane Epistemic, 24-Pillar Pantheon, Athenaeum E-Graph/MCTS, Hephaestus Stitch/GFlowNet/Koopman, Hyperborea Sheaf/Port-Hamiltonian/RG/Anyon, Neurograft Connectome, AETHER Gauge/Thermo & Noosphere Bisociation Synthesis",
+                "simulation_type": "Multi-Plane Epistemic, 24-Pillar Pantheon, Athenaeum E-Graph/MCTS, Hephaestus Stitch/GFlowNet/Koopman, Hyperborea Sheaf/Port-Hamiltonian/RG/Anyon, Neurograft Connectome, AETHER Gauge/Thermo, CHRONOS Quantum/Noncommutative & Noosphere Bisociation Synthesis",
                 "physical_cross_check": self._simulate_physical_discovery(seed)["wide_channel"],
                 "causal_flux": self._simulate_causal_superposition()["optimal_collapsed_action"],
                 "pantheon_quibble_merkle_root": p_res["quibble_merkle_root"],
@@ -748,6 +790,14 @@ class OmniReasoner:
                     "fisher_curvature": ae_res["information_geometry"]["gaussian_curvature"],
                     "symplectic_conserved": ae_res["symplectic_mechanics"]["symplectic_2form_conserved"],
                 },
+                "chronos_synthesis": {
+                    "euler_characteristic": ch_res["causal_dynamical_triangulation"]["euler_characteristic"],
+                    "regge_action": ch_res["causal_dynamical_triangulation"]["lorentzian_regge_action"],
+                    "spectral_action_tr_d2": ch_res["spectral_geometry"]["spectral_action_tr_d2"],
+                    "tropical_value": ch_res["tropical_algebra"]["tropical_value"],
+                    "stiefel_objective": ch_res["stiefel_optimization"]["optimized_objective"],
+                    "bisim_dist_s0_s1": ch_res["coalgebraic_bisimulation"]["dist_s0_s1"],
+                },
                 "noosphere_bisociation": {
                     "hybrid_operator": c_res["blended_concept"]["hybrid_name"],
                     "koestler_score": c_res["primary_bisociation"]["koestler_bisociation_score"],
@@ -760,6 +810,7 @@ class OmniReasoner:
                     f"Hyperborea Sheaf/Port-Hamiltonian/RG/Anyon (dim H^0={hb_res['cellular_sheaf']['dim_H0_global_sections']}, K_c={hb_res['renormalization_group']['critical_coupling_Kc']:.4f}, d_tau={hb_res['anyon_braiding']['golden_ratio_quantum_dim_d_tau']:.4f}), "
                     f"Neurograft Connectome ('{ng_res['tri_neuromodulation']['behavioral_regime']}', critical={ng_res['virtual_lesion_audit']['critical_lesion_target']}), "
                     f"AETHER Gauge/Thermo/Optics (S={ae_res['gauge_holonomy']['yang_mills_action']:.4f}, W_diss={ae_res['non_equilibrium_thermodynamics']['dissipated_work']:.4f}, K={ae_res['information_geometry']['gaussian_curvature']:.2f}, Symplectic={ae_res['symplectic_mechanics']['symplectic_2form_conserved']}), "
+                    f"CHRONOS Spacetime/Spectral/Tropical/Stiefel/Bisimulation (CDT χ={ch_res['causal_dynamical_triangulation']['euler_characteristic']}, Tr(D²)={ch_res['spectral_geometry']['spectral_action_tr_d2']:.2f}, Trop={ch_res['tropical_algebra']['tropical_value']:.2f}, Stiefel={ch_res['stiefel_optimization']['optimized_objective']:.4f}), "
                     f"Noosphere Bisociation ('{c_res['blended_concept']['hybrid_name']}', HCRI={c_res['creative_portfolio'][0]['hcri_score']}), "
                     f"and causal superposition verified (Quibble Merkle Root: {p_res['quibble_merkle_root'][:16]}...)."
                 ),

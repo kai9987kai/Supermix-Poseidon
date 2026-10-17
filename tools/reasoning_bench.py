@@ -94,6 +94,11 @@ CASES = [
     ("p45", "problem", "Simulate symplectic Störmer-Verlet leapfrog integrator contact mechanics with q0=1.0, p0=0.0, dt=0.05, steps=100", ["e_0", "e_f", "symplectic conserved = true"]),
     ("p46", "problem", "Compose categorical bidirectional lens in sequential pipeline with state=[1.0, 2.0, 3.0] and feedback=[0.5, -0.2]", ["composed view", "composed update", "verified = true"]),
     ("p47", "problem", "Solve 2-player monoidal open game categorical optics Nash equilibrium with P1=[[3, 0], [1, 2]] and P2=[[3, 1], [0, 2]]", ["pure equilibria", "payoffs"]),
+    ("p48", "problem", "Compute Causal Dynamical Triangulations CDT quantum spacetime foliation with time_slices=4, spatial_nodes=4, lambda=0.5", ["s_regge", "euler characteristic"]),
+    ("p49", "problem", "Analyze Alain Connes spectral triple noncommutative geometry with nodes=3 and coupling c=1.5", ["tr(d²)", "connes spectral distances"]),
+    ("p50", "problem", "Evaluate tropical algebra max-plus polynomial 0 + 2*x and 3 + 1*x and 5 + 0*x at x=2.0 with corner locus roots", ["tropical polynomial", "corner locus"]),
+    ("p51", "problem", "Run Riemannian optimization on Stiefel manifold St(2, 3) with ambient n=3 and rank p=2 for iterations=5", ["manifold: st(2, 3)", "orthogonality residual"]),
+    ("p52", "problem", "Compute coalgebraic bisimulation metric quantitative behavioral pseudometric with gamma=0.8 and iterations=8", ["behavioral distance", "triangle inequality preservation"]),
 ]
 
 

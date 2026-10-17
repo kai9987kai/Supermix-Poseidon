@@ -221,3 +221,14 @@ def test_omni_reasoner_aether_synthesis():
     assert len(res.empirical_simulation["receipt_sha256"]) == 64
 
 
+def test_omni_reasoner_chronos_synthesis():
+    reasoner = OmniReasoner(seed=42)
+    res = reasoner.reason("Execute Project CHRONOS Causal Dynamical Triangulations, Connes spectral triple noncommutative geometry, and Stiefel optimization")
+    assert res.intent == "chronos_quantum_geometry"
+    assert res.verified is True
+    assert "CHRONOS" in res.empirical_simulation["simulation_type"]
+    assert res.empirical_simulation["euler_characteristic"] == 0
+    assert len(res.empirical_simulation["receipt_sha256"]) == 64
+
+
+
