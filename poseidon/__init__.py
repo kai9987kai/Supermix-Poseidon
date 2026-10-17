@@ -83,5 +83,33 @@ from .creativity_engine import (
     CANONICAL_MATRICES,
     TRIZ_PRINCIPLES,
 )
+from .athenaeum import (
+    ENode,
+    EGraph,
+    RewriteRule,
+    EqualitySaturationEngine,
+    MCTSNode,
+    ProcessRewardModel,
+    TestTimeComputeEngine,
+    SymbolicRegressionSINDy,
+    AthenaeumEngine,
+)
+from .hephaestus import (
+    LambdaAbstraction,
+    WakeSleepLibraryLearner,
+    GFlowNetSampler,
+    KoopmanEDMDLinearizer,
+    BuchbergerGroebnerProver,
+    HephaestusEngine,
+)
+from .hyperborea import (
+    SheafCohomologyEngine,
+    PortHamiltonianDiracEngine,
+    RenormalizationGroupEngine,
+    TopologicalAnyonBraidingEngine,
+    HyperboreaEngine,
+)
 
 _SOURCE_SNAPSHOT = _capture_sources()
+
+

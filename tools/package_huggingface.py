@@ -117,6 +117,12 @@ Additional modules are software simulations or heuristics: Archimedes computes s
 | SmolLM2: 134,515,008 stored parameters | `models/language/model.safetensors` | Separate unchanged pretrained conversation backend |
 | LoRA: 61,440 parameters | `runs/language/adapter/` | Experimental candidate, inactive by default |
 | Poseidon-X Apex Kernel | `poseidon/poseidon_x.py` | Unified Apex Multivector Autopoietic Cognitive Kernel; opt-in |
+| 50-Domain Problem Forge | `poseidon/problem_solver.py` | 50-domain zero-eval mathematical, topological, physical & computational problem solver |
+| Project HYPERBOREA | `poseidon/hyperborea.py` | Cellular sheaf cohomology, Port-Hamiltonian Dirac structures, Wilsonian RG & Fibonacci anyon braiding |
+| Project HEPHAESTUS | `poseidon/hephaestus.py` | Wake-sleep library synthesis, GFlowNet DAG sampling, Koopman EDMD & persistent homology |
+| Project ATHENAEUM | `poseidon/athenaeum.py` | Equality saturation e-graphs, Process-Reward MCTS & SINDy equation discovery |
+| Project ARCHIMEDES & DA VINCI | `poseidon/proof_engine.py`, `poseidon/creativity_engine.py` | Formal natural-deduction proof certificates & Koestler/TRIZ bisociative invention |
+| Project OLYMPUS & PANTHEON | `poseidon/hypothesis_engine.py`, `poseidon/pantheon.py` | Popperian crucial experiment falsification & 24-pillar universal synthesis |
 | Clifford Geometric Algebra | `poseidon/geometric_algebra.py` | Complete Cl(3,0) multivector engine, Rotor3D orientations & fluid vorticity |
 | Autopoietic Affective System | `poseidon/autopoiesis.py` | Autopoietic homeostasis, PAD affective appraisal & micro-sleep self-repair |
 | Hypergraph Theorem Discovery | `poseidon/hypergraph_discovery.py` | Neural-symbolic inductive logic programming with Laplace confidence |
@@ -618,6 +624,15 @@ See runs/language/report.json, data/language/SOURCE_CARD.md and the root model c
                        "nexus_search": "federated-associative-vector-lattice-indexing",
                        "external_adapter": "typed-3d-simulation-telemetry-protocol",
                        "nexus_omega": "causal-epigenetic-self-experimenting-discovery-agent",
+                       "problem_forge_50": "verified-50-domain-zero-eval-symbolic-problem-solver",
+                       "hyperborea": "cellular-sheaf-dirac-port-hamiltonian-wilsonian-rg-anyon-engine",
+                       "hephaestus": "wake-sleep-library-gflownet-koopman-edmd-tda-engine",
+                       "athenaeum": "egraph-equality-saturation-prm-mcts-sindy-engine",
+                       "archimedes": "natural-deduction-formal-proof-certificate-engine",
+                       "da_vinci": "koestler-bisociation-and-triz-contradiction-engine",
+                       "olympus": "popperian-crucial-experiment-falsification-engine",
+                       "pantheon": "24-pillar-universal-cross-domain-synthesis-engine",
+                       "noosphere": "dialectical-tribunal-and-fauconnier-turner-blending",
                        "legacy_ensemble": "historical-unvalidated-not-loaded"},
     }
     write_json(output / "manifest.json", manifest)

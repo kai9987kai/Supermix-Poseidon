@@ -1580,7 +1580,7 @@ class Poseidon:
             core_ready = active_core_path(self.root).is_file()
         except (ValueError, TypeError, OSError) as error:
             core_ready, core_error = False, str(error)
-        result = {"version": __version__, "name": "Supermix Poseidon", "language_ready": (self.root/"models/language/model.safetensors").exists(), "core_ready": core_ready, "atlas": self.atlas_status(), "contrast": self.contrast_status(), "horizon": self.horizon_status(), "odyssey": self.odyssey_status(), "helm": self.helm_status(), "odysseus": self.odysseus_status(), "mco": self.mco_status(), "aura": self.aura_status(), "tessera": self.tessera_status(), "mnemorph": self.mnemorph_status(), "metamorph": self.metamorph_status(), "chimera": self.chimera_status(), "hyperion": self.hyperion_status(), "titan": self.titan_status(), "trident": self.trident_status(), "hyper_agent": self.hyper_agent_status(), "ecosystem": self.ecosystem_status(), "poseidon_x": self.poseidon_x_status(), "external_adapter": self.external_adapter_status(), "nexus_omega": self.nexus_omega_status(), "discovery_lab": self.discovery_lab_status(), "omni_reasoner": self.omni_reasoner_status(), "pantheon": self.pantheon_status(), "noosphere": self.creative_status(), "reports": reports, "limits": "Experimental composite system. Controlled geometric media. Tool-assisted maths. Synthetic survival."} | source_status()
+        result = {"version": __version__, "name": "Supermix Poseidon", "language_ready": (self.root/"models/language/model.safetensors").exists(), "core_ready": core_ready, "atlas": self.atlas_status(), "contrast": self.contrast_status(), "horizon": self.horizon_status(), "odyssey": self.odyssey_status(), "helm": self.helm_status(), "odysseus": self.odysseus_status(), "mco": self.mco_status(), "aura": self.aura_status(), "tessera": self.tessera_status(), "mnemorph": self.mnemorph_status(), "metamorph": self.metamorph_status(), "chimera": self.chimera_status(), "hyperion": self.hyperion_status(), "titan": self.titan_status(), "trident": self.trident_status(), "hyper_agent": self.hyper_agent_status(), "ecosystem": self.ecosystem_status(), "poseidon_x": self.poseidon_x_status(), "external_adapter": self.external_adapter_status(), "nexus_omega": self.nexus_omega_status(), "discovery_lab": self.discovery_lab_status(), "omni_reasoner": self.omni_reasoner_status(), "pantheon": self.pantheon_status(), "noosphere": self.creative_status(), "athenaeum": self.athenaeum_status(), "hephaestus": self.hephaestus_status(), "hyperborea": self.hyperborea_status(), "reports": reports, "limits": "Experimental composite system. Controlled geometric media. Tool-assisted maths. Synthetic survival."} | source_status()
         if core_error:
             result["core_error"] = core_error
         return result
@@ -1785,6 +1785,74 @@ class Poseidon:
             )
             return dossier.to_dict()
 
+    def athenaeum_status(self):
+        from .athenaeum import AthenaeumEngine
+        return AthenaeumEngine().status()
+
+    def athenaeum_synthesize(
+        self,
+        expression: str = "(x + y) * (x - y) + y ^ 2",
+        target_expression: Optional[str] = "x ^ 2",
+        samples=None,
+        budget_rollouts: int = 20,
+    ):
+        with self.lock:
+            from .athenaeum import AthenaeumEngine
+            engine = AthenaeumEngine()
+            expr = (expression or "(x + y) * (x - y) + y ^ 2").strip()
+            target = target_expression
+            if "==" in expr:
+                parts = expr.split("==", 1)
+                expr = parts[0].strip()
+                target = parts[1].strip()
+            parsed_samples = None
+            if isinstance(samples, list) and len(samples) >= 3:
+                parsed_samples = [(float(p[0]), float(p[1])) for p in samples if isinstance(p, (list, tuple)) and len(p) >= 2]
+            return engine.synthesize(
+                expression=expr,
+                target_expression=target,
+                samples=parsed_samples,
+                budget_rollouts=int(budget_rollouts),
+            )
+
+    def hephaestus_status(self):
+        from .hephaestus import HephaestusEngine
+        return HephaestusEngine().status()
+
+    def hephaestus_synthesize(
+        self,
+        corpus=None,
+        terminal_rewards=None,
+        koopman_params=None,
+    ):
+        with self.lock:
+            from .hephaestus import HephaestusEngine
+            engine = HephaestusEngine()
+            return engine.synthesize(
+                corpus=corpus,
+                terminal_rewards=terminal_rewards,
+                koopman_params=koopman_params,
+            )
+
+    def hyperborea_status(self):
+        from .hyperborea import HyperboreaEngine
+        return HyperboreaEngine().status()
+
+    def hyperborea_synthesize(
+        self,
+        sheaf_angles_rad=None,
+        rg_initial_K=None,
+        braid_word=None,
+    ):
+        with self.lock:
+            from .hyperborea import HyperboreaEngine
+            engine = HyperboreaEngine()
+            return engine.synthesize(
+                sheaf_angles_rad=sheaf_angles_rad,
+                rg_initial_K=rg_initial_K,
+                braid_word=braid_word,
+            )
+
     def _memory(self):
         from .memory import MemoryBank
         return MemoryBank.load(self.memory_path) if self.memory_path.exists() else MemoryBank()
@@ -1805,6 +1873,13 @@ class Poseidon:
         if type(seed) is not int or not 0 <= seed < 2**63:
             raise ValueError("Seed must be a nonnegative integer below 2^63.")
         with self.lock:
+            if mode == "hyperborea":
+                return self.hyperborea_synthesize()
+            if mode == "hephaestus":
+                corpus = [s.strip() for s in prompt.split(";") if s.strip()] if ";" in prompt else None
+                return self.hephaestus_synthesize(corpus=corpus)
+            if mode == "athenaeum":
+                return self.athenaeum_synthesize(expression=prompt, target_expression=None)
             if mode == "proof":
                 return self.proof_prove(prompt)
             if mode == "invent":

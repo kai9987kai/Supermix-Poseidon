@@ -474,3 +474,96 @@ def test_creativity_server_endpoints(server):
     assert "Project DA VINCI" in resp["title"]
 
 
+def test_athenaeum_server_endpoints(server):
+    url, _ = server
+
+    # 1. GET /api/athenaeum/status
+    stat = json.load(urlopen(url + "/api/athenaeum/status"))
+    assert stat["ready"] is True
+    assert stat["egraph_equality_saturation"] is True
+    assert stat["prm_mcts_test_time_compute"] is True
+    assert stat["sindy_sparse_identification"] is True
+    assert stat["rewrite_rules_count"] >= 20
+
+    # 2. POST /api/athenaeum/synthesize
+    res_ath = json.load(post(url + "/api/athenaeum/synthesize", {
+        "expression": "(x + 0) * 1 + (x - x)",
+        "target_expression": "x",
+        "budget_rollouts": 12,
+    }))
+    assert res_ath["project"] == "ATHENAEUM"
+    assert res_ath["verified"] is True
+    assert res_ath["egraph_saturation"]["simplified_expression"] == "x"
+    assert len(res_ath["receipt_sha256"]) == 64
+
+    # 3. POST /api/respond with mode="athenaeum"
+    resp = json.load(post(url + "/api/respond", {
+        "prompt": "(x + 0) * 1 + (x - x) == x",
+        "mode": "athenaeum",
+    }))
+    assert resp["project"] == "ATHENAEUM"
+    assert resp["verified"] is True
+
+
+def test_hephaestus_server_endpoints(server):
+    url, _ = server
+
+    # 1. GET /api/hephaestus/status
+    stat = json.load(urlopen(url + "/api/hephaestus/status"))
+    assert stat["ready"] is True
+    assert stat["wake_sleep_library_learning"] is True
+    assert stat["gflownet_trajectory_balance"] is True
+    assert stat["koopman_edmd_linearizer"] is True
+    assert stat["buchberger_groebner_prover"] is True
+
+    # 2. POST /api/hephaestus/synthesize
+    res_hep = json.load(post(url + "/api/hephaestus/synthesize", {
+        "terminal_rewards": {"M1": 4.0, "M2": 12.0, "M3": 8.0, "M4": 16.0},
+    }))
+    assert res_hep["project"] == "HEPHAESTUS"
+    assert res_hep["verified"] is True
+    assert res_hep["wake_sleep_library"]["compression_ratio"] > 1.2
+    assert abs(res_hep["gflownet_sampler"]["partition_function_Z"] - 40.0) < 1e-9
+    assert len(res_hep["receipt_sha256"]) == 64
+
+    # 3. POST /api/respond with mode="hephaestus"
+    resp = json.load(post(url + "/api/respond", {
+        "prompt": "(x ^ 2 + 2 * x * y) + 1; (a ^ 2 + 2 * a * b) - 3; (u ^ 2 + 2 * u * v) * 5",
+        "mode": "hephaestus",
+    }))
+    assert resp["project"] == "HEPHAESTUS"
+    assert resp["verified"] is True
+
+
+def test_hyperborea_server_endpoints(server):
+    url, _ = server
+
+    # 1. GET /api/hyperborea/status
+    stat = json.load(urlopen(url + "/api/hyperborea/status"))
+    assert stat["ready"] is True
+    assert stat["cellular_sheaf_cohomology"] is True
+    assert stat["port_hamiltonian_dirac_control"] is True
+    assert stat["renormalization_group_criticality"] is True
+    assert stat["topological_anyon_braiding"] is True
+
+    # 2. POST /api/hyperborea/synthesize
+    res_hyp = json.load(post(url + "/api/hyperborea/synthesize", {
+        "rg_initial_K": 0.5,
+        "braid_word": ["sigma_1", "sigma_2", "sigma_1"],
+    }))
+    assert res_hyp["project"] == "HYPERBOREA"
+    assert res_hyp["verified"] is True
+    assert res_hyp["cellular_sheaf"]["dim_H0_global_sections"] == 2
+    assert abs(res_hyp["renormalization_group"]["critical_coupling_Kc"] - 0.60937786) < 1e-6
+    assert res_hyp["anyon_braiding"]["hexagon_artin_braid_residual"] < 1e-12
+    assert len(res_hyp["receipt_sha256"]) == 64
+
+    # 3. POST /api/respond with mode="hyperborea"
+    resp = json.load(post(url + "/api/respond", {
+        "prompt": "Synthesize Project HYPERBOREA",
+        "mode": "hyperborea",
+    }))
+    assert resp["project"] == "HYPERBOREA"
+    assert resp["verified"] is True
+
+

@@ -161,10 +161,10 @@ def test_problem_solver_unknown():
         solve_problem("What is the capital of France?")
 
 
-def test_problem_solver_35_capabilities():
+def test_problem_solver_50_capabilities():
     solver = ProblemSolver()
     caps = solver.capabilities()
-    assert len(caps) == 35
+    assert len(caps) == 50
     domains = [c["domain"] for c in caps]
     assert "logic_knights_knaves" in domains
     assert "knapsack" in domains
@@ -191,6 +191,22 @@ def test_problem_solver_35_capabilities():
     assert "thermodynamic_carnot_entropy" in domains
     assert "graph_spectral_partition" in domains
     assert "queuing_markov_chains" in domains
+    assert "egraph_equality_saturation" in domains
+    assert "sindy_symbolic_regression" in domains
+    assert "epidemiological_sir_seir" in domains
+    assert "pid_frequency_control" in domains
+    assert "category_string_diagrams" in domains
+    assert "gflownet_trajectory_balance" in domains
+    assert "koopman_edmd_operator" in domains
+    assert "groebner_polynomial_ideal" in domains
+    assert "control_barrier_function_qp" in domains
+    assert "conformal_differential_privacy" in domains
+    assert "cellular_sheaf_cohomology" in domains
+    assert "port_hamiltonian_passivity" in domains
+    assert "renormalization_group_criticality" in domains
+    assert "topological_anyon_braiding" in domains
+    assert "solomonoff_kolmogorov_mdl" in domains
+
 
 
 def test_logic_knights_knaves_unique():
@@ -577,5 +593,176 @@ def test_hopfield_ising_associative_attractor():
     assert res["recalled_pattern_index"] == 0
     assert res["final_energy"] <= res["initial_energy"]
 
+
+def test_egraph_equality_saturation_simplify_and_equiv():
+    prompt_simp = "Use E-Graph equality saturation to simplify expression: (x + 0) * 1 + (x - x)"
+    res_s = solve_problem(prompt_simp)
+    assert res_s["domain"] == "egraph_equality_saturation"
+    assert res_s["verified"] is True
+    assert res_s["simplified_expression"] == "x"
+    assert res_s["cost_after"] < res_s["cost_before"]
+
+    prompt_eq = "Use E-Graph congruence closure to check (a + b) * c == a * c + b * c"
+    res_e = solve_problem(prompt_eq)
+    assert res_e["domain"] == "egraph_equality_saturation"
+    assert res_e["mode"] == "equivalence"
+    assert res_e["verified"] is True
+    assert res_e["same_eclass"] is True
+
+
+def test_sindy_symbolic_regression_discovery():
+    prompt = "Run SINDy sparse identification symbolic regression on data points (-2, 15), (-1, 6), (0, 1), (1, 0), (2, 3), (3, 10)."
+    res = solve_problem(prompt)
+    assert res["domain"] == "sindy_symbolic_regression"
+    assert res["verified"] is True
+    assert res["r2_score"] > 0.9999
+    assert "x^2" in res["discovered_equation"]
+
+
+def test_epidemiological_sir_kermack_mckendrick():
+    prompt = "Analyze Kermack-McKendrick SIR model epidemiological dynamics with beta=0.5, gamma=0.1, s0=0.99."
+    res = solve_problem(prompt)
+    assert res["domain"] == "epidemiological_sir_seir"
+    assert res["verified"] is True
+    assert abs(res["r0"] - 5.0) < 1e-6
+    assert abs(res["herd_immunity_threshold"] - 0.8) < 1e-6
+    assert res["peak_infectious_fraction"] > 0.45
+    assert res["phase_invariant_residual"] < 1e-8
+
+
+def test_pid_frequency_control_routh_hurwitz():
+    prompt = "Design a closed-loop PID controller and check Routh-Hurwitz stability with kp=6.0, ki=4.0, kd=3.0."
+    res = solve_problem(prompt)
+    assert res["domain"] == "pid_frequency_control"
+    assert res["verified"] is True
+    assert res["hurwitz_stable"] is True
+    assert res["steady_state_step_error"] == 0.0
+    assert all(c > 0 for c in res["routh_first_column"])
+
+
+def test_category_string_diagrams_monoidal_interchange():
+    prompt = "Verify Applied Category Theory commutative diagram and Symmetric Monoidal Category (SMC) interchange law."
+    res = solve_problem(prompt)
+    assert res["domain"] == "category_string_diagrams"
+    assert res["verified"] is True
+    assert res["associativity_verified"] is True
+    assert res["diagram_commutes"] is True
+    assert res["interchange_law_verified"] is True
+    assert res["kronecker_dimension"] == "4x4"
+
+
+def test_gflownet_trajectory_and_detailed_balance():
+    prompt = "Verify GFlowNet trajectory balance and detailed balance on compositional DAG with rewards=4, 12, 8, 16."
+    res = solve_problem(prompt)
+    assert res["domain"] == "gflownet_trajectory_balance"
+    assert res["verified"] is True
+    assert abs(res["partition_function_Z"] - 40.0) < 1e-9
+    assert res["max_trajectory_balance_loss"] < 1e-18
+    assert res["max_detailed_balance_residual"] < 1e-12
+    assert res["kl_divergence"] < 1e-12
+
+
+def test_koopman_edmd_operator_linearization():
+    prompt = "Compute Koopman operator EDMD polynomial observable linearization and eigenfunctions with lambda=0.8, mu=0.5, gamma=-0.6."
+    res = solve_problem(prompt)
+    assert res["domain"] == "koopman_edmd_operator"
+    assert res["verified"] is True
+    assert res["eigenfunction_linearity_residual"] < 1e-9
+    assert res["multi_step_prediction_error"] < 1e-9
+    assert res["spectral_radius"] == 0.8
+
+
+def test_groebner_polynomial_ideal_buchberger():
+    prompt = "Compute Buchberger Groebner basis and check polynomial ideal membership for generators: x^2 + y - 1, x - y and target: x^2 + x - 1."
+    res = solve_problem(prompt)
+    assert res["domain"] == "groebner_polynomial_ideal"
+    assert res["verified"] is True
+    assert res["buchberger_criterion_satisfied"] is True
+    assert res["ideal_membership_certified"] is True
+    assert res["target_remainder"] == "0"
+
+
+def test_control_barrier_function_qp_safety_filter():
+    prompt = "Solve Control Barrier Function CBF-QP safety filter with x=1.8, x_max=2.0, u_des=3.0, alpha=2.0."
+    res = solve_problem(prompt)
+    assert res["domain"] == "control_barrier_function_qp"
+    assert res["verified"] is True
+    assert res["barrier_value_h"] > 0.0
+    assert res["filter_intervened"] is True
+    assert res["cbf_safety_margin"] >= -1e-9
+
+
+def test_conformal_prediction_and_differential_privacy():
+    prompt_cp = "Compute split conformal prediction quantile and finite-sample coverage guarantee at alpha=0.10 with y_hat=10.0."
+    res_cp = solve_problem(prompt_cp)
+    assert res_cp["domain"] == "conformal_differential_privacy"
+    assert res_cp["mode"] == "conformal_prediction"
+    assert res_cp["verified"] is True
+    assert res_cp["target_coverage"] == 0.90
+    assert res_cp["guaranteed_marginal_coverage"] >= 0.90
+    assert res_cp["quantile_q_hat"] == 1.40
+
+    prompt_dp = "Analyze differential privacy Gaussian mechanism noise and advanced composition for sensitivity=1.0, epsilon=0.5, delta=1e-5, k=10."
+    res_dp = solve_problem(prompt_dp)
+    assert res_dp["domain"] == "conformal_differential_privacy"
+    assert res_dp["mode"] == "differential_privacy"
+    assert res_dp["verified"] is True
+    assert res_dp["gaussian_sigma"] > 3.0
+    assert res_dp["basic_composition_epsilon"] == 5.0
+
+
+def test_cellular_sheaf_cohomology_consistent_and_frustrated():
+    prompt_cons = "Compute cellular sheaf cohomology H^0 and Sheaf Laplacian spectrum with stalk_dim=2."
+    res_c = solve_problem(prompt_cons)
+    assert res_c["domain"] == "cellular_sheaf_cohomology"
+    assert res_c["verified"] is True
+    assert res_c["dim_H0_global_sections"] == 2
+    assert res_c["topologically_frustrated"] is False
+
+    prompt_frust = "Analyze frustrated cellular sheaf cohomology on a signed triangle with negative edge holonomy."
+    res_f = solve_problem(prompt_frust)
+    assert res_f["domain"] == "cellular_sheaf_cohomology"
+    assert res_f["verified"] is True
+    assert res_f["dim_H0_global_sections"] == 0
+    assert res_f["topologically_frustrated"] is True
+
+
+def test_port_hamiltonian_dirac_passivity_and_ida_pbc():
+    prompt = "Verify Port-Hamiltonian Dirac structure power conservation and IDA-PBC passivity-based control for q_star=1.0, p_star=0.0."
+    res = solve_problem(prompt)
+    assert res["domain"] == "port_hamiltonian_passivity"
+    assert res["verified"] is True
+    assert res["passivity_certified"] is True
+    assert res["lyapunov_stability_certified"] is True
+    assert res["shaped_hamiltonian_final"] < res["shaped_hamiltonian_initial"]
+
+
+def test_renormalization_group_migdal_kadanoff():
+    prompt = "Compute Migdal-Kadanoff renormalization group critical coupling K_c, thermal eigenvalue, and critical exponent nu with K0=0.5."
+    res = solve_problem(prompt)
+    assert res["domain"] == "renormalization_group_criticality"
+    assert res["verified"] is True
+    assert abs(res["critical_coupling_Kc"] - 0.609378) < 1e-5
+    assert abs(res["correlation_length_exponent_nu"] - 1.338268) < 1e-5
+
+
+def test_topological_anyon_braiding_fibonacci():
+    prompt = "Verify Fibonacci anyon braiding Pentagon identity and Hexagon identity for 4 tau-anyons with braid word sigma_1 sigma_2 sigma_1."
+    res = solve_problem(prompt)
+    assert res["domain"] == "topological_anyon_braiding"
+    assert res["verified"] is True
+    assert res["fusion_space_dim_charge_tau"] == 3
+    assert res["pentagon_identity_residual"] < 1e-12
+    assert res["hexagon_artin_braid_residual"] < 1e-12
+
+
+def test_solomonoff_kolmogorov_levin_mdl():
+    prompt = "Compute Solomonoff universal prior, Minimum Description Length (MDL) posterior, and Levin universal search Kt complexity."
+    res = solve_problem(prompt)
+    assert res["domain"] == "solomonoff_kolmogorov_mdl"
+    assert res["verified"] is True
+    assert res["optimal_mdl_hypothesis"] == "h_1"
+    assert res["optimal_levin_hypothesis"] == "h_1"
+    assert res["kraft_inequality_satisfied"] is True
 
 

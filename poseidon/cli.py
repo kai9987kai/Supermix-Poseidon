@@ -38,6 +38,9 @@ def main():
         "hypothesis",
         "proof",
         "invent",
+        "athenaeum",
+        "hephaestus",
+        "hyperborea",
     ])
     p.add_argument("prompt", nargs="?", default="")
     p.add_argument("--root", default=".")

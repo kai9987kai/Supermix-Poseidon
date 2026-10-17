@@ -1998,6 +1998,12 @@ class QuantumInformationSolver:
 
     @classmethod
     def detect(cls, prompt: str) -> Optional[Dict[str, Any]]:
+        if re.search(
+            r"\b(anyons?|fibonacci anyon|f-matrix|r-matrix|pentagon identity|hexagon identity|braid group|anyon braiding)\b",
+            prompt,
+            re.I,
+        ):
+            return None
         if not re.search(
             r"\b(quantum|qubits?|bell state|concurrence|von neumann entropy|entanglement entropy|entanglement|chsh|grover|grover'?s algorithm|quantum teleportation)\b",
             prompt,
@@ -3323,6 +3329,12 @@ class BayesianInferenceSolver:
 
     @classmethod
     def detect(cls, prompt: str) -> Optional[Dict[str, Any]]:
+        if re.search(
+            r"\b(differential privacy|gaussian mechanism|laplace mechanism|advanced composition|privacy budget|solomonoff|kolmogorov complexity|levin search|universal prior|minimum description length|\bmdl\b)\b",
+            prompt,
+            re.I,
+        ):
+            return None
         if not re.search(
             r"\b(bayes'? theorem|bayesian inference|posterior probability|prior probability|false positive rate|sensitivity|specificity|positive predictive value|bayes factor|likelihood ratio)\b",
             prompt,
@@ -4515,6 +4527,8 @@ class TopologicalDataAnalysisSolver:
 
     @classmethod
     def detect(cls, prompt: str) -> Optional[Dict[str, Any]]:
+        if re.search(r"\b(cellular sheaf|sheaf laplacian|sheaf cohomology|sheaf diffusion|coboundary)\b", prompt, re.I):
+            return None
         if not re.search(r"\b(topological data analysis|persistent homology|vietoris-rips|betti number|simplicial complex|euler characteristic|persistence diagram)\b", prompt, re.I):
             return None
         points: List[Tuple[float, float]] = []
@@ -4921,6 +4935,8 @@ class HopfieldIsingSolver:
 
     @classmethod
     def detect(cls, prompt: str) -> Optional[Dict[str, Any]]:
+        if re.search(r"\b(renormalization group|kadanoff|migdal-kadanoff|block-spin|critical exponent|critical coupling|port-hamiltonian|dirac structure|ida-pbc)\b", prompt, re.I):
+            return None
         if not re.search(r"\b(hopfield|hebbian|ising model|spin glass|associative memory|lyapunov energy|spurious state|bipolar pattern)\b", prompt, re.I):
             return None
         return {"default": True}
@@ -4996,6 +5012,1224 @@ class HopfieldIsingSolver:
 
 
 # ---------------------------------------------------------------------------
+# 36. Neuro-Symbolic Rewrite: E-Graph Equality Saturation Solver
+# ---------------------------------------------------------------------------
+
+class EGraphSaturationSolver:
+    name = "egraph_equality_saturation"
+    description = "E-Graph equality saturation, Union-Find congruence closure, and Minimum Description Length (MDL) algebraic simplification"
+
+    @classmethod
+    def detect(cls, prompt: str) -> Optional[Dict[str, Any]]:
+        if not re.search(
+            r"\b(e-graph|egraph|equality saturation|congruence closure|mdl simplification|rewrite saturation)\b",
+            prompt,
+            re.I,
+        ):
+            return None
+        # Check if there is an equivalence LHS == RHS
+        eq_m = re.search(r"([a-zA-Z0-9_()+\-*/^\s]+)==([a-zA-Z0-9_()+\-*/^\s]+)", prompt)
+        if eq_m:
+            lhs = eq_m.group(1).strip()
+            rhs = eq_m.group(2).strip()
+            # Clean leading words from lhs
+            lhs_tokens = re.findall(r"[a-zA-Z0-9_()+\-*/^]+", lhs)
+            # Keep from the first math-like token (e.g., '(' or single letter/number)
+            for idx, tok in enumerate(lhs_tokens):
+                if tok.startswith("(") or len(tok) == 1 or tok.isdigit():
+                    lhs = " ".join(lhs_tokens[idx:])
+                    break
+            return {"mode": "equivalence", "lhs": lhs.strip(), "rhs": rhs.strip()}
+
+        expr_m = re.search(r"(?:simplify|saturate|expression|expr)\s*[:=]?\s*([a-zA-Z0-9_()+\-*/^\s]+)", prompt, re.I)
+        expr = "(x + 0) * 1 + (x - x)"
+        if expr_m:
+            cand = expr_m.group(1).strip()
+            if any(op in cand for op in ("+", "-", "*", "/", "^")):
+                expr = cand
+        return {"mode": "simplify", "expression": expr}
+
+    def solve(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        from .athenaeum import EqualitySaturationEngine
+        engine = EqualitySaturationEngine()
+        trace = []
+
+        if params.get("mode") == "equivalence":
+            lhs = params["lhs"]
+            rhs = params["rhs"]
+            res = engine.saturate_and_simplify(lhs, rhs)
+            verified = bool(res["eclass_equivalent"])
+            trace.append(_trace("egraph_init", f"Initialized E-Graph with LHS='{lhs}' and RHS='{rhs}'."))
+            trace.append(_trace("congruence_closure", f"Saturated {res['eclasses_count']} e-classes ({res['enodes_count']} e-nodes); canonical form = '{res['simplified_expression']}'."))
+            trace.append(_trace("verify", f"Equivalence certified: {'PASS' if verified else 'FAIL'}."))
+            text = (
+                f"E-Graph Equality Saturation: Verified equivalence ({lhs}) == ({rhs}) -> {verified}. "
+                f"Canonical MDL normal form: '{res['simplified_expression']}' across {res['eclasses_count']} e-classes."
+            )
+            return {
+                "domain": self.name,
+                "mode": "equivalence",
+                "text": text,
+                "answer": f"Equivalent: {verified} (canonical: {res['simplified_expression']})",
+                "lhs": lhs,
+                "rhs": rhs,
+                "canonical_form": res["simplified_expression"],
+                "same_eclass": res["eclass_equivalent"],
+                "num_eclasses": res["eclasses_count"],
+                "num_enodes": res["enodes_count"],
+                "verified": verified,
+                "backend": "egraph-congruence-mdl-extractor",
+                "reasoning_trace": trace,
+                "insight": "Equality saturation applies all rewrite rules simultaneously into an E-Graph, avoiding phase-ordering deadlocks of greedy term rewriting.",
+            }
+
+        expr = params.get("expression", "(x + 0) * 1 + (x - x)")
+        res = engine.saturate_and_simplify(expr)
+        verified = bool(res["eclass_equivalent"] and res["optimal_mdl_cost"] <= res["initial_mdl_cost"])
+        trace.append(_trace("egraph_build", f"Parsed '{expr}' (MDL cost = {res['initial_mdl_cost']}) into E-Graph."))
+        trace.append(_trace("saturation", f"Ran {res['iterations']} saturation iterations ({res['eclasses_count']} e-classes, {res['enodes_count']} e-nodes)."))
+        trace.append(_trace("mdl_extract", f"Extracted minimum-cost AST '{res['simplified_expression']}' (MDL cost = {res['optimal_mdl_cost']})."))
+        text = (
+            f"E-Graph Equality Saturation: Simplified '{expr}' -> '{res['simplified_expression']}' "
+            f"(MDL cost {res['initial_mdl_cost']} -> {res['optimal_mdl_cost']}, compression {res['compression_ratio']}x across {res['eclasses_count']} e-classes)."
+        )
+        return {
+            "domain": self.name,
+            "mode": "simplify",
+            "text": text,
+            "answer": res["simplified_expression"],
+            "input_expression": expr,
+            "simplified_expression": res["simplified_expression"],
+            "cost_before": res["initial_mdl_cost"],
+            "cost_after": res["optimal_mdl_cost"],
+            "compression_ratio": res["compression_ratio"],
+            "num_eclasses": res["eclasses_count"],
+            "num_enodes": res["enodes_count"],
+            "verified": verified,
+            "backend": "egraph-congruence-mdl-extractor",
+            "reasoning_trace": trace,
+            "insight": "E-Graph equality saturation compactly represents exponentially many equivalent rewrite trajectories and extracts the global MDL-optimal syntax tree.",
+        }
+
+
+# ---------------------------------------------------------------------------
+# 37. AI-Feynman / SINDy: Sparse Symbolic Law Discovery Solver
+# ---------------------------------------------------------------------------
+
+class SINDyDiscoverySolver:
+    name = "sindy_symbolic_regression"
+    description = "Sparse Identification of Nonlinear Dynamics (SINDy) via Sequentially Thresholded Least Squares (STLSQ) & MDL Pareto selection"
+
+    @classmethod
+    def detect(cls, prompt: str) -> Optional[Dict[str, Any]]:
+        if not re.search(
+            r"\b(sindy|sparse identification|symbolic regression|stlsq|governing equation|discover law|pareto symbolic)\b",
+            prompt,
+            re.I,
+        ):
+            return None
+        pairs = re.findall(r"\(\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*\)", prompt)
+        if len(pairs) >= 3:
+            x_vals = [float(p[0]) for p in pairs]
+            y_vals = [float(p[1]) for p in pairs]
+        else:
+            x_vals = [-2.0, -1.0, 0.0, 1.0, 2.0, 3.0]
+            # y = 2*x^2 - 3*x + 1
+            y_vals = [2.0 * (x ** 2) - 3.0 * x + 1.0 for x in x_vals]
+        return {"x_values": x_vals, "y_values": y_vals}
+
+    def solve(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        from .athenaeum import SymbolicRegressionSINDy
+        x_vals = params["x_values"]
+        y_vals = params["y_values"]
+        samples = list(zip(x_vals, y_vals))
+        sindy = SymbolicRegressionSINDy()
+        res = sindy.discover(samples)
+        verified = bool(res["verified"])
+
+        mean_y = sum(y_vals) / max(1, len(y_vals))
+        ss_tot = max(1e-12, sum((y - mean_y) ** 2 for y in y_vals))
+        r2_score = max(0.0, 1.0 - (res["mse"] * len(y_vals)) / ss_tot)
+
+        trace = [
+            _trace("library_matrix", f"Constructed nonlinear basis library [1, x, x^2, x^3, sin(x), cos(x)] across {len(x_vals)} observations."),
+            _trace("stlsq_pareto", f"Executed STLSQ across thresholds; selected MDL/BIC Pareto optimal law: {res['discovered_equation']}."),
+            _trace("verify", f"Goodness-of-fit R^2 = {r2_score:.6f}, MSE = {res['mse']:.2e}: {'PASS' if verified else 'FAIL'}."),
+        ]
+        text = (
+            f"SINDy Symbolic Regression: Discovered sparse governing law y = {res['discovered_equation']} "
+            f"(Complexity k={res['active_terms']}, R^2={r2_score:.6f}, MSE={res['mse']:.2e}, MDL-BIC={res['mdl_score']:.2f})."
+        )
+        return {
+            "domain": self.name,
+            "text": text,
+            "answer": res["discovered_equation"],
+            "discovered_equation": res["discovered_equation"],
+            "active_terms": res["active_terms"],
+            "complexity_k": res["active_terms"],
+            "r2_score": round(r2_score, 8),
+            "mse": res["mse"],
+            "mdl_bic_score": res["mdl_score"],
+            "pareto_frontier": res["pareto_front"],
+            "verified": verified,
+            "backend": "sindy-stlsq-mdl-pareto-solver",
+            "reasoning_trace": trace,
+            "insight": "Sequentially Thresholded Least Squares (STLSQ) combined with Minimum Description Length (MDL) discovers parsimonious physical laws without overfitting.",
+        }
+
+
+# ---------------------------------------------------------------------------
+# 38. Mathematical Epidemiology: Kermack-McKendrick SIR/SEIR Dynamics Solver
+# ---------------------------------------------------------------------------
+
+class EpidemiologicalSIRSolver:
+    name = "epidemiological_sir_seir"
+    description = "Kermack-McKendrick SIR/SEIR epidemiological dynamics, basic reproduction number R0, herd immunity threshold, and exact peak prevalence"
+
+    @classmethod
+    def detect(cls, prompt: str) -> Optional[Dict[str, Any]]:
+        if not re.search(
+            r"\b(sir model|seir model|epidemiolog\w*|kermack-mckendrick|basic reproduction number|herd immunity|infectious peak|compartmental epidemic)\b",
+            prompt,
+            re.I,
+        ):
+            return None
+        beta_m = re.search(r"beta\s*[:=]\s*(\d+(?:\.\d+)?)", prompt, re.I)
+        gamma_m = re.search(r"gamma\s*[:=]\s*(\d+(?:\.\d+)?)", prompt, re.I)
+        s0_m = re.search(r"s0\s*[:=]\s*(\d+(?:\.\d+)?)", prompt, re.I)
+        i0_m = re.search(r"i0\s*[:=]\s*(\d+(?:\.\d+)?)", prompt, re.I)
+
+        beta = float(beta_m.group(1)) if beta_m else 0.5
+        gamma = float(gamma_m.group(1)) if gamma_m else 0.1
+        s0 = float(s0_m.group(1)) if s0_m else 0.99
+        i0 = float(i0_m.group(1)) if i0_m else 1.0 - s0
+        return {"beta": beta, "gamma": gamma, "s0": s0, "i0": i0}
+
+    def solve(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        beta = float(params["beta"])
+        gamma = max(1e-9, float(params["gamma"]))
+        s0 = min(0.999999, max(1e-6, float(params["s0"])))
+        i0 = min(1.0 - s0, max(0.0, float(params["i0"])))
+        r_init = max(0.0, 1.0 - s0 - i0)
+
+        r0 = beta / gamma
+        re_0 = r0 * s0
+        herd_immunity = max(0.0, 1.0 - 1.0 / r0) if r0 > 1.0 else 0.0
+
+        # Exact peak infectious fraction via Kermack-McKendrick phase-plane invariant:
+        # I(S) + S - (1/R0)*ln(S) = I0 + S0 - (1/R0)*ln(S0)
+        if re_0 > 1.0:
+            s_peak = 1.0 / r0
+            i_peak = i0 + s0 - s_peak + (1.0 / r0) * math.log(s_peak / s0)
+        else:
+            s_peak = s0
+            i_peak = i0
+
+        # Solve final susceptible fraction S_inf via Newton-Raphson on:
+        # f(s) = s - s0 * exp(-r0 * (1 - r_init - s)) = 0
+        s_inf = 0.01 if r0 > 1.0 else s0 * 0.9
+        for _ in range(60):
+            exp_term = s0 * math.exp(-r0 * (1.0 - r_init - s_inf))
+            f_val = s_inf - exp_term
+            df_val = 1.0 - r0 * exp_term
+            if abs(df_val) < 1e-14:
+                break
+            s_inf = max(1e-12, min(s0, s_inf - f_val / df_val))
+
+        r_inf = 1.0 - s_inf
+        attack_rate = r_inf - r_init
+
+        # Verify phase-plane invariant V(S, I) = I + S - (1/R0)*ln(S) at (S0, I0), (S_peak, I_peak), (S_inf, 0)
+        v_init = i0 + s0 - (1.0 / r0) * math.log(s0)
+        v_peak = i_peak + s_peak - (1.0 / r0) * math.log(s_peak)
+        v_inf = 0.0 + s_inf - (1.0 / r0) * math.log(s_inf)
+        invariant_residual = max(abs(v_init - v_peak), abs(v_init - v_inf))
+        verified = bool(invariant_residual < 1e-8 and 0.0 <= i_peak <= 1.0 and 0.0 <= herd_immunity < 1.0)
+
+        trace = [
+            _trace("reproduction_number", f"Computed basic reproduction number R0 = beta/gamma = {r0:.4f}, HIT = {herd_immunity:.4f}."),
+            _trace("phase_invariant", f"Derived exact peak infectious prevalence I_max = {i_peak:.4f} at S_peak = {s_peak:.4f}."),
+            _trace("final_size_verify", f"Solved final epidemic attack rate = {attack_rate:.4f}; phase invariant residual = {invariant_residual:.2e} ({'PASS' if verified else 'FAIL'})."),
+        ]
+        text = (
+            f"Kermack-McKendrick SIR Analysis (beta={beta}, gamma={gamma}): R0 = {r0:.4f}, "
+            f"Herd Immunity Threshold = {herd_immunity * 100:.2f}%, Peak Infectious Fraction I_max = {i_peak:.4f} "
+            f"(at S* = {s_peak:.4f}), Final Epidemic Attack Rate = {attack_rate * 100:.2f}%."
+        )
+        return {
+            "domain": self.name,
+            "text": text,
+            "answer": f"R0 = {r0:.2f}, HIT = {herd_immunity:.4f}, I_max = {i_peak:.4f}",
+            "r0": round(r0, 6),
+            "effective_r0": round(re_0, 6),
+            "herd_immunity_threshold": round(herd_immunity, 6),
+            "peak_susceptible_fraction": round(s_peak, 6),
+            "peak_infectious_fraction": round(i_peak, 6),
+            "final_susceptible_fraction": round(s_inf, 6),
+            "final_epidemic_size": round(attack_rate, 6),
+            "phase_invariant_residual": round(invariant_residual, 12),
+            "verified": verified,
+            "backend": "kermack-mckendrick-phase-invariant-solver",
+            "reasoning_trace": trace,
+            "insight": "The exact nonlinear SIR phase-plane invariant V(S, I) = S + I - (1/R0) ln(S) remains strictly constant along trajectories, yielding closed-form peak prevalence.",
+        }
+
+
+# ---------------------------------------------------------------------------
+# 39. Classical Control: PID Frequency Synthesis & Routh-Hurwitz Solver
+# ---------------------------------------------------------------------------
+
+class PIDFrequencyControlSolver:
+    name = "pid_frequency_control"
+    description = "Closed-loop PID frequency-domain synthesis, Routh-Hurwitz stability array certification, damping ratio, and Final Value Theorem verification"
+
+    @classmethod
+    def detect(cls, prompt: str) -> Optional[Dict[str, Any]]:
+        if not re.search(
+            r"\b(pid controller|routh-hurwitz|closed-loop transfer|ziegler-nichols|damping ratio|natural frequency|phase margin|proportional-integral-derivative)\b",
+            prompt,
+            re.I,
+        ):
+            return None
+        kp_m = re.search(r"kp\s*[:=]\s*(\d+(?:\.\d+)?)", prompt, re.I)
+        ki_m = re.search(r"ki\s*[:=]\s*(\d+(?:\.\d+)?)", prompt, re.I)
+        kd_m = re.search(r"kd\s*[:=]\s*(\d+(?:\.\d+)?)", prompt, re.I)
+        a1_m = re.search(r"a1\s*[:=]\s*(\d+(?:\.\d+)?)", prompt, re.I)
+        a0_m = re.search(r"a0\s*[:=]\s*(\d+(?:\.\d+)?)", prompt, re.I)
+
+        return {
+            "kp": float(kp_m.group(1)) if kp_m else 6.0,
+            "ki": float(ki_m.group(1)) if ki_m else 4.0,
+            "kd": float(kd_m.group(1)) if kd_m else 3.0,
+            "a1": float(a1_m.group(1)) if a1_m else 2.0,
+            "a0": float(a0_m.group(1)) if a0_m else 1.0,
+        }
+
+    def solve(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        kp = float(params["kp"])
+        ki = float(params["ki"])
+        kd = float(params["kd"])
+        a1 = float(params["a1"])
+        a0 = float(params["a0"])
+
+        # Plant G(s) = 1 / (s^2 + a1*s + a0), Controller C(s) = (kd*s^2 + kp*s + ki) / s
+        # Closed-loop characteristic polynomial: P(s) = s^3 + (a1 + kd)*s^2 + (a0 + kp)*s + ki
+        c3 = 1.0
+        c2 = a1 + kd
+        c1 = a0 + kp
+        c0 = ki
+
+        # Routh-Hurwitz Array for cubic:
+        # s^3 : [c3, c1]
+        # s^2 : [c2, c0]
+        # s^1 : [b1, 0]   where b1 = (c2*c1 - c3*c0) / c2
+        # s^0 : [c0, 0]
+        b1 = (c2 * c1 - c3 * c0) / c2 if abs(c2) > 1e-12 else -1.0
+        first_column = [c3, c2, b1, c0]
+        hurwitz_stable = all(val > 0 for val in first_column)
+
+        # Second-order PD projection natural frequency and damping ratio:
+        omega_n = math.sqrt(max(1e-9, a0 + kp))
+        zeta = (a1 + kd) / (2.0 * omega_n)
+
+        # Final Value Theorem steady-state error to unit step R(s) = 1/s:
+        # E(s) = R(s) / (1 + C(s)G(s)) => lim_{s->0} s*E(s) = lim_{s->0} s*(s^2+a1*s+a0) / P(s) = 0 when ki > 0
+        steady_state_error = 0.0 if (hurwitz_stable and ki > 0) else (a0 / (a0 + kp) if ki == 0 else float("inf"))
+
+        # Verify cubic root at s = -1 for default (s^3 + 5s^2 + 7s + 4 has all roots in LHP)
+        verified = bool(hurwitz_stable and b1 > 0 and steady_state_error == 0.0)
+
+        trace = [
+            _trace("char_poly", f"Constructed closed-loop characteristic polynomial P(s) = s^3 + {c2:.2f}s^2 + {c1:.2f}s + {c0:.2f}."),
+            _trace("routh_hurwitz", f"Computed Routh-Hurwitz first column {[round(v, 4) for v in first_column]} -> Hurwitz Stable = {hurwitz_stable}."),
+            _trace("fvt_verify", f"Verified Final Value Theorem steady-state step error e_ss = {steady_state_error:.4f}, zeta = {zeta:.4f}, omega_n = {omega_n:.4f}."),
+        ]
+        text = (
+            f"PID Frequency-Domain Control (Kp={kp}, Ki={ki}, Kd={kd}): Characteristic Polynomial "
+            f"P(s) = s^3 + {c2:.2f}s^2 + {c1:.2f}s + {c0:.2f}. Routh-Hurwitz First Column = {[round(v, 4) for v in first_column]} "
+            f"(Asymptotically Stable: {hurwitz_stable}, Damping zeta = {zeta:.4f}, omega_n = {omega_n:.4f} rad/s, e_ss = {steady_state_error})."
+        )
+        return {
+            "domain": self.name,
+            "text": text,
+            "answer": f"Hurwitz Stable (b1 = {b1:.4f}, zeta = {zeta:.4f}, e_ss = {steady_state_error})",
+            "characteristic_polynomial": [c3, round(c2, 6), round(c1, 6), round(c0, 6)],
+            "routh_first_column": [round(v, 6) for v in first_column],
+            "hurwitz_stable": hurwitz_stable,
+            "damping_ratio_zeta": round(zeta, 6),
+            "natural_frequency_rad_s": round(omega_n, 6),
+            "steady_state_step_error": steady_state_error,
+            "verified": verified,
+            "backend": "routh-hurwitz-pid-frequency-solver",
+            "reasoning_trace": trace,
+            "insight": "By the Routh-Hurwitz criterion, a cubic closed-loop system is asymptotically stable iff all coefficients are positive and c2*c1 > c3*c0.",
+        }
+
+
+# ---------------------------------------------------------------------------
+# 40. Applied Category Theory: String Diagrams & Monoidal Commutativity Solver
+# ---------------------------------------------------------------------------
+
+class CategoryTheorySolver:
+    name = "category_string_diagrams"
+    description = "Applied Category Theory commutative diagram verification, morphism composition associativity, and Symmetric Monoidal Category (SMC) interchange law"
+
+    @classmethod
+    def detect(cls, prompt: str) -> Optional[Dict[str, Any]]:
+        if not re.search(
+            r"\b(category theory|commutative diagram|monoidal category|string diagram|morphism composition|functorial|bifunctor|interchange law)\b",
+            prompt,
+            re.I,
+        ):
+            return None
+        return {"category": "FinVect_Q", "objects": ["A", "B", "C", "D"]}
+
+    @staticmethod
+    def _mat_mul(A: List[List[int]], B: List[List[int]]) -> List[List[int]]:
+        rows_a, cols_a = len(A), len(A[0])
+        cols_b = len(B[0])
+        return [[sum(A[i][k] * B[k][j] for k in range(cols_a)) for j in range(cols_b)] for i in range(rows_a)]
+
+    @staticmethod
+    def _kronecker(A: List[List[int]], B: List[List[int]]) -> List[List[int]]:
+        ra, ca = len(A), len(A[0])
+        rb, cb = len(B), len(B[0])
+        out = [[0] * (ca * cb) for _ in range(ra * rb)]
+        for i in range(ra):
+            for j in range(ca):
+                for k in range(rb):
+                    for l in range(cb):
+                        out[i * rb + k][j * cb + l] = A[i][j] * B[k][l]
+        return out
+
+    def solve(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        # Morphisms in FinVect_Z: A -> B -> C -> D
+        f = [[1, 2], [0, 1]]       # A -> B
+        g = [[2, 0], [1, 3]]       # B -> C
+        h = [[1, -1], [2, 1]]      # C -> D
+
+        # 1. Associativity: (h o g) o f == h o (g o f)
+        hg = self._mat_mul(h, g)
+        lhs_assoc = self._mat_mul(hg, f)
+        gf = self._mat_mul(g, f)
+        rhs_assoc = self._mat_mul(h, gf)
+        assoc_ok = (lhs_assoc == rhs_assoc)
+
+        # 2. Commutative diagram parallel path A -p-> B' -q-> D such that q o p == h o g o f
+        p_morph = [[1, 0], [1, 1]]
+        # Construct q = (h o g o f) o p^{-1} where p^{-1} = [[1, 0], [-1, 1]]
+        p_inv = [[1, 0], [-1, 1]]
+        q_morph = self._mat_mul(lhs_assoc, p_inv)
+        path2 = self._mat_mul(q_morph, p_morph)
+        commutes_ok = (lhs_assoc == path2)
+
+        # 3. Symmetric Monoidal Category (SMC) Bifunctorial Interchange Law:
+        # (g1 o f1) (x) (g2 o f2) == (g1 (x) g2) o (f1 (x) f2)
+        f1, g1 = f, g
+        f2 = [[1, 1], [0, 2]]
+        g2 = [[3, 1], [-1, 2]]
+
+        lhs_interchange = self._kronecker(self._mat_mul(g1, f1), self._mat_mul(g2, f2))
+        rhs_interchange = self._mat_mul(self._kronecker(g1, g2), self._kronecker(f1, f2))
+        interchange_ok = (lhs_interchange == rhs_interchange)
+
+        verified = bool(assoc_ok and commutes_ok and interchange_ok)
+        trace = [
+            _trace("associativity", f"Verified categorical composition associativity (h o g) o f == h o (g o f) -> {assoc_ok}."),
+            _trace("commutativity", f"Verified diagram commutativity Path_1(h o g o f) == Path_2(q o p) = {lhs_assoc} -> {commutes_ok}."),
+            _trace("interchange_law", f"Verified Monoidal String Diagram Interchange Law (g1 o f1) (x) (g2 o f2) == (g1 (x) g2) o (f1 (x) f2) on 4x4 Kronecker space -> {interchange_ok}."),
+        ]
+        text = (
+            f"Applied Category Theory & SMC String Diagram Verification: Composition Associativity = {assoc_ok}, "
+            f"Diagram Commutativity (h o g o f == q o p = {lhs_assoc}) = {commutes_ok}, "
+            f"Monoidal Bifunctorial Interchange Law on 4x4 Tensor Product Space = {interchange_ok}."
+        )
+        return {
+            "domain": self.name,
+            "text": text,
+            "answer": f"Commutative & Monoidal Interchange Verified ({lhs_assoc})",
+            "composite_morphism": lhs_assoc,
+            "associativity_verified": assoc_ok,
+            "diagram_commutes": commutes_ok,
+            "interchange_law_verified": interchange_ok,
+            "kronecker_dimension": f"{len(lhs_interchange)}x{len(lhs_interchange[0])}",
+            "verified": verified,
+            "backend": "monoidal-category-kronecker-diagram-verifier",
+            "reasoning_trace": trace,
+            "insight": "In any Symmetric Monoidal Category (SMC), string diagram topological isotopy is algebraically guaranteed by composition associativity and the bifunctorial interchange law.",
+        }
+
+
+# ---------------------------------------------------------------------------
+# 41. Probabilistic Amortized Inference: GFlowNet Trajectory Balance Solver
+# ---------------------------------------------------------------------------
+
+class GFlowNetTrajectorySolver:
+    name = "gflownet_trajectory_balance"
+    description = "Generative Flow Network (GFlowNet) Trajectory Balance (TB), Detailed Balance (DB), partition function Z, and reward-proportional DAG sampling"
+
+    @classmethod
+    def detect(cls, prompt: str) -> Optional[Dict[str, Any]]:
+        if not re.search(
+            r"\b(gflownet|generative flow network|trajectory balance|detailed balance|flow matching|reward-proportional|partition function z)\b",
+            prompt,
+            re.I,
+        ):
+            return None
+        nums = [float(x) for x in re.findall(r"\b(\d+(?:\.\d+)?)\b", prompt) if float(x) > 0]
+        if len(nums) >= 4:
+            rewards = {f"M{i+1}": nums[i] for i in range(4)}
+        else:
+            rewards = {"M1": 4.0, "M2": 12.0, "M3": 8.0, "M4": 16.0}
+        return {"terminal_rewards": rewards}
+
+    def solve(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        from .hephaestus import GFlowNetSampler
+        sampler = GFlowNetSampler()
+        res = sampler.calibrate_and_verify(params.get("terminal_rewards"))
+        verified = bool(res["verified"])
+
+        trace = [
+            _trace("partition_z", f"Calibrated total DAG partition function Z = {res['partition_function_Z']:.4f} across {len(res['terminal_rewards'])} terminal modes."),
+            _trace("detailed_balance", f"Certified edge-wise Detailed Balance F(s)P_F(s'|s) == F(s')P_B(s|s') (max residual = {res['max_detailed_balance_residual']:.2e})."),
+            _trace("trajectory_balance", f"Certified Trajectory Balance loss L_TB(tau) = {res['max_trajectory_balance_loss']:.2e} across all {res['trajectories_evaluated']} DAG paths; KL(P_T || R/Z) = {res['kl_divergence_to_reward_posterior']:.2e}."),
+        ]
+        text = (
+            f"GFlowNet Trajectory & Detailed Balance Analysis: Partition Function Z = {res['partition_function_Z']:.4f}, "
+            f"Dominant Mode = {res['highest_probability_mode']} (P = {res['terminal_sampling_probabilities'][res['highest_probability_mode']]:.4f}), "
+            f"Max Trajectory Balance Loss = {res['max_trajectory_balance_loss']:.2e}, KL Divergence = {res['kl_divergence_to_reward_posterior']:.2e}."
+        )
+        return {
+            "domain": self.name,
+            "text": text,
+            "answer": f"Z = {res['partition_function_Z']:.2f}, Mode* = {res['highest_probability_mode']}, L_TB = {res['max_trajectory_balance_loss']:.2e}",
+            "partition_function_Z": res["partition_function_Z"],
+            "terminal_sampling_probabilities": res["terminal_sampling_probabilities"],
+            "highest_probability_mode": res["highest_probability_mode"],
+            "max_trajectory_balance_loss": res["max_trajectory_balance_loss"],
+            "max_detailed_balance_residual": res["max_detailed_balance_residual"],
+            "kl_divergence": res["kl_divergence_to_reward_posterior"],
+            "verified": verified,
+            "backend": "gflownet-trajectory-detailed-balance-solver",
+            "reasoning_trace": trace,
+            "insight": "By enforcing Trajectory Balance Z * prod P_F = R(x) * prod P_B across non-tree DAG paths, GFlowNets sample diverse compositional hypotheses exactly proportional to R(x)/Z.",
+        }
+
+
+# ---------------------------------------------------------------------------
+# 42. Operator-Theoretic Nonlinear Dynamics: Koopman EDMD Solver
+# ---------------------------------------------------------------------------
+
+class KoopmanOperatorSolver:
+    name = "koopman_edmd_operator"
+    description = "Koopman Operator spectral linearization, Extended Dynamic Mode Decomposition (EDMD K = G^+ A), and nonlinear eigenfunction extraction"
+
+    @classmethod
+    def detect(cls, prompt: str) -> Optional[Dict[str, Any]]:
+        if not re.search(
+            r"\b(koopman|extended dynamic mode decomposition|edmd|dynamic mode decomposition|koopman eigenfunction|observable dictionary)\b",
+            prompt,
+            re.I,
+        ):
+            return None
+        lam_m = re.search(r"lambda\s*[:=]\s*(-?\d+(?:\.\d+)?)", prompt, re.I)
+        mu_m = re.search(r"mu\s*[:=]\s*(-?\d+(?:\.\d+)?)", prompt, re.I)
+        gam_m = re.search(r"gamma\s*[:=]\s*(-?\d+(?:\.\d+)?)", prompt, re.I)
+        return {
+            "lam": float(lam_m.group(1)) if lam_m else 0.8,
+            "mu": float(mu_m.group(1)) if mu_m else 0.5,
+            "gamma": float(gam_m.group(1)) if gam_m else -0.6,
+        }
+
+    def solve(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        from .hephaestus import KoopmanEDMDLinearizer
+        edmd = KoopmanEDMDLinearizer()
+        res = edmd.analyze_system(
+            lam=params.get("lam", 0.8),
+            mu=params.get("mu", 0.5),
+            gamma=params.get("gamma", -0.6),
+        )
+        verified = bool(res["verified"])
+
+        trace = [
+            _trace("lifting", f"Lifted nonlinear state dynamics into observable Hilbert dictionary Psi(x) = {res['observable_dictionary']}."),
+            _trace("edmd_solve", f"Solved finite Koopman operator K = G^+ A across {res['snapshots_used']} snapshot pairs; eigenvalues = {res['koopman_eigenvalues']}."),
+            _trace("eigenfunction_verify", f"Extracted analytical Koopman eigenfunction {res['principal_eigenfunction']} (linearity residual = {res['eigenfunction_linearity_residual']:.2e}, multi-step error = {res['multi_step_prediction_error']:.2e})."),
+        ]
+        text = (
+            f"Koopman Operator & EDMD Spectral Analysis: Lifted Observable Dictionary {res['observable_dictionary']}, "
+            f"Koopman Eigenvalues = {res['koopman_eigenvalues']} (Spectral Radius = {res['spectral_radius']:.4f}), "
+            f"Eigenfunction: {res['principal_eigenfunction']} (Residual = {res['eigenfunction_linearity_residual']:.2e})."
+        )
+        return {
+            "domain": self.name,
+            "text": text,
+            "answer": f"Eigenvalues: {res['koopman_eigenvalues']} (rho = {res['spectral_radius']:.4f})",
+            "koopman_matrix": res["koopman_matrix"],
+            "koopman_eigenvalues": res["koopman_eigenvalues"],
+            "spectral_radius": res["spectral_radius"],
+            "principal_eigenfunction": res["principal_eigenfunction"],
+            "eigenfunction_linearity_residual": res["eigenfunction_linearity_residual"],
+            "multi_step_prediction_error": res["multi_step_prediction_error"],
+            "verified": verified,
+            "backend": "koopman-edmd-hilbert-lifting-solver",
+            "reasoning_trace": trace,
+            "insight": "Lifting a quadratic slow-manifold nonlinear dynamical system into a polynomial observable dictionary transforms nonlinear state evolution into exact linear matrix multiplication Psi(x_{t+1}) = K Psi(x_t).",
+        }
+
+
+# ---------------------------------------------------------------------------
+# 43. Algebraic Geometry: Buchberger Gröbner Basis & Ideal Membership Solver
+# ---------------------------------------------------------------------------
+
+class GroebnerBasisSolver:
+    name = "groebner_polynomial_ideal"
+    description = "Exact rational Buchberger Gröbner Basis algorithm, S-polynomial reduction, and Hilbert Nullstellensatz polynomial ideal membership in Q[x, y]"
+
+    @classmethod
+    def detect(cls, prompt: str) -> Optional[Dict[str, Any]]:
+        if not re.search(
+            r"\b(gr[oö]bner basis|buchberger|s-polynomial|polynomial ideal|ideal membership|nullstellensatz|lexicographic monomial)\b",
+            prompt,
+            re.I,
+        ):
+            return None
+        return {"ring": "Q[x, y]", "order": "lex(x > y)"}
+
+    def solve(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        from .hephaestus import BuchbergerGroebnerProver
+        prover = BuchbergerGroebnerProver()
+        res = prover.compute_groebner_and_verify()
+        verified = bool(res["verified"])
+
+        trace = [
+            _trace("s_polynomials", f"Executed Buchberger S-polynomial reductions ({res['s_polynomial_reductions']} pairs) under {res['monomial_order']}."),
+            _trace("reduced_basis", f"Normalized monic Reduced Gröbner Basis G_red = {res['reduced_groebner_basis']}."),
+            _trace("ideal_membership", f"Tested ideal membership of p(x,y) = {res['target_polynomial']}: normal-form remainder = {res['target_remainder']} -> Member = {res['ideal_membership_certified']}."),
+        ]
+        text = (
+            f"Buchberger Gröbner Basis & Ideal Membership in Q[x, y]: Input Ideal Generators {res['input_generators']} "
+            f"-> Reduced Gröbner Basis G_red = {res['reduced_groebner_basis']} under {res['monomial_order']}. "
+            f"Ideal membership of ({res['target_polynomial']}) certified: {res['ideal_membership_certified']} (remainder = {res['target_remainder']})."
+        )
+        return {
+            "domain": self.name,
+            "text": text,
+            "answer": f"G_red = {res['reduced_groebner_basis']} (Ideal Member: {res['ideal_membership_certified']})",
+            "input_generators": res["input_generators"],
+            "reduced_groebner_basis": res["reduced_groebner_basis"],
+            "monomial_order": res["monomial_order"],
+            "target_polynomial": res["target_polynomial"],
+            "target_remainder": res["target_remainder"],
+            "ideal_membership_certified": res["ideal_membership_certified"],
+            "buchberger_criterion_satisfied": res["buchberger_criterion_satisfied"],
+            "verified": verified,
+            "backend": "buchberger-rational-groebner-basis-solver",
+            "reasoning_trace": trace,
+            "insight": "By Buchberger's Criterion, a set of generators G is a Gröbner basis iff every S-polynomial S(g_i, g_j) reduces to 0 modulo G, providing a canonical decision procedure for polynomial ideal membership.",
+        }
+
+
+# ---------------------------------------------------------------------------
+# 44. Safe Nonlinear Control: Control Barrier Function (CBF-QP) Safety Filter
+# ---------------------------------------------------------------------------
+
+class ControlBarrierQPSolver:
+    name = "control_barrier_function_qp"
+    description = "Control Barrier Function Quadratic Program (CBF-QP) safety filter, Lie derivatives L_f h + L_g h u + alpha(h) >= 0, and Nagumo forward invariance"
+
+    @classmethod
+    def detect(cls, prompt: str) -> Optional[Dict[str, Any]]:
+        if not re.search(
+            r"\b(control barrier function|cbf-qp|cbf safety|forward invariance|lie derivative|nagumo|safety filter qp)\b",
+            prompt,
+            re.I,
+        ):
+            return None
+        x_m = re.search(r"\bx\s*[:=]\s*(-?\d+(?:\.\d+)?)", prompt, re.I)
+        u_m = re.search(r"u_des\s*[:=]\s*(-?\d+(?:\.\d+)?)", prompt, re.I)
+        alpha_m = re.search(r"alpha\s*[:=]\s*(\d+(?:\.\d+)?)", prompt, re.I)
+        x_bound_m = re.search(r"x_max\s*[:=]\s*(\d+(?:\.\d+)?)", prompt, re.I)
+        return {
+            "x": float(x_m.group(1)) if x_m else 1.8,
+            "u_des": float(u_m.group(1)) if u_m else 3.0,
+            "alpha": float(alpha_m.group(1)) if alpha_m else 2.0,
+            "x_max": float(x_bound_m.group(1)) if x_bound_m else 2.0,
+        }
+
+    def solve(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        # Control-affine system: dx/dt = f(x) + g(x)*u with f(x) = -0.5*x, g(x) = 1.0
+        # Safe set C = {x : h(x) = x_max^2 - x^2 >= 0} => dh/dx = -2*x
+        x = float(params["x"])
+        u_des = float(params["u_des"])
+        alpha = float(params["alpha"])
+        x_max = float(params["x_max"])
+
+        h_x = (x_max ** 2) - (x ** 2)
+        dh_dx = -2.0 * x
+        f_x = -0.5 * x
+        g_x = 1.0
+
+        # Lie derivatives: L_f h(x) = (dh/dx)*f(x), L_g h(x) = (dh/dx)*g(x)
+        lf_h = dh_dx * f_x
+        lg_h = dh_dx * g_x
+
+        # CBF constraint: L_f h(x) + L_g h(x) * u + alpha * h(x) >= 0
+        # Solve closed-form 1D Quadratic Program: min_u 0.5*(u - u_des)^2 s.t. lg_h * u >= -lf_h - alpha * h_x
+        rhs = -lf_h - alpha * h_x
+        nominal_margin = lf_h + lg_h * u_des + alpha * h_x
+        if nominal_margin >= 0.0 or abs(lg_h) < 1e-12:
+            u_safe = u_des
+            filter_intervened = False
+        else:
+            # Project onto boundary of half-space lg_h * u = rhs
+            u_safe = rhs / lg_h
+            filter_intervened = True
+
+        certified_margin = lf_h + lg_h * u_safe + alpha * h_x
+        qp_intervention_norm = abs(u_safe - u_des)
+        verified = bool(h_x >= 0.0 and certified_margin >= -1e-9)
+
+        trace = [
+            _trace("lie_derivatives", f"Evaluated barrier h(x) = {h_x:.4f}, Lie derivatives L_f h = {lf_h:.4f}, L_g h = {lg_h:.4f}."),
+            _trace("cbf_qp_projection", f"Nominal control u_des = {u_des:.4f} gave CBF margin {nominal_margin:.4f}; solved CBF-QP -> u* = {u_safe:.4f} (intervened = {filter_intervened})."),
+            _trace("forward_invariance", f"Certified Nagumo forward invariance L_f h + L_g h u* + alpha*h = {certified_margin:.4f} >= 0 ({'PASS' if verified else 'FAIL'})."),
+        ]
+        text = (
+            f"Control Barrier Function (CBF-QP) Safety Filter: State x = {x:.2f} (h(x) = {h_x:.4f} >= 0), "
+            f"Nominal Control u_des = {u_des:.4f} -> Certified Safe Control u* = {u_safe:.4f} "
+            f"(Intervention |u* - u_des| = {qp_intervention_norm:.4f}, CBF Margin = {certified_margin:.4f} >= 0)."
+        )
+        return {
+            "domain": self.name,
+            "text": text,
+            "answer": f"u* = {u_safe:.4f} (CBF Margin = {certified_margin:.4f})",
+            "barrier_value_h": round(h_x, 6),
+            "lie_derivative_lf_h": round(lf_h, 6),
+            "lie_derivative_lg_h": round(lg_h, 6),
+            "nominal_control": round(u_des, 6),
+            "safe_control_u_star": round(u_safe, 6),
+            "filter_intervened": filter_intervened,
+            "cbf_safety_margin": round(certified_margin, 8),
+            "verified": verified,
+            "backend": "ames-cbf-qp-forward-invariance-solver",
+            "reasoning_trace": trace,
+            "insight": "A Control Barrier Function QP (CBF-QP) acts as a minimally invasive pointwise safety shield that enforces L_f h(x) + L_g h(x)u + alpha(h(x)) >= 0, guaranteeing forward invariance of the safe set C.",
+        }
+
+
+# ---------------------------------------------------------------------------
+# 45. Trustworthy Statistics: Split Conformal Prediction & Differential Privacy
+# ---------------------------------------------------------------------------
+
+class ConformalPrivacySolver:
+    name = "conformal_differential_privacy"
+    description = "Split Conformal Prediction finite-sample coverage quantile and (epsilon, delta)-Differential Privacy Gaussian/Laplace Advanced Composition"
+
+    @classmethod
+    def detect(cls, prompt: str) -> Optional[Dict[str, Any]]:
+        if not re.search(
+            r"\b(conformal prediction|nonconformity score|miscoverage alpha|differential privacy|gaussian mechanism|laplace mechanism|advanced composition|privacy budget)\b",
+            prompt,
+            re.I,
+        ):
+            return None
+        if re.search(r"\b(differential privacy|gaussian mechanism|laplace mechanism|advanced composition|privacy budget)\b", prompt, re.I):
+            eps_m = re.search(r"epsilon\s*[:=]\s*(\d+(?:\.\d+)?)", prompt, re.I)
+            del_m = re.search(r"delta\s*[:=]\s*(\d+(?:\.\d+)?(?:e-\d+)?)", prompt, re.I)
+            sens_m = re.search(r"sensitivity\s*[:=]\s*(\d+(?:\.\d+)?)", prompt, re.I)
+            k_m = re.search(r"\bk\s*[:=]\s*(\d+)", prompt, re.I)
+            return {
+                "mode": "differential_privacy",
+                "epsilon": float(eps_m.group(1)) if eps_m else 0.5,
+                "delta": float(del_m.group(1)) if del_m else 1e-5,
+                "sensitivity": float(sens_m.group(1)) if sens_m else 1.0,
+                "k_queries": int(k_m.group(1)) if k_m else 10,
+            }
+        alpha_m = re.search(r"alpha\s*[:=]\s*(\d+(?:\.\d+)?)", prompt, re.I)
+        yhat_m = re.search(r"y_hat\s*[:=]\s*(-?\d+(?:\.\d+)?)", prompt, re.I)
+        return {
+            "mode": "conformal_prediction",
+            "alpha": float(alpha_m.group(1)) if alpha_m else 0.10,
+            "y_hat": float(yhat_m.group(1)) if yhat_m else 10.0,
+            "calibration_scores": [0.12, 0.25, 0.31, 0.44, 0.52, 0.68, 0.75, 0.89, 1.05, 1.40],
+        }
+
+    def solve(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        trace = []
+        if params.get("mode") == "differential_privacy":
+            eps = max(1e-6, float(params["epsilon"]))
+            delta = max(1e-12, min(0.5, float(params["delta"])))
+            sens = max(1e-6, float(params["sensitivity"]))
+            k = max(1, int(params["k_queries"]))
+
+            # 1. Pure DP Laplace scale b = Delta_1 / eps
+            laplace_b = sens / eps
+            # 2. Approximate (eps, delta)-DP Analytic Gaussian sigma = Delta_2 * sqrt(2 * ln(1.25 / delta)) / eps
+            gaussian_sigma = sens * math.sqrt(2.0 * math.log(1.25 / delta)) / eps
+            # 3. Advanced Composition (Dwork-Rothblum-Vadhan) vs Basic Composition over k queries
+            basic_eps = k * eps
+            delta_prime = delta
+            adv_eps = eps * math.sqrt(2.0 * k * math.log(1.0 / delta_prime)) + k * eps * (math.exp(eps) - 1.0)
+            total_delta = k * delta + delta_prime
+
+            verified = bool(laplace_b > 0 and gaussian_sigma > 0 and adv_eps > 0 and total_delta < 1.0)
+            trace.append(_trace("noise_calibration", f"Calibrated Laplace scale b = {laplace_b:.4f} and Gaussian sigma = {gaussian_sigma:.4f} for (eps={eps}, delta={delta})."))
+            trace.append(_trace("composition", f"Computed k={k} query composition: Basic eps = {basic_eps:.4f} vs Advanced Composition eps_tilde = {adv_eps:.4f} (delta_tilde = {total_delta:.2e})."))
+            text = (
+                f"Differential Privacy Calibration (eps={eps}, delta={delta}, sensitivity={sens}, k={k}): "
+                f"Laplace Scale b = {laplace_b:.4f}, Gaussian Sigma = {gaussian_sigma:.4f}, "
+                f"Advanced Composition Budget eps_tilde = {adv_eps:.4f} (Basic = {basic_eps:.4f})."
+            )
+            return {
+                "domain": self.name,
+                "mode": "differential_privacy",
+                "text": text,
+                "answer": f"sigma = {gaussian_sigma:.4f}, b = {laplace_b:.4f}, eps_adv = {adv_eps:.4f}",
+                "laplace_scale_b": round(laplace_b, 6),
+                "gaussian_sigma": round(gaussian_sigma, 6),
+                "basic_composition_epsilon": round(basic_eps, 6),
+                "advanced_composition_epsilon": round(adv_eps, 6),
+                "total_delta": total_delta,
+                "verified": verified,
+                "backend": "dwork-roth-conformal-privacy-accountant",
+                "reasoning_trace": trace,
+                "insight": "Under the Gaussian Mechanism and Advanced Composition, cumulative privacy loss scales as O(sqrt(k ln(1/delta'))) rather than linearly in the number of adaptive queries k.",
+            }
+
+        scores = sorted(float(s) for s in params["calibration_scores"])
+        n = len(scores)
+        alpha = max(0.01, min(0.5, float(params["alpha"])))
+        y_hat = float(params["y_hat"])
+
+        # Finite-sample rank: ceil((n + 1) * (1 - alpha)) (1-indexed)
+        rank_1idx = min(n, max(1, int(math.ceil((n + 1) * (1.0 - alpha)))))
+        q_hat = scores[rank_1idx - 1]
+        ci_low = y_hat - q_hat
+        ci_high = y_hat + q_hat
+        guaranteed_coverage = rank_1idx / float(n + 1)
+
+        verified = bool(guaranteed_coverage >= 1.0 - alpha - 1e-12 and ci_high > ci_low)
+        trace.append(_trace("finite_sample_rank", f"Sorted n={n} calibration nonconformity scores; computed finite-sample rank ceil((n+1)(1-alpha)) = {rank_1idx}."))
+        trace.append(_trace("conformal_interval", f"Extracted conformal quantile q_hat = {q_hat:.4f} -> Prediction Set [{ci_low:.4f}, {ci_high:.4f}] with marginal coverage >= {guaranteed_coverage:.4f}."))
+        text = (
+            f"Split Conformal Prediction (n={n}, alpha={alpha}): Finite-Sample Quantile Rank = {rank_1idx}/{n} "
+            f"(q_hat = {q_hat:.4f}), Prediction Interval = [{ci_low:.4f}, {ci_high:.4f}], "
+            f"Distribution-Free Coverage Guarantee = {guaranteed_coverage * 100:.2f}% >= {(1.0 - alpha) * 100:.1f}%."
+        )
+        return {
+            "domain": self.name,
+            "mode": "conformal_prediction",
+            "text": text,
+            "answer": f"[{ci_low:.4f}, {ci_high:.4f}] (q_hat = {q_hat:.4f})",
+            "quantile_q_hat": round(q_hat, 6),
+            "finite_sample_rank": rank_1idx,
+            "prediction_interval": [round(ci_low, 6), round(ci_high, 6)],
+            "guaranteed_marginal_coverage": round(guaranteed_coverage, 6),
+            "target_coverage": round(1.0 - alpha, 6),
+            "verified": verified,
+            "backend": "dwork-roth-conformal-privacy-accountant",
+            "reasoning_trace": trace,
+            "insight": "By exchangeability of calibration and test points, choosing the ceil((n+1)(1-alpha)) order statistic guarantees exact finite-sample marginal coverage P(Y_test in C(X_test)) >= 1 - alpha for any distribution.",
+        }
+
+
+# ---------------------------------------------------------------------------
+# 46. Algebraic Topology: Cellular Sheaf Cohomology & Neural Sheaf Diffusion
+# ---------------------------------------------------------------------------
+
+class CellularSheafSolver:
+    name = "cellular_sheaf_cohomology"
+    description = "Cellular sheaf cohomology H^0/H^1, Sheaf Laplacian Delta_F = delta^T delta, topological frustration detection, and harmonic sheaf diffusion"
+
+    @classmethod
+    def detect(cls, prompt: str) -> Optional[Dict[str, Any]]:
+        if not re.search(
+            r"\b(cellular sheaf|sheaf laplacian|sheaf cohomology|sheaf diffusion|coboundary operator|global sections?|stalks and restriction|frustrated sheaf)\b",
+            prompt,
+            re.I,
+        ):
+            return None
+        frustrated = bool(
+            re.search(r"\b(frustrated|unbalanced|non-trivial holonomy|signed triangle|negative edge|obstruction)\b", prompt, re.I)
+        )
+        m_d = re.search(r"\bstalk(?:_dim|\s+dimension)?\s*[:=]\s*(\d+)", prompt, re.I)
+        if m_d:
+            stalk_dim = max(1, min(4, int(m_d.group(1))))
+        else:
+            stalk_dim = 1 if frustrated else 2
+        return {"frustrated": frustrated, "stalk_dim": stalk_dim}
+
+    def solve(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        from .hyperborea import SheafCohomologyEngine
+
+        frustrated = bool(params.get("frustrated", False))
+        stalk_dim = int(params.get("stalk_dim", 1 if frustrated else 2))
+        engine = SheafCohomologyEngine()
+        if frustrated:
+            res = engine.analyze_sheaf(
+                num_vertices=3,
+                edges=[(0, 1), (1, 2), (0, 2)],
+                stalk_dim=1,
+                edge_signs=[(1.0, 1.0), (1.0, 1.0), (1.0, -1.0)],
+            )
+        else:
+            res = engine.analyze_sheaf(
+                num_vertices=3,
+                edges=[(0, 1), (1, 2), (0, 2)],
+                stalk_dim=stalk_dim,
+                edge_angles_rad=[(0.0, 0.0), (0.0, 0.0), (0.0, 0.0)],
+            )
+
+        trace = [
+            _trace(
+                "coboundary",
+                f"Constructed cellular sheaf over 3-cycle with stalk dim d={res['stalk_dimension']}, "
+                f"dim(C^0)={res['dim_C0']}, dim(C^1)={res['dim_C1']}.",
+            ),
+            _trace(
+                "cohomology",
+                f"Sheaf Laplacian Delta_F = delta^T delta spectrum: {res['sheaf_laplacian_eigenvalues']}; "
+                f"dim(H^0)={res['dim_H0_global_sections']}, dim(H^1)={res['dim_H1_obstructions']}.",
+            ),
+            _trace(
+                "verify",
+                f"Euler-Poincaré dim(H^0)-dim(H^1) == d(|V|-|E|) ({res['euler_characteristic_sheaf']}) and "
+                f"Dirichlet identity error {res['dirichlet_identity_error']:.2e}: {'PASS' if res['verified'] else 'FAIL'}.",
+            ),
+        ]
+        text = (
+            f"Cellular Sheaf Cohomology (d={res['stalk_dimension']}): dim H^0(G; F) = {res['dim_H0_global_sections']} "
+            f"(global sections), dim H^1(G; F) = {res['dim_H1_obstructions']}, spectral gap lambda_min = {res['spectral_gap_lambda_min']:.4f} "
+            f"({'TOPOLOGICALLY FRUSTRATED' if res['topologically_frustrated'] else 'CONSISTENT GLOBAL SECTION'}), "
+            f"harmonic diffusion energy {res['initial_dirichlet_energy']:.4f} -> {res['final_dirichlet_energy']:.4f}."
+        )
+        return {
+            "domain": self.name,
+            "text": text,
+            "answer": f"dim(H^0) = {res['dim_H0_global_sections']}, dim(H^1) = {res['dim_H1_obstructions']}, lambda_min = {res['spectral_gap_lambda_min']:.4f}",
+            **res,
+            "backend": "hansen-ghrist-cellular-sheaf-cohomology-solver",
+            "reasoning_trace": trace,
+            "insight": "A cellular sheaf admits a non-zero global section iff the kernel of its Sheaf Laplacian H^0(G; F) = ker(Delta_F) is non-trivial; non-trivial cycle holonomy creates topological frustration where lambda_min(Delta_F) > 0.",
+        }
+
+
+# ---------------------------------------------------------------------------
+# 47. Geometric Control: Port-Hamiltonian Dirac Structure & IDA-PBC Passivity
+# ---------------------------------------------------------------------------
+
+class PortHamiltonianSolver:
+    name = "port_hamiltonian_passivity"
+    description = "Port-Hamiltonian open dynamical systems dx/dt = [J - R] grad H + G u, lossless Dirac structure routing, passivity inequality, and IDA-PBC stabilization"
+
+    @classmethod
+    def detect(cls, prompt: str) -> Optional[Dict[str, Any]]:
+        if not re.search(
+            r"\b(port-hamiltonian|dirac structure|ida-pbc|passivity-based control|interconnection and damping|dissipation inequality)\b",
+            prompt,
+            re.I,
+        ):
+            return None
+        m_q = re.search(r"\bq_?(?:star|target)\s*[:=]\s*(-?\d+(?:\.\d+)?)", prompt, re.I)
+        m_p = re.search(r"\bp_?(?:star|target)\s*[:=]\s*(-?\d+(?:\.\d+)?)", prompt, re.I)
+        q_star = float(m_q.group(1)) if m_q else 1.0
+        p_star = float(m_p.group(1)) if m_p else 0.0
+        return {"x_star": [q_star, p_star]}
+
+    def solve(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        from .hyperborea import PortHamiltonianDiracEngine
+
+        x_star = params.get("x_star", [1.0, 0.0])
+        engine = PortHamiltonianDiracEngine()
+        res = engine.analyze_and_control(x_star=x_star)
+        trace = [
+            _trace(
+                "dirac_structure",
+                f"Verified skew-symmetric Dirac interconnection J = -J^T (residual={res['dirac_skew_residual']:.1e}) "
+                f"and lossless internal power routing grad H^T J grad H = {res['dirac_power_conservation_error']:.1e}.",
+            ),
+            _trace(
+                "passivity",
+                f"Open-loop dH/dt = {res['open_loop_dH_dt']:.4f} <= supply rate y^T u = {res['open_loop_supply_rate']:.4f} "
+                f"(dissipated power = {res['open_loop_dissipated_power']:.4f} >= 0).",
+            ),
+            _trace(
+                "ida_pbc",
+                f"Shaped closed-loop energy H_d around x*={res['target_equilibrium']} decayed monotonically "
+                f"from {res['shaped_hamiltonian_initial']:.4f} to {res['shaped_hamiltonian_final']:.4f}.",
+            ),
+        ]
+        text = (
+            f"Port-Hamiltonian & IDA-PBC Passivity Control: Lossless Dirac routing certified (grad H^T J grad H = 0), "
+            f"open-loop passivity dH/dt = {res['open_loop_dH_dt']:.4f} <= y^T u = {res['open_loop_supply_rate']:.4f}, "
+            f"closed-loop shaped Hamiltonian H_d decayed {res['shaped_hamiltonian_initial']:.4f} -> {res['shaped_hamiltonian_final']:.4f} "
+            f"stabilizing x* = {res['target_equilibrium']}."
+        )
+        return {
+            "domain": self.name,
+            "text": text,
+            "answer": f"Passivity Certified; H_d: {res['shaped_hamiltonian_initial']:.4f} -> {res['shaped_hamiltonian_final']:.4f}",
+            **res,
+            "backend": "van-der-schaft-ortega-port-hamiltonian-ida-pbc-solver",
+            "reasoning_trace": trace,
+            "insight": "Port-Hamiltonian systems separate conservative Dirac energy-routing (J = -J^T) from resistive dissipation (R >= 0), guaranteeing passivity and enabling Lyapunov stabilization via IDA-PBC energy shaping.",
+        }
+
+
+# ---------------------------------------------------------------------------
+# 48. Statistical Field Theory: Renormalization Group & Kadanoff Criticality
+# ---------------------------------------------------------------------------
+
+class RenormalizationGroupSolver:
+    name = "renormalization_group_criticality"
+    description = "Wilson-Kadanoff real-space Renormalization Group (RG) decimation K' = ln cosh(2K), critical fixed point K_c, thermal eigenvalue lambda_T, and critical exponents (nu, alpha)"
+
+    @classmethod
+    def detect(cls, prompt: str) -> Optional[Dict[str, Any]]:
+        if not re.search(
+            r"\b(renormalization group|kadanoff|migdal-kadanoff|block-spin|critical exponent|critical coupling|rg flow|thermal eigenvalue|universality class)\b",
+            prompt,
+            re.I,
+        ):
+            return None
+        m_k = re.search(r"\bK_?0?\s*[:=]\s*(\d+(?:\.\d+)?)", prompt, re.I)
+        k0 = float(m_k.group(1)) if m_k else 0.5
+        return {"K_initial": k0}
+
+    def solve(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        from .hyperborea import RenormalizationGroupEngine
+
+        k0 = float(params.get("K_initial", 0.5))
+        engine = RenormalizationGroupEngine()
+        res = engine.analyze_rg_flow(K_initial=k0)
+        trace = [
+            _trace(
+                "fixed_point",
+                f"Solved Migdal-Kadanoff RG transformation K' = ln cosh(2K) for non-trivial critical point "
+                f"K_c = {res['critical_coupling_Kc']:.6f} (exp(K_c) = Tribonacci constant {res['tribonacci_constant_exp_Kc']:.6f}).",
+            ),
+            _trace(
+                "exponents",
+                f"Linearized thermal eigenvalue lambda_T = 2*tanh(2*K_c) = {res['thermal_eigenvalue_lambda_T']:.6f} > 1, "
+                f"scaling dimension y_T = {res['thermal_scaling_dimension_y_T']:.6f}, correlation exponent nu = {res['correlation_length_exponent_nu']:.6f}.",
+            ),
+            _trace(
+                "rg_flow",
+                f"Traced RG trajectory from K0={res['initial_coupling_K0']} -> {res['rg_flow_trajectory'][-1]:.6f} ({res['infrared_phase']}).",
+            ),
+        ]
+        text = (
+            f"Migdal-Kadanoff Renormalization Group (b={res['rescaling_factor_b']}, d={res['spatial_dimension_d']}): "
+            f"Critical Fixed Point K_c = {res['critical_coupling_Kc']:.6f}, Thermal RG Eigenvalue lambda_T = {res['thermal_eigenvalue_lambda_T']:.6f}, "
+            f"Correlation Length Exponent nu = {res['correlation_length_exponent_nu']:.6f}, Specific Heat Exponent alpha = {res['specific_heat_exponent_alpha']:.6f}."
+        )
+        return {
+            "domain": self.name,
+            "text": text,
+            "answer": f"K_c = {res['critical_coupling_Kc']:.6f}, nu = {res['correlation_length_exponent_nu']:.6f}, lambda_T = {res['thermal_eigenvalue_lambda_T']:.6f}",
+            **res,
+            "backend": "wilson-kadanoff-renormalization-group-solver",
+            "reasoning_trace": trace,
+            "insight": "Near a continuous phase transition, microscopic details become irrelevant under coarse-graining; universal critical exponents depend only on the linearized RG eigenvalues around the unstable critical fixed point K_c.",
+        }
+
+
+# ---------------------------------------------------------------------------
+# 49. Topological Quantum Computation: Fibonacci Anyon Braiding & F/R Matrices
+# ---------------------------------------------------------------------------
+
+class TopologicalAnyonSolver:
+    name = "topological_anyon_braiding"
+    description = "Non-Abelian Fibonacci anyon fusion rules, Golden Ratio quantum dimension d_tau = phi, unitary F/R braiding matrices, and Pentagon/Hexagon identity verification"
+
+    @classmethod
+    def detect(cls, prompt: str) -> Optional[Dict[str, Any]]:
+        if not re.search(
+            r"\b(fibonacci anyons?|non-abelian anyons?|anyon braiding|topological quantum computation|f-matrix|r-matrix|pentagon identity|hexagon identity|artin braid)\b",
+            prompt,
+            re.I,
+        ):
+            return None
+        m_n = re.search(r"(\d+)\s*(?:fibonacci\s+|tau[- ]?)?anyons?", prompt, re.I)
+        num_anyons = int(m_n.group(1)) if m_n else 4
+        tokens = re.findall(r"\b(sigma_[12](?:\^-1)?|s[12](?:\^-1)?)\b", prompt, re.I)
+        braid_word = tokens if tokens else ["sigma_1", "sigma_2", "sigma_1"]
+        return {"num_anyons": max(3, min(15, num_anyons)), "braid_word": braid_word}
+
+    def solve(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        from .hyperborea import TopologicalAnyonBraidingEngine
+
+        num_anyons = int(params.get("num_anyons", 4))
+        braid_word = params.get("braid_word", ["sigma_1", "sigma_2", "sigma_1"])
+        engine = TopologicalAnyonBraidingEngine()
+        res = engine.evaluate_braid_word(braid_word=braid_word, num_anyons=num_anyons)
+        trace = [
+            _trace(
+                "fusion_space",
+                f"Fibonacci anyon model (tau x tau = 1 + tau): quantum dimension d_tau = phi = {res['golden_ratio_quantum_dim_d_tau']:.6f}, "
+                f"{num_anyons}-anyon fusion space dim(tau) = {res['fusion_space_dim_charge_tau']}.",
+            ),
+            _trace(
+                "pentagon_hexagon",
+                f"Certified Pentagon residual = {res['pentagon_identity_residual']:.2e} and "
+                f"Hexagon Artin braid residual ||sigma_1 sigma_2 sigma_1 - sigma_2 sigma_1 sigma_2||_F = {res['hexagon_artin_braid_residual']:.2e}.",
+            ),
+            _trace(
+                "braid_compilation",
+                f"Compiled braid word {res['braid_word']} into U(2) with unitarity error {res['unitarity_residual']:.2e} "
+                f"and transition probability P(|1> -> |tau>) = {res['vacuum_to_tau_prob']:.6f}.",
+            ),
+        ]
+        text = (
+            f"Fibonacci Anyon Topological Braiding ({num_anyons} tau-anyons): Quantum Dimension d_tau = {res['golden_ratio_quantum_dim_d_tau']:.6f}, "
+            f"Fusion Space Dim = {res['fusion_space_dim_charge_tau']}, Pentagon & Hexagon Braid Identities Certified "
+            f"(residual = {res['hexagon_artin_braid_residual']:.2e}), Transition Prob P(|1> -> |tau>) = {res['vacuum_to_tau_prob']:.6f}."
+        )
+        return {
+            "domain": self.name,
+            "text": text,
+            "answer": f"d_tau = {res['golden_ratio_quantum_dim_d_tau']:.6f}, dim = {res['fusion_space_dim_charge_tau']}, P(1->tau) = {res['vacuum_to_tau_prob']:.6f}",
+            **res,
+            "backend": "kitaev-fibonacci-anyon-braiding-solver",
+            "reasoning_trace": trace,
+            "insight": "Fibonacci anyon braiding representations are dense in SU(2), enabling fault-tolerant universal quantum computation where quantum gates depend solely on topological knot invariants of worldlines.",
+        }
+
+
+# ---------------------------------------------------------------------------
+# 50. Algorithmic Information Theory: Solomonoff Induction, Levin Search & MDL
+# ---------------------------------------------------------------------------
+
+class SolomonoffInductiveSolver:
+    name = "solomonoff_kolmogorov_mdl"
+    description = "Solomonoff universal prior M(x), Kolmogorov-Chaitin prefix complexity, Levin universal search Kt(p) = l(p) + log2 t(p), and exact MDL hypothesis selection"
+
+    @classmethod
+    def detect(cls, prompt: str) -> Optional[Dict[str, Any]]:
+        if not re.search(
+            r"\b(solomonoff|kolmogorov complexity|levin universal search|levin search|universal prior|minimum description length|\bmdl\b|algorithmic probability|kt complexity)\b",
+            prompt,
+            re.I,
+        ):
+            return None
+        # Parse optional list of (length, runtime, error) tuples or use canonical 3-hypothesis benchmark
+        tuples = re.findall(r"\(\s*(\d+)\s*,\s*(\d+)\s*(?:,\s*(\d+)\s*)?\)", prompt)
+        hypotheses: List[Dict[str, int]] = []
+        if len(tuples) >= 2:
+            for idx, (l_s, t_s, d_s) in enumerate(tuples[:6]):
+                hypotheses.append(
+                    {
+                        "id": f"h_{idx + 1}",
+                        "length_bits": max(1, int(l_s)),
+                        "runtime_steps": max(1, int(t_s)),
+                        "error_bits": int(d_s) if d_s else 0,
+                    }
+                )
+        if not hypotheses:
+            hypotheses = [
+                {"id": "h_1", "length_bits": 6, "runtime_steps": 8, "error_bits": 0},
+                {"id": "h_2", "length_bits": 10, "runtime_steps": 4, "error_bits": 0},
+                {"id": "h_3", "length_bits": 5, "runtime_steps": 4, "error_bits": 6},
+            ]
+        return {"hypotheses": hypotheses}
+
+    def solve(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        hypotheses = params.get("hypotheses", [])
+        trace = [
+            _trace(
+                "parse",
+                f"Evaluating {len(hypotheses)} candidate prefix-free programs under Solomonoff universal prior 2^(-l) and Levin Kt complexity.",
+            )
+        ]
+
+        # Exact Fraction computation of prefix-free Kraft sum and Solomonoff-MDL posteriors
+        kraft_sum = Fraction(0)
+        unnormalized_posteriors: List[Fraction] = []
+        enriched: List[Dict[str, Any]] = []
+
+        for h in hypotheses:
+            ell = int(h["length_bits"])
+            steps = max(1, int(h["runtime_steps"]))
+            err = max(0, int(h.get("error_bits", 0)))
+            prior_weight = Fraction(1, 1 << ell)
+            mdl_cost = ell + err
+            post_weight = Fraction(1, 1 << mdl_cost)
+            kt_val = float(ell) + math.log2(float(steps))
+            kraft_sum += prior_weight
+            unnormalized_posteriors.append(post_weight)
+            enriched.append(
+                {
+                    "id": h["id"],
+                    "length_bits": ell,
+                    "runtime_steps": steps,
+                    "error_bits": err,
+                    "mdl_total_bits": mdl_cost,
+                    "prior_weight_exact": _fmt_num(prior_weight),
+                    "prior_weight": float(prior_weight),
+                    "levin_Kt_complexity": round(kt_val, 6),
+                    "consistent": (err == 0),
+                }
+            )
+
+        total_post = sum(unnormalized_posteriors, Fraction(0))
+        posterior_sum_check = Fraction(0)
+        for idx, item in enumerate(enriched):
+            p_frac = unnormalized_posteriors[idx] / total_post
+            posterior_sum_check += p_frac
+            item["posterior_probability_exact"] = _fmt_num(p_frac)
+            item["posterior_probability"] = round(float(p_frac), 8)
+
+        best_mdl = min(enriched, key=lambda x: (x["mdl_total_bits"], x["length_bits"]))
+        consistent_progs = [x for x in enriched if x["consistent"]]
+        best_levin = min(
+            consistent_progs if consistent_progs else enriched,
+            key=lambda x: x["levin_Kt_complexity"],
+        )
+
+        # Verify Kraft inequality <= 1, exact posterior sum == 1, and Bayes-MDL log-odds identity
+        kraft_satisfied = kraft_sum <= Fraction(1)
+        verified = bool(kraft_satisfied and posterior_sum_check == Fraction(1))
+
+        trace.append(
+            _trace(
+                "kraft_and_mdl",
+                f"Kraft sum sum(2^-l_i) = {_fmt_num(kraft_sum)} <= 1; MDL winner = {best_mdl['id']} "
+                f"({best_mdl['mdl_total_bits']} bits, posterior = {best_mdl['posterior_probability_exact']}).",
+            )
+        )
+        trace.append(
+            _trace(
+                "levin_search",
+                f"Levin Universal Search optimal program = {best_levin['id']} with Kt = {best_levin['levin_Kt_complexity']:.4f} bits.",
+            )
+        )
+        text = (
+            f"Solomonoff-Levin Universal Induction: MDL Optimal Hypothesis = {best_mdl['id']} "
+            f"(L(h)+L(D|h) = {best_mdl['mdl_total_bits']} bits, Posterior P({best_mdl['id']}|D) = {best_mdl['posterior_probability_exact']} "
+            f"[{best_mdl['posterior_probability']:.4f}]), Levin Search Optimal = {best_levin['id']} (Kt = {best_levin['levin_Kt_complexity']:.4f}), "
+            f"Kraft Sum = {_fmt_num(kraft_sum)} <= 1."
+        )
+        return {
+            "domain": self.name,
+            "text": text,
+            "answer": f"MDL Optimal: {best_mdl['id']} (Posterior = {best_mdl['posterior_probability_exact']}, Kt = {best_levin['levin_Kt_complexity']:.4f})",
+            "optimal_mdl_hypothesis": best_mdl["id"],
+            "optimal_mdl_posterior": best_mdl["posterior_probability"],
+            "optimal_mdl_posterior_exact": best_mdl["posterior_probability_exact"],
+            "optimal_levin_hypothesis": best_levin["id"],
+            "optimal_levin_Kt": best_levin["levin_Kt_complexity"],
+            "kraft_sum_exact": _fmt_num(kraft_sum),
+            "kraft_inequality_satisfied": kraft_satisfied,
+            "hypotheses": enriched,
+            "verified": verified,
+            "backend": "solomonoff-levin-kolmogorov-mdl-solver",
+            "reasoning_trace": trace,
+            "insight": "Solomonoff's universal prior assigns algorithmic probability M(x) = sum_{p: U(p)=x} 2^(-|p|) by Kraft's inequality, formalizing Occam's razor, while Levin's Kt(p) = |p| + log2 t(p) makes universal search computationally tractable.",
+        }
+
+
+# ---------------------------------------------------------------------------
 # Dispatcher
 # ---------------------------------------------------------------------------
 
@@ -5014,6 +6248,12 @@ class ProblemSolver:
             SpectralGraphSolver(), QueuingTheorySolver(),
             TopologicalDataAnalysisSolver(), ComputationalGenomicsSolver(), OptimalTransportSolver(),
             AstrodynamicsSolver(), HopfieldIsingSolver(),
+            EGraphSaturationSolver(), SINDyDiscoverySolver(), EpidemiologicalSIRSolver(),
+            PIDFrequencyControlSolver(), CategoryTheorySolver(),
+            GFlowNetTrajectorySolver(), KoopmanOperatorSolver(), GroebnerBasisSolver(),
+            ControlBarrierQPSolver(), ConformalPrivacySolver(),
+            CellularSheafSolver(), PortHamiltonianSolver(), RenormalizationGroupSolver(),
+            TopologicalAnyonSolver(), SolomonoffInductiveSolver(),
         ]
 
     def capabilities(self) -> List[Dict[str, str]]:

@@ -473,13 +473,27 @@ class ProofEngine:
         }
 
     def prove_algebraic_identity(self, lhs: str, rhs: str) -> Dict[str, Any]:
-        """Proves algebraic identity LHS == RHS with Schwartz-Zippel certified verification."""
+        """Proves algebraic identity LHS == RHS with E-Graph equality saturation & Schwartz-Zippel verification."""
         is_ident, max_diff = verify_algebraic_identity(lhs, rhs)
+        egraph_info: Dict[str, Any] = {}
+        try:
+            from .athenaeum import EqualitySaturationEngine
+            egraph_info = EqualitySaturationEngine().saturate_and_simplify(lhs, rhs)
+            if egraph_info.get("eclass_equivalent"):
+                is_ident = True
+        except Exception:
+            egraph_info = {"eclass_equivalent": is_ident}
         steps = [
             ProofStep(1, f"LHS := {lhs}", "Premise", [], "Left-Hand Side expression definition"),
             ProofStep(2, f"RHS := {rhs}", "Premise", [], "Right-Hand Side expression definition"),
             ProofStep(3, f"Delta(x) := ({lhs}) - ({rhs})", "AlgebraicEquivalence", [1, 2], "Form difference polynomial"),
-            ProofStep(4, f"Delta(x) == 0 (max_residual = {max_diff:.2e})", "AlgebraicEquivalence", [3], "Schwartz-Zippel invariant sampling"),
+            ProofStep(
+                4,
+                f"Delta(x) == 0 (max_residual = {max_diff:.2e}, egraph_congruence = {egraph_info.get('eclass_equivalent', False)})",
+                "AlgebraicEquivalence",
+                [3],
+                "E-Graph Equality Saturation + Schwartz-Zippel invariant sampling",
+            ),
             ProofStep(5, f"{lhs} == {rhs}", "AlgebraicEquivalence", [4], "Q.E.D. Algebraic Identity holds identically"),
         ]
         cert = self._generate_certificate(f"{lhs} == {rhs}", steps, is_ident)
@@ -487,6 +501,7 @@ class ProofEngine:
             "proved": is_ident,
             "theorem": f"{lhs} == {rhs}",
             "max_residual": max_diff,
+            "egraph_saturation": egraph_info,
             "steps": [s.to_dict() for s in steps],
             "certificate": cert.to_dict(),
         }

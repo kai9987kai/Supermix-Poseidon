@@ -69,6 +69,21 @@ CASES = [
     ("p20", "problem", "Monge-Kantorovich optimal transport and exact 1D Wasserstein distance with regularization=0.1", ["0.3000"]),
     ("p21", "problem", "Hohmann transfer orbital maneuver delta-v from r1=7000 km to r2=42164 km", ["3.77", "km/s"]),
     ("p22", "problem", "Hebbian Hopfield network associative memory and Ising model Lyapunov energy", ["attractor", "-5.000"]),
+    ("p23", "problem", "Use E-Graph equality saturation to simplify expression: (x + 0) * 1 + (x - x)", ["x", "mdl"]),
+    ("p24", "problem", "Run SINDy sparse identification symbolic regression on data points (-2, 15), (-1, 6), (0, 1), (1, 0), (2, 3), (3, 10)", ["2*x^2", "3*x"]),
+    ("p25", "problem", "Analyze Kermack-McKendrick SIR model epidemiological dynamics with beta=0.5, gamma=0.1, s0=0.99", ["5.00", "0.8000"]),
+    ("p26", "problem", "Design a closed-loop PID controller and check Routh-Hurwitz stability with kp=6.0, ki=4.0, kd=3.0", ["hurwitz", "6.2000"]),
+    ("p27", "problem", "Verify Applied Category Theory commutative diagram and Symmetric Monoidal Category (SMC) interchange law", ["commutative", "monoidal"]),
+    ("p28", "problem", "Verify GFlowNet trajectory balance and detailed balance on compositional DAG with rewards 4, 12, 8, 16", ["40.00", "m4"]),
+    ("p29", "problem", "Compute Koopman operator EDMD polynomial observable linearization and eigenfunctions with lambda=0.8, mu=0.5, gamma=-0.6", ["0.8", "eigenfunction"]),
+    ("p30", "problem", "Compute Buchberger Groebner basis and check polynomial ideal membership in Q[x, y]", ["x - 2*y", "y^2 - 1"]),
+    ("p31", "problem", "Solve Control Barrier Function CBF-QP safety filter with x=1.8, x_max=2.0, u_des=3.0, alpha=2.0", ["1.3222", "cbf"]),
+    ("p32", "problem", "Compute split conformal prediction quantile and finite-sample coverage guarantee at alpha=0.10 with y_hat=10.0", ["8.6000", "11.4000", "1.4000"]),
+    ("p33", "problem", "Compute cellular sheaf cohomology H^0 and Sheaf Laplacian spectrum with stalk dimension 2", ["dim(h^0) = 2", "dim(h^1) = 2"]),
+    ("p34", "problem", "Verify Port-Hamiltonian Dirac structure power conservation and IDA-PBC passivity-based control", ["passivity certified", "h_d"]),
+    ("p35", "problem", "Compute Migdal-Kadanoff renormalization group critical coupling and correlation length critical exponent nu", ["0.609378", "1.338266"]),
+    ("p36", "problem", "Verify Fibonacci anyon braiding Pentagon identity and Hexagon identity for 4 tau-anyons with braid word sigma_1 sigma_2 sigma_1", ["1.618034", "dim = 3"]),
+    ("p37", "problem", "Compute Solomonoff universal prior, Minimum Description Length (MDL) posterior, and Levin universal search Kt complexity", ["h_1", "32/35", "9.0000"]),
 ]
 
 

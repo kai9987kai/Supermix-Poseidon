@@ -206,6 +206,24 @@ def make_handler(runtime, port):
                 except Exception as error:
                     self.send_json(500, {"error": str(error), "type": type(error).__name__})
                 return
+            if path == "/api/athenaeum/status":
+                try:
+                    self.send_json(200, runtime.athenaeum_status())
+                except Exception as error:
+                    self.send_json(500, {"error": str(error), "type": type(error).__name__})
+                return
+            if path == "/api/hephaestus/status":
+                try:
+                    self.send_json(200, runtime.hephaestus_status())
+                except Exception as error:
+                    self.send_json(500, {"error": str(error), "type": type(error).__name__})
+                return
+            if path == "/api/hyperborea/status":
+                try:
+                    self.send_json(200, runtime.hyperborea_status())
+                except Exception as error:
+                    self.send_json(500, {"error": str(error), "type": type(error).__name__})
+                return
             if path in ("/", "/index.html", "/style.css", "/app.js"):
                 file = WEB/("index.html" if path in ("/", "/index.html") else path[1:])
             elif path.startswith("/artifacts/"):
@@ -531,6 +549,56 @@ def make_handler(runtime, port):
                         domain_b=domain_b,
                         improving_param=imp,
                         deteriorating_param=det,
+                    )
+                    self.send_json(200, res)
+                except (ValueError, TypeError) as error:
+                    self.send_json(400, {"error": str(error)})
+                except Exception as error:
+                    self.send_json(500, {"error": str(error), "type": type(error).__name__})
+                return
+            if path == "/api/athenaeum/synthesize":
+                try:
+                    expr = payload.get("expression", "(x + y) * (x - y) + y ^ 2")
+                    target = payload.get("target_expression", "x ^ 2")
+                    samples = payload.get("samples")
+                    budget = payload.get("budget_rollouts", 20)
+                    res = runtime.athenaeum_synthesize(
+                        expression=expr,
+                        target_expression=target,
+                        samples=samples,
+                        budget_rollouts=budget,
+                    )
+                    self.send_json(200, res)
+                except (ValueError, TypeError) as error:
+                    self.send_json(400, {"error": str(error)})
+                except Exception as error:
+                    self.send_json(500, {"error": str(error), "type": type(error).__name__})
+                return
+            if path == "/api/hephaestus/synthesize":
+                try:
+                    corpus = payload.get("corpus")
+                    terminal_rewards = payload.get("terminal_rewards")
+                    koopman_params = payload.get("koopman_params")
+                    res = runtime.hephaestus_synthesize(
+                        corpus=corpus,
+                        terminal_rewards=terminal_rewards,
+                        koopman_params=koopman_params,
+                    )
+                    self.send_json(200, res)
+                except (ValueError, TypeError) as error:
+                    self.send_json(400, {"error": str(error)})
+                except Exception as error:
+                    self.send_json(500, {"error": str(error), "type": type(error).__name__})
+                return
+            if path == "/api/hyperborea/synthesize":
+                try:
+                    sheaf_angles_rad = payload.get("sheaf_angles_rad")
+                    rg_initial_K = payload.get("rg_initial_K")
+                    braid_word = payload.get("braid_word")
+                    res = runtime.hyperborea_synthesize(
+                        sheaf_angles_rad=sheaf_angles_rad,
+                        rg_initial_K=rg_initial_K,
+                        braid_word=braid_word,
                     )
                     self.send_json(200, res)
                 except (ValueError, TypeError) as error:

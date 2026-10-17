@@ -625,23 +625,49 @@ class OmniReasoner:
         else:
             from .pantheon import PantheonEngine
             from .creative_synthesis import DialecticalTribunal
+            from .athenaeum import AthenaeumEngine
+            from .hephaestus import HephaestusEngine
+            from .hyperborea import HyperboreaEngine
             p_res = PantheonEngine(seed=seed).synthesize(prompt, seed=seed)
             c_res = DialecticalTribunal().deliberate(prompt, seed=seed)
+            a_res = AthenaeumEngine().synthesize(budget_rollouts=12)
+            h_res = HephaestusEngine().synthesize()
+            hb_res = HyperboreaEngine().synthesize()
             sim_result = {
-                "simulation_type": "Multi-Plane Epistemic, 24-Pillar Pantheon & Noosphere Bisociation Synthesis",
+                "simulation_type": "Multi-Plane Epistemic, 24-Pillar Pantheon, Athenaeum E-Graph/MCTS, Hephaestus Stitch/GFlowNet/Koopman, Hyperborea Sheaf/Port-Hamiltonian/RG/Anyon & Noosphere Bisociation Synthesis",
                 "physical_cross_check": self._simulate_physical_discovery(seed)["wide_channel"],
                 "causal_flux": self._simulate_causal_superposition()["optimal_collapsed_action"],
                 "pantheon_quibble_merkle_root": p_res["quibble_merkle_root"],
                 "pantheon_dream_twin": p_res["counterfactual_dream"],
+                "athenaeum_neuro_symbolic": {
+                    "egraph_simplified": a_res["egraph_saturation"]["simplified_expression"],
+                    "mcts_best_q": a_res["test_time_compute_mcts"]["best_q_value"],
+                    "sindy_law": a_res["sindy_discovery"]["discovered_equation"],
+                },
+                "hephaestus_synthesis": {
+                    "stitch_compression_ratio": h_res["wake_sleep_library"]["compression_ratio"],
+                    "gflownet_partition_z": h_res["gflownet_sampler"]["partition_function_Z"],
+                    "koopman_eigenvalues": h_res["koopman_edmd"]["koopman_eigenvalues"],
+                    "groebner_basis": h_res["groebner_basis"]["reduced_groebner_basis"],
+                },
+                "hyperborea_synthesis": {
+                    "sheaf_dim_h0": hb_res["cellular_sheaf"]["dim_H0_global_sections"],
+                    "port_hamiltonian_hd_final": hb_res["port_hamiltonian"]["shaped_hamiltonian_final"],
+                    "rg_critical_Kc": hb_res["renormalization_group"]["critical_coupling_Kc"],
+                    "anyon_quantum_dim": hb_res["anyon_braiding"]["golden_ratio_quantum_dim_d_tau"],
+                },
                 "noosphere_bisociation": {
                     "hybrid_operator": c_res["blended_concept"]["hybrid_name"],
                     "koestler_score": c_res["primary_bisociation"]["koestler_bisociation_score"],
                     "top_hcri": c_res["creative_portfolio"][0]["hcri_score"],
                 },
                 "conclusion": (
-                    f"Integrated 24-Pillar Pantheon synthesis, Noosphere Bisociation ('{c_res['blended_concept']['hybrid_name']}', "
-                    f"HCRI={c_res['creative_portfolio'][0]['hcri_score']}), and causal superposition verified "
-                    f"(Quibble Merkle Root: {p_res['quibble_merkle_root'][:16]}...)."
+                    f"Integrated 24-Pillar Pantheon synthesis, Athenaeum E-Graph/PRM-MCTS (Q*={a_res['test_time_compute_mcts']['best_q_value']:.3f}, "
+                    f"SINDy law: y={a_res['sindy_discovery']['discovered_equation']}), Hephaestus Stitch/GFlowNet/Koopman/Gröbner "
+                    f"(MDL ratio={h_res['wake_sleep_library']['compression_ratio']:.2f}x, Z={h_res['gflownet_sampler']['partition_function_Z']:.1f}), "
+                    f"Hyperborea Sheaf/Port-Hamiltonian/RG/Anyon (dim H^0={hb_res['cellular_sheaf']['dim_H0_global_sections']}, K_c={hb_res['renormalization_group']['critical_coupling_Kc']:.4f}, d_tau={hb_res['anyon_braiding']['golden_ratio_quantum_dim_d_tau']:.4f}), "
+                    f"Noosphere Bisociation ('{c_res['blended_concept']['hybrid_name']}', HCRI={c_res['creative_portfolio'][0]['hcri_score']}), "
+                    f"and causal superposition verified (Quibble Merkle Root: {p_res['quibble_merkle_root'][:16]}...)."
                 ),
             }
 
