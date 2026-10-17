@@ -112,6 +112,7 @@ class OmniReasoner:
         "pantheon_24_pillar_synthesis",
         "creative_bisociation_synthesis",
         "scientific_hypothesis_falsification",
+        "neurograft_connectome",
         "general_hyper_reasoning",
     )
 
@@ -128,6 +129,10 @@ class OmniReasoner:
     def classify_intent(self, query: str) -> str:
         """Classifies the semantic intent of the query to select domain co-processors."""
         q = query.lower()
+        if any(k in q for k in ("aether", "gauge field", "wilson loop", "yang-mills", "jarzynski", "crooks fluctuation", "fisher-rao", "symplectic contact", "stormer-verlet", "open game", "categorical lens")):
+            return "aether_gauge_thermo"
+        if any(k in q for k in ("neurograft", "connectome", "liquid time", "ltc", "monoamin", "graft route", "virtual lesion", "synaptic dyad")):
+            return "neurograft_connectome"
         if any(k in q for k in ("hypothesis", "hypotheses", "falsif", "popper", "crucial experiment", "lakatos", "research programme", "paradigm synthesis")):
             return "scientific_hypothesis_falsification"
         if any(k in q for k in ("pantheon", "24-pillar", "24 pillar", "quibble", "mnemorph", "ntag215", "ntag-215")):
@@ -170,9 +175,9 @@ class OmniReasoner:
         word_count = len(query.split())
         epistemic_uncertainty = min(0.95, 0.35 + 0.05 * math.log(max(1, word_count)))
         
-        curiosity = 0.85 if intent in ("physical_discovery", "biocatalytic_synthesis", "heuristic_problem_solving") else 0.65
-        rigor_pressure = 0.95 if intent in ("formal_verification", "clifford_geometric", "heuristic_problem_solving") else 0.75
-        causal_drive = 0.90 if intent in ("causal_superposition", "physical_discovery", "heuristic_problem_solving") else 0.70
+        curiosity = 0.85 if intent in ("physical_discovery", "biocatalytic_synthesis", "heuristic_problem_solving", "neurograft_connectome", "aether_gauge_thermo") else 0.65
+        rigor_pressure = 0.95 if intent in ("formal_verification", "clifford_geometric", "heuristic_problem_solving", "neurograft_connectome", "aether_gauge_thermo") else 0.75
+        causal_drive = 0.90 if intent in ("causal_superposition", "physical_discovery", "heuristic_problem_solving", "neurograft_connectome", "aether_gauge_thermo") else 0.70
 
         return {
             "curiosity": round(curiosity, 4),
@@ -364,6 +369,59 @@ class OmniReasoner:
                 f"Project OLYMPUS scientific inquiry completed: Hypothesis {h1.id} [{h1.status}]. "
                 f"Lakatos assessment: {outcome.lakatos_assessment}. "
                 f"Receipt SHA-256: {outcome.receipt.hash_sha256[:16]}... (verified={outcome.receipt.verify()})."
+            ),
+        }
+
+    def _simulate_neurograft(self, seed: int = 42) -> Dict[str, Any]:
+        """Runs Project NEUROGRAFT heterogeneous connectome, LTC dynamics, and virtual lesion audit."""
+        from .neurograft import NeurograftEngine
+        engine = NeurograftEngine(seed=seed)
+        res = engine.synthesize(horizon=4)
+        return {
+            "simulation_type": "Stage 23 Project NEUROGRAFT Bio-Connectome & LTC Dynamic Synthesis",
+            "neurograft_receipt": res,
+            "neuromodulator_regime": res["tri_neuromodulation"]["behavioral_regime"],
+            "dopamine": res["tri_neuromodulation"]["dopamine_level"],
+            "serotonin": res["tri_neuromodulation"]["serotonin_level"],
+            "octopamine": res["tri_neuromodulation"]["octopamine_level"],
+            "cross_graft_entropy": res["cross_graft_routing"]["routing_entropy"],
+            "critical_lesion_target": res["virtual_lesion_audit"]["critical_lesion_target"],
+            "intact_policy_entropy": res["virtual_lesion_audit"]["intact_policy_entropy"],
+            "receipt_sha256": res["receipt_sha256"],
+            "conclusion": (
+                f"Project NEUROGRAFT multi-species connectome synthesized across 4 graphs "
+                f"({res['connectomes']['worm']['nodes']} C. elegans + {res['connectomes']['fly_female']['nodes']} FlyF + "
+                f"{res['connectomes']['fly_male']['nodes']} FlyM + {res['connectomes']['human']['nodes']} Human nodes). "
+                f"LTC integration stable (contractive={res['ltc_trajectories']['worm']['contractive_stable']}). "
+                f"Neuromodulation regime: '{res['tri_neuromodulation']['behavioral_regime']}' (plasticity eta={res['tri_neuromodulation']['plasticity_multiplier']:.3f}). "
+                f"Critical lesion target '{res['virtual_lesion_audit']['critical_lesion_target']}' with max KL={res['virtual_lesion_audit']['max_kl_divergence']:.4f}."
+            ),
+        }
+
+    def _simulate_aether(self, seed: int = 42) -> Dict[str, Any]:
+        """Runs Stage 24 Project AETHER Gauge-Field, Non-Equilibrium Thermo, Information Geometry, Symplectic & Open Game Synthesis."""
+        from .aether import AetherEngine
+        engine = AetherEngine(seed=seed)
+        res = engine.synthesize()
+        return {
+            "simulation_type": "Stage 24 Project AETHER Gauge-Field, Thermo-Fluctuation, Symplectic & Open Game Synthesis",
+            "aether_receipt": res,
+            "gauge_action": res["gauge_holonomy"]["yang_mills_action"],
+            "u1_holonomy": res["gauge_holonomy"]["u1_holonomy_trace"],
+            "su2_holonomy": res["gauge_holonomy"]["su2_holonomy_trace"],
+            "dissipated_work": res["non_equilibrium_thermodynamics"]["dissipated_work"],
+            "entropy_production": res["non_equilibrium_thermodynamics"]["entropy_production_nats"],
+            "fisher_curvature": res["information_geometry"]["gaussian_curvature"],
+            "poincare_geodesic": res["information_geometry"]["geodesic_distance_to_ref"],
+            "symplectic_conserved": res["symplectic_mechanics"]["symplectic_2form_conserved"],
+            "shadow_hamiltonian_residual": res["symplectic_mechanics"]["shadow_hamiltonian_residual"],
+            "receipt_sha256": res["receipt_sha256"],
+            "conclusion": (
+                f"Project AETHER synthesized: Yang-Mills action S={res['gauge_holonomy']['yang_mills_action']:.4f}, "
+                f"Jarzynski dissipation W_diss={res['non_equilibrium_thermodynamics']['dissipated_work']:.4f}, "
+                f"Fisher-Rao curvature K={res['information_geometry']['gaussian_curvature']:.2f}, "
+                f"Symplectic 2-form conserved={res['symplectic_mechanics']['symplectic_2form_conserved']} "
+                f"(shadow residual={res['symplectic_mechanics']['shadow_hamiltonian_residual']:.6f})."
             ),
         }
 
@@ -567,6 +625,21 @@ class OmniReasoner:
                 "with explicit refutation bounds. Competing Hypothesis H2 posits standard homogeneous null dynamics. "
                 "Crucial discriminator experiment designed with high Popperian severity and maximum Shannon information gain."
             )
+        elif intent == "neurograft_connectome":
+            hypo_text = (
+                "Hypothesis H1: Heterogeneous multi-species connectome topology (C. elegans, FlyWire, human) coupled with "
+                "continuous-time Liquid Time-Constant (LTC) integration and tri-monoaminergic neuromodulation (DA, 5-HT, OA) "
+                "will maintain Lipschitz-contractive stability, dynamically adapt plasticity, and reveal critical routing pathways "
+                "via in silico virtual lesion causal attribution."
+            )
+        elif intent == "aether_gauge_thermo":
+            hypo_text = (
+                "Hypothesis H1: Synthesizing lattice gauge curvature (Wilson loop U(1)/SU(2) holonomy) with "
+                "non-equilibrium Jarzynski-Crooks work fluctuations, Fisher-Rao Riemannian geometry, "
+                "symplectic Störmer-Verlet contact mechanics, and monoidal open game categorical optics "
+                "will maintain strict gauge invariance, satisfy thermodynamic fluctuation theorems, "
+                "preserve phase-space differential 2-forms, and yield optic Nash equilibrium fixpoints."
+            )
         else:
             hypo_text = (
                 "Hypothesis H1: System 2 deliberation combined with 24-Pillar Pantheon synthesis and formal bounded model checking will resolve the query with provable safety invariants, "
@@ -622,19 +695,27 @@ class OmniReasoner:
             }
         elif intent == "scientific_hypothesis_falsification":
             sim_result = self._simulate_scientific_hypothesis(prompt)
+        elif intent == "neurograft_connectome":
+            sim_result = self._simulate_neurograft(seed)
+        elif intent == "aether_gauge_thermo":
+            sim_result = self._simulate_aether(seed)
         else:
             from .pantheon import PantheonEngine
             from .creative_synthesis import DialecticalTribunal
             from .athenaeum import AthenaeumEngine
             from .hephaestus import HephaestusEngine
             from .hyperborea import HyperboreaEngine
+            from .neurograft import NeurograftEngine
+            from .aether import AetherEngine
             p_res = PantheonEngine(seed=seed).synthesize(prompt, seed=seed)
             c_res = DialecticalTribunal().deliberate(prompt, seed=seed)
             a_res = AthenaeumEngine().synthesize(budget_rollouts=12)
             h_res = HephaestusEngine().synthesize()
             hb_res = HyperboreaEngine().synthesize()
+            ng_res = NeurograftEngine(seed=seed).synthesize(horizon=3)
+            ae_res = AetherEngine(seed=seed).synthesize()
             sim_result = {
-                "simulation_type": "Multi-Plane Epistemic, 24-Pillar Pantheon, Athenaeum E-Graph/MCTS, Hephaestus Stitch/GFlowNet/Koopman, Hyperborea Sheaf/Port-Hamiltonian/RG/Anyon & Noosphere Bisociation Synthesis",
+                "simulation_type": "Multi-Plane Epistemic, 24-Pillar Pantheon, Athenaeum E-Graph/MCTS, Hephaestus Stitch/GFlowNet/Koopman, Hyperborea Sheaf/Port-Hamiltonian/RG/Anyon, Neurograft Connectome, AETHER Gauge/Thermo & Noosphere Bisociation Synthesis",
                 "physical_cross_check": self._simulate_physical_discovery(seed)["wide_channel"],
                 "causal_flux": self._simulate_causal_superposition()["optimal_collapsed_action"],
                 "pantheon_quibble_merkle_root": p_res["quibble_merkle_root"],
@@ -656,6 +737,17 @@ class OmniReasoner:
                     "rg_critical_Kc": hb_res["renormalization_group"]["critical_coupling_Kc"],
                     "anyon_quantum_dim": hb_res["anyon_braiding"]["golden_ratio_quantum_dim_d_tau"],
                 },
+                "neurograft_connectome": {
+                    "regime": ng_res["tri_neuromodulation"]["behavioral_regime"],
+                    "critical_lesion": ng_res["virtual_lesion_audit"]["critical_lesion_target"],
+                    "routing_entropy": ng_res["cross_graft_routing"]["routing_entropy"],
+                },
+                "aether_synthesis": {
+                    "yang_mills_action": ae_res["gauge_holonomy"]["yang_mills_action"],
+                    "dissipated_work": ae_res["non_equilibrium_thermodynamics"]["dissipated_work"],
+                    "fisher_curvature": ae_res["information_geometry"]["gaussian_curvature"],
+                    "symplectic_conserved": ae_res["symplectic_mechanics"]["symplectic_2form_conserved"],
+                },
                 "noosphere_bisociation": {
                     "hybrid_operator": c_res["blended_concept"]["hybrid_name"],
                     "koestler_score": c_res["primary_bisociation"]["koestler_bisociation_score"],
@@ -666,10 +758,13 @@ class OmniReasoner:
                     f"SINDy law: y={a_res['sindy_discovery']['discovered_equation']}), Hephaestus Stitch/GFlowNet/Koopman/Gröbner "
                     f"(MDL ratio={h_res['wake_sleep_library']['compression_ratio']:.2f}x, Z={h_res['gflownet_sampler']['partition_function_Z']:.1f}), "
                     f"Hyperborea Sheaf/Port-Hamiltonian/RG/Anyon (dim H^0={hb_res['cellular_sheaf']['dim_H0_global_sections']}, K_c={hb_res['renormalization_group']['critical_coupling_Kc']:.4f}, d_tau={hb_res['anyon_braiding']['golden_ratio_quantum_dim_d_tau']:.4f}), "
+                    f"Neurograft Connectome ('{ng_res['tri_neuromodulation']['behavioral_regime']}', critical={ng_res['virtual_lesion_audit']['critical_lesion_target']}), "
+                    f"AETHER Gauge/Thermo/Optics (S={ae_res['gauge_holonomy']['yang_mills_action']:.4f}, W_diss={ae_res['non_equilibrium_thermodynamics']['dissipated_work']:.4f}, K={ae_res['information_geometry']['gaussian_curvature']:.2f}, Symplectic={ae_res['symplectic_mechanics']['symplectic_2form_conserved']}), "
                     f"Noosphere Bisociation ('{c_res['blended_concept']['hybrid_name']}', HCRI={c_res['creative_portfolio'][0]['hcri_score']}), "
                     f"and causal superposition verified (Quibble Merkle Root: {p_res['quibble_merkle_root'][:16]}...)."
                 ),
             }
+
 
         thought_steps.append(ThoughtStep(
             step_number=3,

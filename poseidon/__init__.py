@@ -1,5 +1,5 @@
 """Supermix Poseidon: explicitly bounded, locally trained research system."""
-__version__ = "2.0.0"
+__version__ = "3.5.0"
 
 from .provenance import capture_sources as _capture_sources
 from .cognitive_agent import CognitiveAgent, CognitiveDecision
@@ -108,6 +108,22 @@ from .hyperborea import (
     RenormalizationGroupEngine,
     TopologicalAnyonBraidingEngine,
     HyperboreaEngine,
+)
+from .neurograft import (
+    HeterogeneousConnectomeGraph,
+    LiquidTimeConstantEngine,
+    TriMonoaminergicEngine,
+    CrossSourceGraftRouter,
+    VirtualConnectomeLesionAuditor,
+    NeurograftEngine,
+)
+from .aether import (
+    GaugeFieldHolonomyEngine,
+    NonEquilibriumThermodynamicsEngine,
+    InformationGeometryFisherEngine,
+    SymplecticContactMechanicsEngine,
+    CategoricalOpenGameLensEngine,
+    AetherEngine,
 )
 
 _SOURCE_SNAPSHOT = _capture_sources()

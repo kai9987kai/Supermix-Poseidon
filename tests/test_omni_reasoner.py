@@ -211,3 +211,13 @@ def test_omni_reasoner_scientific_hypothesis_falsification():
     assert "paradigm_synthesis" in res.empirical_simulation
 
 
+def test_omni_reasoner_aether_synthesis():
+    reasoner = OmniReasoner(seed=42)
+    res = reasoner.reason("Execute Project AETHER lattice gauge field holonomy, Jarzynski non-equilibrium thermodynamics, and open game optics")
+    assert res.intent == "aether_gauge_thermo"
+    assert res.verified is True
+    assert "AETHER" in res.empirical_simulation["simulation_type"]
+    assert res.empirical_simulation["symplectic_conserved"] is True
+    assert len(res.empirical_simulation["receipt_sha256"]) == 64
+
+

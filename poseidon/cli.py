@@ -41,6 +41,8 @@ def main():
         "athenaeum",
         "hephaestus",
         "hyperborea",
+        "neurograft",
+        "aether",
     ])
     p.add_argument("prompt", nargs="?", default="")
     p.add_argument("--root", default=".")

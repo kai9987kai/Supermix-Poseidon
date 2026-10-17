@@ -224,6 +224,18 @@ def make_handler(runtime, port):
                 except Exception as error:
                     self.send_json(500, {"error": str(error), "type": type(error).__name__})
                 return
+            if path == "/api/neurograft/status":
+                try:
+                    self.send_json(200, runtime.neurograft_status())
+                except Exception as error:
+                    self.send_json(500, {"error": str(error), "type": type(error).__name__})
+                return
+            if path == "/api/aether/status":
+                try:
+                    self.send_json(200, runtime.aether_status())
+                except Exception as error:
+                    self.send_json(500, {"error": str(error), "type": type(error).__name__})
+                return
             if path in ("/", "/index.html", "/style.css", "/app.js"):
                 file = WEB/("index.html" if path in ("/", "/index.html") else path[1:])
             elif path.startswith("/artifacts/"):
@@ -599,6 +611,45 @@ def make_handler(runtime, port):
                         sheaf_angles_rad=sheaf_angles_rad,
                         rg_initial_K=rg_initial_K,
                         braid_word=braid_word,
+                    )
+                    self.send_json(200, res)
+                except (ValueError, TypeError) as error:
+                    self.send_json(400, {"error": str(error)})
+                except Exception as error:
+                    self.send_json(500, {"error": str(error), "type": type(error).__name__})
+                return
+            if path == "/api/neurograft/synthesize":
+                try:
+                    seed = int(payload.get("seed", 42))
+                    horizon = int(payload.get("horizon", 6))
+                    modulator_overrides = payload.get("modulator_overrides")
+                    lesion_source = payload.get("lesion_source")
+                    res = runtime.neurograft_synthesize(
+                        seed=seed,
+                        horizon=horizon,
+                        modulator_overrides=modulator_overrides,
+                        lesion_source=lesion_source,
+                    )
+                    self.send_json(200, res)
+                except (ValueError, TypeError) as error:
+                    self.send_json(400, {"error": str(error)})
+                except Exception as error:
+                    self.send_json(500, {"error": str(error), "type": type(error).__name__})
+                return
+            if path == "/api/aether/synthesize":
+                try:
+                    coords = payload.get("grid_coords", [0, 0])
+                    coords_tuple = (int(coords[0]), int(coords[1])) if isinstance(coords, (list, tuple)) and len(coords) >= 2 else (0, 0)
+                    thermo_end = float(payload.get("thermo_center_end", 2.0))
+                    mu = float(payload.get("mu", 1.0))
+                    sigma = float(payload.get("sigma", 1.5))
+                    steps = int(payload.get("symplectic_steps", 60))
+                    res = runtime.aether_synthesize(
+                        grid_coords=coords_tuple,
+                        thermo_center_end=thermo_end,
+                        mu=mu,
+                        sigma=sigma,
+                        symplectic_steps=steps,
                     )
                     self.send_json(200, res)
                 except (ValueError, TypeError) as error:

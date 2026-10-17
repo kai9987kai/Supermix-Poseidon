@@ -567,3 +567,71 @@ def test_hyperborea_server_endpoints(server):
     assert resp["verified"] is True
 
 
+def test_neurograft_server_endpoints(server):
+    url, _ = server
+
+    # 1. GET /api/neurograft/status
+    stat = json.load(urlopen(url + "/api/neurograft/status"))
+    assert stat["ready"] is True
+    assert stat["species_connectomes"] == ["worm", "fly_female", "fly_male", "human"]
+    assert stat["ltc_continuous_integration"] is True
+    assert stat["tri_monoaminergic_neuromodulation"] is True
+    assert stat["virtual_lesion_causal_attribution"] is True
+
+    # 2. POST /api/neurograft/synthesize
+    res_ng = json.load(post(url + "/api/neurograft/synthesize", {
+        "seed": 42,
+        "horizon": 4,
+    }))
+    assert res_ng["project"] == "NEUROGRAFT"
+    assert res_ng["verified"] is True
+    assert res_ng["tri_neuromodulation"]["behavioral_regime"] in ("goal-exploitation", "exploration", "hazard-avoidance", "homeostatic-rest")
+    assert res_ng["virtual_lesion_audit"]["critical_lesion_target"] in ("worm", "fly_female", "fly_male", "human")
+    assert len(res_ng["receipt_sha256"]) == 64
+
+    # 3. POST /api/respond with mode="neurograft"
+    resp = json.load(post(url + "/api/respond", {
+        "prompt": "Synthesize Project NEUROGRAFT",
+        "mode": "neurograft",
+    }))
+    assert resp["project"] == "NEUROGRAFT"
+    assert resp["verified"] is True
+
+
+def test_aether_server_endpoints(server):
+    url, _ = server
+
+    # 1. GET /api/aether/status
+    stat = json.load(urlopen(url + "/api/aether/status"))
+    assert stat["ready"] is True
+    assert stat["version"] == "v3.5.0-AETHER-60"
+    assert stat["subsystems"]["gauge_field_holonomy"] is True
+    assert stat["subsystems"]["jarzynski_non_equilibrium_thermodynamics"] is True
+    assert stat["subsystems"]["symplectic_contact_mechanics"] is True
+    assert stat["total_verified_domains"] == 60
+
+    # 2. POST /api/aether/synthesize
+    res_ae = json.load(post(url + "/api/aether/synthesize", {
+        "grid_coords": [0, 0],
+        "thermo_center_end": 2.0,
+        "mu": 1.0,
+        "sigma": 1.5,
+        "symplectic_steps": 50,
+    }))
+    assert res_ae["project"] == "AETHER"
+    assert res_ae["verified"] is True
+    assert res_ae["gauge_holonomy"]["yang_mills_action"] >= 0.0
+    assert res_ae["non_equilibrium_thermodynamics"]["second_law_satisfied"] is True
+    assert res_ae["information_geometry"]["gaussian_curvature"] == -0.5
+    assert res_ae["symplectic_mechanics"]["symplectic_conserved"] is True
+    assert len(res_ae["receipt_sha256"]) == 64
+
+    # 3. POST /api/respond with mode="aether"
+    resp = json.load(post(url + "/api/respond", {
+        "prompt": "Synthesize Project AETHER",
+        "mode": "aether",
+    }))
+    assert resp["project"] == "AETHER"
+    assert resp["verified"] is True
+
+

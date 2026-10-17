@@ -1580,7 +1580,7 @@ class Poseidon:
             core_ready = active_core_path(self.root).is_file()
         except (ValueError, TypeError, OSError) as error:
             core_ready, core_error = False, str(error)
-        result = {"version": __version__, "name": "Supermix Poseidon", "language_ready": (self.root/"models/language/model.safetensors").exists(), "core_ready": core_ready, "atlas": self.atlas_status(), "contrast": self.contrast_status(), "horizon": self.horizon_status(), "odyssey": self.odyssey_status(), "helm": self.helm_status(), "odysseus": self.odysseus_status(), "mco": self.mco_status(), "aura": self.aura_status(), "tessera": self.tessera_status(), "mnemorph": self.mnemorph_status(), "metamorph": self.metamorph_status(), "chimera": self.chimera_status(), "hyperion": self.hyperion_status(), "titan": self.titan_status(), "trident": self.trident_status(), "hyper_agent": self.hyper_agent_status(), "ecosystem": self.ecosystem_status(), "poseidon_x": self.poseidon_x_status(), "external_adapter": self.external_adapter_status(), "nexus_omega": self.nexus_omega_status(), "discovery_lab": self.discovery_lab_status(), "omni_reasoner": self.omni_reasoner_status(), "pantheon": self.pantheon_status(), "noosphere": self.creative_status(), "athenaeum": self.athenaeum_status(), "hephaestus": self.hephaestus_status(), "hyperborea": self.hyperborea_status(), "reports": reports, "limits": "Experimental composite system. Controlled geometric media. Tool-assisted maths. Synthetic survival."} | source_status()
+        result = {"version": __version__, "name": "Supermix Poseidon", "language_ready": (self.root/"models/language/model.safetensors").exists(), "core_ready": core_ready, "atlas": self.atlas_status(), "contrast": self.contrast_status(), "horizon": self.horizon_status(), "odyssey": self.odyssey_status(), "helm": self.helm_status(), "odysseus": self.odysseus_status(), "mco": self.mco_status(), "aura": self.aura_status(), "tessera": self.tessera_status(), "mnemorph": self.mnemorph_status(), "metamorph": self.metamorph_status(), "chimera": self.chimera_status(), "hyperion": self.hyperion_status(), "titan": self.titan_status(), "trident": self.trident_status(), "hyper_agent": self.hyper_agent_status(), "ecosystem": self.ecosystem_status(), "poseidon_x": self.poseidon_x_status(), "external_adapter": self.external_adapter_status(), "nexus_omega": self.nexus_omega_status(), "discovery_lab": self.discovery_lab_status(), "omni_reasoner": self.omni_reasoner_status(), "pantheon": self.pantheon_status(), "noosphere": self.creative_status(), "athenaeum": self.athenaeum_status(), "hephaestus": self.hephaestus_status(), "hyperborea": self.hyperborea_status(), "neurograft": self.neurograft_status(), "aether": self.aether_status(), "reports": reports, "limits": "Experimental composite system. Controlled geometric media. Tool-assisted maths. Synthetic survival."} | source_status()
         if core_error:
             result["core_error"] = core_error
         return result
@@ -1588,7 +1588,7 @@ class Poseidon:
     def omni_reasoner_status(self):
         return {
             "ready": True,
-            "version": "stage-17-omni-reasoner-v3",
+            "version": "stage-24-omni-reasoner-v5",
             "prover": "Tessera LTL Bounded Model Checker",
             "deliberation": "GhostInTheMachine Cognitive Monologue + 4-Agent Dialectical Tribunal",
             "intents": [
@@ -1602,6 +1602,9 @@ class Poseidon:
                 "heuristic_problem_solving",
                 "pantheon_24_pillar_synthesis",
                 "creative_bisociation_synthesis",
+                "scientific_hypothesis_falsification",
+                "neurograft_connectome",
+                "aether_gauge_thermo",
                 "general_hyper_reasoning",
             ],
         }
@@ -1853,6 +1856,49 @@ class Poseidon:
                 braid_word=braid_word,
             )
 
+    def neurograft_status(self):
+        from .neurograft import NeurograftEngine
+        return NeurograftEngine().status()
+
+    def neurograft_synthesize(
+        self,
+        seed: int = 42,
+        horizon: int = 6,
+        modulator_overrides=None,
+        lesion_source=None,
+    ):
+        with self.lock:
+            from .neurograft import NeurograftEngine
+            engine = NeurograftEngine(seed=seed)
+            return engine.synthesize(
+                horizon=horizon,
+                modulator_overrides=modulator_overrides,
+                lesion_source=lesion_source,
+            )
+
+    def aether_status(self):
+        from .aether import AetherEngine
+        return AetherEngine().status()
+
+    def aether_synthesize(
+        self,
+        grid_coords=(0, 0),
+        thermo_center_end: float = 2.0,
+        mu: float = 1.0,
+        sigma: float = 1.5,
+        symplectic_steps: int = 60,
+    ):
+        with self.lock:
+            from .aether import AetherEngine
+            engine = AetherEngine()
+            return engine.synthesize(
+                grid_coords=grid_coords,
+                thermo_center_end=thermo_center_end,
+                mu=mu,
+                sigma=sigma,
+                symplectic_steps=symplectic_steps,
+            )
+
     def _memory(self):
         from .memory import MemoryBank
         return MemoryBank.load(self.memory_path) if self.memory_path.exists() else MemoryBank()
@@ -1873,6 +1919,10 @@ class Poseidon:
         if type(seed) is not int or not 0 <= seed < 2**63:
             raise ValueError("Seed must be a nonnegative integer below 2^63.")
         with self.lock:
+            if mode == "aether":
+                return self.aether_synthesize()
+            if mode == "neurograft":
+                return self.neurograft_synthesize(seed=seed)
             if mode == "hyperborea":
                 return self.hyperborea_synthesize()
             if mode == "hephaestus":

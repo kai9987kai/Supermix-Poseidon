@@ -84,6 +84,16 @@ CASES = [
     ("p35", "problem", "Compute Migdal-Kadanoff renormalization group critical coupling and correlation length critical exponent nu", ["0.609378", "1.338266"]),
     ("p36", "problem", "Verify Fibonacci anyon braiding Pentagon identity and Hexagon identity for 4 tau-anyons with braid word sigma_1 sigma_2 sigma_1", ["1.618034", "dim = 3"]),
     ("p37", "problem", "Compute Solomonoff universal prior, Minimum Description Length (MDL) posterior, and Levin universal search Kt complexity", ["h_1", "32/35", "9.0000"]),
+    ("p38", "problem", "Analyze connectome network graph nodes=12 edges=18 for rich-club threshold degree k=3 and reciprocal dyads", ["rich-club", "0.6667", "dyads = 2"]),
+    ("p39", "problem", "Calculate closed-form continuous-depth liquid time-constant neural dynamics with mean_act=0.5, gate=0.7, and dt=0.1", ["1.1423", "0.9162", "stable"]),
+    ("p40", "problem", "Evaluate 3-factor monoaminergic neuromodulation with chemo=0.8, reward=0.6, wall=0.3, and choke=false", ["0.7400", "0.8400", "goal-exploitation"]),
+    ("p41", "problem", "Execute differentiable neural graft routing across num_sources=4 with top_k=2 senders and null-route logit", ["0.6240", "top-2", "zero self-routing"]),
+    ("p42", "problem", "Perform in silico virtual lesion audit and connectome ablation with threshold=0.15", ["human", "0.4720", "62.6%"]),
+    ("p43", "problem", "Compute lattice gauge field connection Wilson loop holonomy on 4x4 grid with coupling g=1.0 at plaquette x=0, y=0", ["u(1) holonomy", "action s ="]),
+    ("p44", "problem", "Calculate Jarzynski non-equilibrium thermodynamics free energy difference and Crooks fluctuation with beta=1.0, trajectories=150, shift=2.0", ["delta f", "w_diss", "sigma"]),
+    ("p45", "problem", "Simulate symplectic Störmer-Verlet leapfrog integrator contact mechanics with q0=1.0, p0=0.0, dt=0.05, steps=100", ["e_0", "e_f", "symplectic conserved = true"]),
+    ("p46", "problem", "Compose categorical bidirectional lens in sequential pipeline with state=[1.0, 2.0, 3.0] and feedback=[0.5, -0.2]", ["composed view", "composed update", "verified = true"]),
+    ("p47", "problem", "Solve 2-player monoidal open game categorical optics Nash equilibrium with P1=[[3, 0], [1, 2]] and P2=[[3, 1], [0, 2]]", ["pure equilibria", "payoffs"]),
 ]
 
 

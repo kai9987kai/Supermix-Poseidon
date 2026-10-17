@@ -161,10 +161,10 @@ def test_problem_solver_unknown():
         solve_problem("What is the capital of France?")
 
 
-def test_problem_solver_50_capabilities():
+def test_problem_solver_60_capabilities():
     solver = ProblemSolver()
     caps = solver.capabilities()
-    assert len(caps) == 50
+    assert len(caps) == 60
     domains = [c["domain"] for c in caps]
     assert "logic_knights_knaves" in domains
     assert "knapsack" in domains
@@ -173,6 +173,11 @@ def test_problem_solver_50_capabilities():
     assert "pocket_cube" in domains
     assert "markov_decision_process" in domains
     assert "quantum_information" in domains
+    assert "connectome_graph_motifs" in domains
+    assert "liquid_time_constant_ltc" in domains
+    assert "tri_monoaminergic_neuromodulation" in domains
+    assert "neural_graft_routing" in domains
+    assert "virtual_lesion_causal_attribution" in domains
     assert "topological_data_analysis" in domains
     assert "computational_genomics_crispr" in domains
     assert "optimal_transport_wasserstein" in domains
@@ -206,6 +211,11 @@ def test_problem_solver_50_capabilities():
     assert "renormalization_group_criticality" in domains
     assert "topological_anyon_braiding" in domains
     assert "solomonoff_kolmogorov_mdl" in domains
+    assert "gauge_field_holonomy" in domains
+    assert "jarzynski_fluctuation_thermodynamics" in domains
+    assert "symplectic_contact_mechanics" in domains
+    assert "categorical_bidirectional_lens" in domains
+    assert "open_game_nash_optics" in domains
 
 
 
@@ -764,5 +774,117 @@ def test_solomonoff_kolmogorov_levin_mdl():
     assert res["optimal_mdl_hypothesis"] == "h_1"
     assert res["optimal_levin_hypothesis"] == "h_1"
     assert res["kraft_inequality_satisfied"] is True
+
+
+def test_connectome_graph_motifs():
+    prompt = "Analyze connectome network graph nodes=12 edges=18 for rich-club threshold degree k=3 and reciprocal dyads."
+    res = solve_problem(prompt)
+    assert res["domain"] == "connectome_graph_motifs"
+    assert res["verified"] is True
+    assert res["nodes"] == 12
+    assert res["edges"] == 18
+    assert res["threshold_degree"] == 3
+    assert 0.0 <= res["rich_club_coefficient"] <= 1.0
+    assert res["reciprocal_dyads"] >= 1
+    assert res["electrical_gap_junctions"] >= 1
+
+
+def test_liquid_time_constant_ltc():
+    prompt = "Calculate closed-form continuous-depth liquid time-constant neural dynamics with mean_act=0.5, gate=0.7, and dt=0.1."
+    res = solve_problem(prompt)
+    assert res["domain"] == "liquid_time_constant_ltc"
+    assert res["verified"] is True
+    assert res["liquid_tau"] > 0
+    assert 0.0 < res["dynamic_retention_alpha"] < 1.0
+    assert res["is_contractive"] is True
+    assert res["stability_margin"] > 0
+
+
+def test_tri_monoaminergic_neuromodulation():
+    prompt = "Evaluate 3-factor monoaminergic neuromodulation with chemo=0.8, reward=0.6, wall=0.3, and choke=false."
+    res = solve_problem(prompt)
+    assert res["domain"] == "tri_monoaminergic_neuromodulation"
+    assert res["verified"] is True
+    assert 0.0 <= res["dopamine"] <= 1.0
+    assert 0.0 <= res["serotonin"] <= 1.0
+    assert 0.0 <= res["octopamine"] <= 1.0
+    assert 0.1 <= res["plasticity_gain"] <= 2.5
+    assert res["behavioral_regime"] in ("goal-exploitation", "foraging-chemotaxis", "arousal-exploration", "choke-point-maneuver")
+
+
+def test_neural_graft_routing():
+    prompt = "Execute differentiable neural graft routing across num_sources=4 with top_k=2 senders and null-route logit."
+    res = solve_problem(prompt)
+    assert res["domain"] == "neural_graft_routing"
+    assert res["verified"] is True
+    assert res["num_sources"] == 4
+    assert res["top_k"] == 2
+    assert 0.0 <= res["mean_route_entropy"] <= 1.0
+    assert len(res["sample_route_weights"]) == 5
+
+
+def test_virtual_lesion_causal_attribution():
+    prompt = "Perform in silico virtual lesion audit and connectome ablation with threshold=0.15."
+    res = solve_problem(prompt)
+    assert res["domain"] == "virtual_lesion_causal_attribution"
+    assert res["verified"] is True
+    assert res["most_critical_source"] in ("worm", "fly_female", "fly_male", "human")
+    assert all(kl >= 0.0 for kl in res["kl_divergences"].values())
+    assert abs(sum(res["shapley_attribution"].values()) - 1.0) < 1e-3
+
+
+def test_gauge_field_holonomy():
+    prompt = "Compute lattice gauge field connection Wilson loop holonomy on 4x4 grid with coupling g=1.2 at plaquette x=0, y=0."
+    res = solve_problem(prompt)
+    assert res["domain"] == "gauge_field_holonomy"
+    assert res["verified"] is True
+    assert res["yang_mills_action"] >= 0.0
+    assert -1.0 <= res["u1_holonomy_trace"] <= 1.0
+    assert -2.0 <= res["su2_holonomy_trace"] <= 2.0
+
+
+def test_jarzynski_fluctuation_thermodynamics():
+    prompt = "Calculate Jarzynski non-equilibrium thermodynamics free energy difference and Crooks fluctuation with beta=1.0, trajectories=150, shift=2.0."
+    res = solve_problem(prompt)
+    assert res["domain"] == "jarzynski_fluctuation_thermodynamics"
+    assert res["verified"] is True
+    assert res["second_law_satisfied"] is True
+    assert res["tur_bound_satisfied"] is True
+    assert res["dissipated_work"] >= -1e-9
+    assert res["entropy_production_nats"] >= 0.0
+
+
+def test_symplectic_contact_mechanics():
+    prompt = "Simulate symplectic Störmer-Verlet leapfrog integrator contact mechanics with q0=1.0, p0=0.0, dt=0.05, steps=100."
+    res = solve_problem(prompt)
+    assert res["domain"] == "symplectic_contact_mechanics"
+    assert res["verified"] is True
+    assert res["symplectic_2form_conserved"] is True
+    assert res["shadow_hamiltonian_residual"] < 0.02
+    assert res["energy_drift"] < 0.05
+
+
+def test_categorical_bidirectional_lens():
+    prompt_seq = "Compose categorical bidirectional lens in sequential pipeline with state=[1.0, 2.0, 3.0] and feedback=[0.5, -0.2]."
+    res_s = solve_problem(prompt_seq)
+    assert res_s["domain"] == "categorical_bidirectional_lens"
+    assert res_s["verified"] is True
+    assert len(res_s["view_projection"]) == 2
+    assert len(res_s["update_feedback"]) == 3
+
+    prompt_ten = "Evaluate monoidal lens parallel tensor composition with state=[2.0, 1.0] and feedback=[0.1, 0.4]."
+    res_t = solve_problem(prompt_ten)
+    assert res_t["domain"] == "categorical_bidirectional_lens"
+    assert res_t["verified"] is True
+    assert res_t["composition_mode"] == "tensor"
+
+
+def test_open_game_nash_optics():
+    prompt = "Solve 2-player monoidal open game categorical optics Nash equilibrium with P1=[[3, 0], [1, 2]] and P2=[[3, 1], [0, 2]]."
+    res = solve_problem(prompt)
+    assert res["domain"] == "open_game_nash_optics"
+    assert res["verified"] is True
+    assert res["num_pure_equilibria"] >= 1
+    assert res["has_pure_equilibrium"] is True
 
 
