@@ -295,7 +295,7 @@ to avoid relicensing upstream artifacts as MIT.
 def package(output: Path, repo_id: str = REPO_ID) -> dict:
     sys.path.insert(0, str(ROOT))
     from poseidon import __version__
-    if __version__ not in ("1.3.0", "2.0.0"):
+    if __version__ not in ("1.3.0", "2.0.0", "3.0.0", "3.1.0", "3.2.0", "3.3.0", "3.4.0", "3.5.0"):
         raise ValueError(f"unsupported version {__version__}")
     if repo_id != REPO_ID:
         raise ValueError("this release card is bound to Kai9987kai/Supermix-Poseidon")
@@ -624,7 +624,9 @@ See runs/language/report.json, data/language/SOURCE_CARD.md and the root model c
                        "nexus_search": "federated-associative-vector-lattice-indexing",
                        "external_adapter": "typed-3d-simulation-telemetry-protocol",
                        "nexus_omega": "causal-epigenetic-self-experimenting-discovery-agent",
-                       "problem_forge_50": "verified-50-domain-zero-eval-symbolic-problem-solver",
+                       "problem_forge_60": "verified-60-domain-zero-eval-symbolic-problem-solver",
+                       "aether": "gauge-field-nonequilibrium-thermo-fisher-rao-symplectic-open-game-engine",
+                       "neurograft": "multispecies-connectome-ltc-trimonoaminergic-virtual-lesion-engine",
                        "hyperborea": "cellular-sheaf-dirac-port-hamiltonian-wilsonian-rg-anyon-engine",
                        "hephaestus": "wake-sleep-library-gflownet-koopman-edmd-tda-engine",
                        "athenaeum": "egraph-equality-saturation-prm-mcts-sindy-engine",
