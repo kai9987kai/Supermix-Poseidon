@@ -44,6 +44,7 @@ def main():
         "neurograft",
         "aether",
         "chronos",
+        "noether",
     ])
     p.add_argument("prompt", nargs="?", default="")
     p.add_argument("--root", default=".")

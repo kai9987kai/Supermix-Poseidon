@@ -129,6 +129,8 @@ class OmniReasoner:
     def classify_intent(self, query: str) -> str:
         """Classifies the semantic intent of the query to select domain co-processors."""
         q = query.lower()
+        if any(k in q for k in ("noether", "lie symmetry", "conserved charge", "poisson bracket", "modular tensor category", "mtc", "verlinde", "clifford sta", "spacetime algebra", "faraday bivector", "batalin-vilkovisky", "bv quantization", "active brownian particle", "active matter")):
+            return "noether_invariant_symmetries"
         if any(k in q for k in ("chronos", "causal dynamical triangulation", "cdt", "regge calculus", "noncommutative geometry", "spectral triple", "connes", "tropical algebra", "tropical geometry", "stiefel", "grassmannian", "coalgebraic", "bisimulation metric")):
             return "chronos_quantum_geometry"
         if any(k in q for k in ("aether", "gauge field", "wilson loop", "yang-mills", "jarzynski", "crooks fluctuation", "fisher-rao", "symplectic contact", "stormer-verlet", "open game", "categorical lens")):
@@ -446,12 +448,38 @@ class OmniReasoner:
             "bisim_dist_s0_s2": res["coalgebraic_bisimulation"]["dist_s0_s2"],
             "receipt_sha256": res["receipt_sha256"],
             "conclusion": (
-                f"Project CHRONOS synthesized: CDT Euler χ={res['causal_dynamical_triangulation']['euler_characteristic']}, "
+                f"Project CHRONOS synthesized: CDT Euler chi={res['causal_dynamical_triangulation']['euler_characteristic']}, "
                 f"Regge action S={res['causal_dynamical_triangulation']['lorentzian_regge_action']:.2f}, "
-                f"Connes spectral action Tr(D²)={res['spectral_geometry']['spectral_action_tr_d2']:.2f}, "
+                f"Connes spectral action Tr(D^2)={res['spectral_geometry']['spectral_action_tr_d2']:.2f}, "
                 f"Tropical value={res['tropical_algebra']['tropical_value']:.2f}, "
                 f"Stiefel objective={res['stiefel_optimization']['optimized_objective']:.4f} (resid={res['stiefel_optimization']['orthogonality_residual']:.2e}), "
                 f"Coalgebraic bisimulation d(s0, s1)={res['coalgebraic_bisimulation']['dist_s0_s1']:.4f}."
+            ),
+        }
+
+    def _simulate_noether(self, seed: int = 42) -> Dict[str, Any]:
+        """Runs Stage 26 Project NOETHER Lie Symmetries, Modular Tensor Categories, Clifford STA, BV Quantization & Active Matter."""
+        from .noether import NoetherEngine
+        engine = NoetherEngine()
+        res = engine.synthesize(seed=seed)
+        return {
+            "simulation_type": "Stage 26 Project NOETHER Lie Symmetries, Modular Tensor Categories, Clifford STA, BV Quantization & Active Matter",
+            "noether_receipt": res,
+            "conserved_charge": res["noether_symmetries"]["noether_conserved_charge"],
+            "poisson_zero": res["noether_symmetries"]["poisson_bracket_bracket_zero"],
+            "mtc_total_dim": res["modular_tensor_category"]["total_quantum_dimension_D"],
+            "sta_invariant_1": res["clifford_spacetime_algebra"]["lab_frame"]["invariant_1_scalar"],
+            "bv_classical_residual": res["batalin_vilkovisky"]["classical_master_equation_residual"],
+            "active_matter_lp": res["active_matter"]["persistence_length_lp"],
+            "active_matter_deff": res["active_matter"]["effective_long_time_diffusion_Deff"],
+            "receipt_sha256": res["receipt_sha256"],
+            "conclusion": (
+                f"Project NOETHER synthesized: SO(2) conserved Q={res['noether_symmetries']['noether_conserved_charge']:.4f} "
+                f"({{Q,H}}=0: {res['noether_symmetries']['poisson_bracket_bracket_zero']}), "
+                f"Fibonacci MTC total dimension D={res['modular_tensor_category']['total_quantum_dimension_D']:.4f}, "
+                f"Clifford STA I1={res['clifford_spacetime_algebra']['lab_frame']['invariant_1_scalar']:.2f}, "
+                f"BV CME residual={res['batalin_vilkovisky']['classical_master_equation_residual']:.2e}, "
+                f"Active Matter lp={res['active_matter']['persistence_length_lp']:.2f}, Deff={res['active_matter']['effective_long_time_diffusion_Deff']:.2f}."
             ),
         }
 
@@ -670,6 +698,14 @@ class OmniReasoner:
                 "will maintain strict gauge invariance, satisfy thermodynamic fluctuation theorems, "
                 "preserve phase-space differential 2-forms, and yield optic Nash equilibrium fixpoints."
             )
+        elif intent == "noether_invariant_symmetries":
+            hypo_text = (
+                "Hypothesis H1: Continuous Lie symmetry groups (SO(2) rotation) combined with "
+                "Modular Tensor Category (MTC) Verlinde fusion representations, Clifford Spacetime Algebra Cl(1,3) "
+                "Faraday bivector Lorentz invariants, Batalin-Vilkovisky (BV) antibracket master quantization, "
+                "and nonequilibrium Active Brownian Particle (ABP) ballistic-to-diffusive crossovers "
+                "will maintain exact canonical conservation laws, satisfy TQFT modularity, and guarantee anomaly-free master gauge invariance."
+            )
         elif intent == "chronos_quantum_geometry":
             hypo_text = (
                 "Hypothesis H1: Discrete quantum spacetime triangulation (Lorentzian CDT) combined with "
@@ -737,6 +773,8 @@ class OmniReasoner:
             sim_result = self._simulate_neurograft(seed)
         elif intent == "aether_gauge_thermo":
             sim_result = self._simulate_aether(seed)
+        elif intent == "noether_invariant_symmetries":
+            sim_result = self._simulate_noether(seed)
         elif intent == "chronos_quantum_geometry":
             sim_result = self._simulate_chronos(seed)
         else:
@@ -748,6 +786,7 @@ class OmniReasoner:
             from .neurograft import NeurograftEngine
             from .aether import AetherEngine
             from .chronos import ChronosEngine
+            from .noether import NoetherEngine
             p_res = PantheonEngine(seed=seed).synthesize(prompt, seed=seed)
             c_res = DialecticalTribunal().deliberate(prompt, seed=seed)
             a_res = AthenaeumEngine().synthesize(budget_rollouts=12)
@@ -756,8 +795,9 @@ class OmniReasoner:
             ng_res = NeurograftEngine(seed=seed).synthesize(horizon=3)
             ae_res = AetherEngine(seed=seed).synthesize()
             ch_res = ChronosEngine().synthesize(seed=seed)
+            noe_res = NoetherEngine().synthesize(seed=seed)
             sim_result = {
-                "simulation_type": "Multi-Plane Epistemic, 24-Pillar Pantheon, Athenaeum E-Graph/MCTS, Hephaestus Stitch/GFlowNet/Koopman, Hyperborea Sheaf/Port-Hamiltonian/RG/Anyon, Neurograft Connectome, AETHER Gauge/Thermo, CHRONOS Quantum/Noncommutative & Noosphere Bisociation Synthesis",
+                "simulation_type": "Multi-Plane Epistemic, 24-Pillar Pantheon, Athenaeum E-Graph/MCTS, Hephaestus Stitch/GFlowNet/Koopman, Hyperborea Sheaf/Port-Hamiltonian/RG/Anyon, Neurograft Connectome, AETHER Gauge/Thermo, CHRONOS Quantum/Noncommutative, NOETHER Invariant Symmetries & Noosphere Bisociation Synthesis",
                 "physical_cross_check": self._simulate_physical_discovery(seed)["wide_channel"],
                 "causal_flux": self._simulate_causal_superposition()["optimal_collapsed_action"],
                 "pantheon_quibble_merkle_root": p_res["quibble_merkle_root"],
@@ -798,6 +838,13 @@ class OmniReasoner:
                     "stiefel_objective": ch_res["stiefel_optimization"]["optimized_objective"],
                     "bisim_dist_s0_s1": ch_res["coalgebraic_bisimulation"]["dist_s0_s1"],
                 },
+                "noether_synthesis": {
+                    "conserved_charge": noe_res["noether_symmetries"]["noether_conserved_charge"],
+                    "mtc_total_dim": noe_res["modular_tensor_category"]["total_quantum_dimension_D"],
+                    "sta_invariant_1": noe_res["clifford_spacetime_algebra"]["lab_frame"]["invariant_1_scalar"],
+                    "bv_cme_residual": noe_res["batalin_vilkovisky"]["classical_master_equation_residual"],
+                    "active_matter_deff": noe_res["active_matter"]["effective_long_time_diffusion_Deff"],
+                },
                 "noosphere_bisociation": {
                     "hybrid_operator": c_res["blended_concept"]["hybrid_name"],
                     "koestler_score": c_res["primary_bisociation"]["koestler_bisociation_score"],
@@ -810,7 +857,8 @@ class OmniReasoner:
                     f"Hyperborea Sheaf/Port-Hamiltonian/RG/Anyon (dim H^0={hb_res['cellular_sheaf']['dim_H0_global_sections']}, K_c={hb_res['renormalization_group']['critical_coupling_Kc']:.4f}, d_tau={hb_res['anyon_braiding']['golden_ratio_quantum_dim_d_tau']:.4f}), "
                     f"Neurograft Connectome ('{ng_res['tri_neuromodulation']['behavioral_regime']}', critical={ng_res['virtual_lesion_audit']['critical_lesion_target']}), "
                     f"AETHER Gauge/Thermo/Optics (S={ae_res['gauge_holonomy']['yang_mills_action']:.4f}, W_diss={ae_res['non_equilibrium_thermodynamics']['dissipated_work']:.4f}, K={ae_res['information_geometry']['gaussian_curvature']:.2f}, Symplectic={ae_res['symplectic_mechanics']['symplectic_2form_conserved']}), "
-                    f"CHRONOS Spacetime/Spectral/Tropical/Stiefel/Bisimulation (CDT χ={ch_res['causal_dynamical_triangulation']['euler_characteristic']}, Tr(D²)={ch_res['spectral_geometry']['spectral_action_tr_d2']:.2f}, Trop={ch_res['tropical_algebra']['tropical_value']:.2f}, Stiefel={ch_res['stiefel_optimization']['optimized_objective']:.4f}), "
+                    f"CHRONOS Spacetime/Spectral/Tropical/Stiefel/Bisimulation (CDT chi={ch_res['causal_dynamical_triangulation']['euler_characteristic']}, Tr(D^2)={ch_res['spectral_geometry']['spectral_action_tr_d2']:.2f}, Trop={ch_res['tropical_algebra']['tropical_value']:.2f}, Stiefel={ch_res['stiefel_optimization']['optimized_objective']:.4f}), "
+                    f"NOETHER Symmetries/MTC/STA/BV/ActiveMatter (Q={noe_res['noether_symmetries']['noether_conserved_charge']:.4f}, MTC D={noe_res['modular_tensor_category']['total_quantum_dimension_D']:.4f}, STA I1={noe_res['clifford_spacetime_algebra']['lab_frame']['invariant_1_scalar']:.2f}, BV resid={noe_res['batalin_vilkovisky']['classical_master_equation_residual']:.2e}, ABP Deff={noe_res['active_matter']['effective_long_time_diffusion_Deff']:.2f}), "
                     f"Noosphere Bisociation ('{c_res['blended_concept']['hybrid_name']}', HCRI={c_res['creative_portfolio'][0]['hcri_score']}), "
                     f"and causal superposition verified (Quibble Merkle Root: {p_res['quibble_merkle_root'][:16]}...)."
                 ),

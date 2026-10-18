@@ -161,10 +161,10 @@ def test_problem_solver_unknown():
         solve_problem("What is the capital of France?")
 
 
-def test_problem_solver_65_capabilities():
+def test_problem_solver_70_capabilities():
     solver = ProblemSolver()
     caps = solver.capabilities()
-    assert len(caps) == 65
+    assert len(caps) == 70
     domains = [c["domain"] for c in caps]
     assert "logic_knights_knaves" in domains
     assert "knapsack" in domains
@@ -193,6 +193,11 @@ def test_problem_solver_65_capabilities():
     assert "tropical_algebraic_geometry" in domains
     assert "stiefel_grassmannian_optimization" in domains
     assert "coalgebraic_bisimulation_metric" in domains
+    assert "noether_symmetry_conservation" in domains
+    assert "modular_tensor_category" in domains
+    assert "clifford_spacetime_algebra" in domains
+    assert "batalin_vilkovisky_quantization" in domains
+    assert "active_matter_nonequilibrium" in domains
     assert "causal_do_calculus" in domains
     assert "evolutionary_ecology" in domains
     assert "signal_channel_modulation" in domains
@@ -944,4 +949,46 @@ def test_coalgebraic_bisimulation_metric():
     assert res["triangle_preserved"] is True
 
 
+def test_noether_symmetry_conservation():
+    prompt = "Compute Noether symmetry and conserved charge for continuous SO(2) rotation with mass=1.0, r0=1.5, omega=2.0."
+    res = solve_problem(prompt)
+    assert res["domain"] == "noether_symmetry_conservation"
+    assert res["verified"] is True
+    assert res["noether_charge"] > 0
+    assert res["poisson_bracket_zero"] is True
 
+
+def test_modular_tensor_category():
+    prompt = "Evaluate Fibonacci modular tensor category MTC with Verlinde formula and quantum dimension d_tau."
+    res = solve_problem(prompt)
+    assert res["domain"] == "modular_tensor_category"
+    assert res["verified"] is True
+    assert res["total_dimension_D"] > 0
+    assert len(res["quantum_dimensions"]) == 2
+
+
+def test_clifford_spacetime_algebra():
+    prompt = "Compute Clifford spacetime algebra Cl(1,3) STA Faraday bivector with beta=0.6, e_field=[3.0, 4.0, 0.0], b_field=[0.0, 2.0, 1.0]."
+    res = solve_problem(prompt)
+    assert res["domain"] == "clifford_spacetime_algebra"
+    assert res["verified"] is True
+    assert res["invariant_1_scalar"] is not None
+    assert res["lorentz_gamma"] > 1.0
+
+
+def test_batalin_vilkovisky_quantization():
+    prompt = "Evaluate Batalin-Vilkovisky BV quantization with Classical Master Equation CME and gauge_param xi=1.0."
+    res = solve_problem(prompt)
+    assert res["domain"] == "batalin_vilkovisky_quantization"
+    assert res["verified"] is True
+    assert res["classical_master_equation_residual"] < 1e-9
+    assert res["quantum_bv_laplacian_anomaly"] < 1e-9
+
+
+def test_active_matter_nonequilibrium():
+    prompt = "Analyze Active Brownian Particle ABP active matter nonequilibrium dynamics with swim_speed=10.0 and rotational_diffusion=1.0."
+    res = solve_problem(prompt)
+    assert res["domain"] == "active_matter_nonequilibrium"
+    assert res["verified"] is True
+    assert res["persistence_length"] > 0
+    assert res["effective_diffusion"] > 0

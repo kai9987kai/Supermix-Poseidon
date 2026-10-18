@@ -670,3 +670,39 @@ def test_chronos_server_endpoints(server):
     assert resp["verified"] is True
 
 
+def test_noether_server_endpoints(server):
+    url, _ = server
+
+    # 1. GET /api/noether/status
+    stat = json.load(urlopen(url + "/api/noether/status"))
+    assert stat["ready"] is True
+    assert stat["version"] == "v3.7.0-NOETHER-70"
+    assert stat["subsystems"]["noether_symmetry_conservation"] is True
+    assert stat["subsystems"]["modular_tensor_category"] is True
+    assert stat["subsystems"]["clifford_spacetime_algebra"] is True
+    assert stat["subsystems"]["batalin_vilkovisky_quantization"] is True
+    assert stat["subsystems"]["active_matter_nonequilibrium"] is True
+    assert stat["total_verified_domains"] == 70
+
+    # 2. POST /api/noether/synthesize
+    res_noe = json.load(post(url + "/api/noether/synthesize", {
+        "seed": 42,
+    }))
+    assert res_noe["project"] == "NOETHER"
+    assert res_noe["verified"] is True
+    assert res_noe["noether_symmetry"]["symmetry_group"] == "SO(2)"
+    assert res_noe["modular_tensor_category"]["verlinde_algebra_valid"] is True
+    assert res_noe["clifford_spacetime_algebra"]["lorentz_invariance_verified"] is True
+    assert res_noe["batalin_vilkovisky"]["cme_satisfied"] is True
+    assert res_noe["active_matter"]["verified"] is True
+    assert len(res_noe["receipt_sha256"]) == 64
+
+    # 3. POST /api/respond with mode="noether"
+    resp = json.load(post(url + "/api/respond", {
+        "prompt": "Synthesize Project NOETHER",
+        "mode": "noether",
+    }))
+    assert resp["project"] == "NOETHER"
+    assert resp["verified"] is True
+
+

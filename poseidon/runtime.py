@@ -1580,7 +1580,7 @@ class Poseidon:
             core_ready = active_core_path(self.root).is_file()
         except (ValueError, TypeError, OSError) as error:
             core_ready, core_error = False, str(error)
-        result = {"version": __version__, "name": "Supermix Poseidon", "language_ready": (self.root/"models/language/model.safetensors").exists(), "core_ready": core_ready, "atlas": self.atlas_status(), "contrast": self.contrast_status(), "horizon": self.horizon_status(), "odyssey": self.odyssey_status(), "helm": self.helm_status(), "odysseus": self.odysseus_status(), "mco": self.mco_status(), "aura": self.aura_status(), "tessera": self.tessera_status(), "mnemorph": self.mnemorph_status(), "metamorph": self.metamorph_status(), "chimera": self.chimera_status(), "hyperion": self.hyperion_status(), "titan": self.titan_status(), "trident": self.trident_status(), "hyper_agent": self.hyper_agent_status(), "ecosystem": self.ecosystem_status(), "poseidon_x": self.poseidon_x_status(), "external_adapter": self.external_adapter_status(), "nexus_omega": self.nexus_omega_status(), "discovery_lab": self.discovery_lab_status(), "omni_reasoner": self.omni_reasoner_status(), "pantheon": self.pantheon_status(), "noosphere": self.creative_status(), "athenaeum": self.athenaeum_status(), "hephaestus": self.hephaestus_status(), "hyperborea": self.hyperborea_status(), "neurograft": self.neurograft_status(), "aether": self.aether_status(), "chronos": self.chronos_status(), "reports": reports, "limits": "Experimental composite system. Controlled geometric media. Tool-assisted maths. Synthetic survival."} | source_status()
+        result = {"version": __version__, "name": "Supermix Poseidon", "language_ready": (self.root/"models/language/model.safetensors").exists(), "core_ready": core_ready, "atlas": self.atlas_status(), "contrast": self.contrast_status(), "horizon": self.horizon_status(), "odyssey": self.odyssey_status(), "helm": self.helm_status(), "odysseus": self.odysseus_status(), "mco": self.mco_status(), "aura": self.aura_status(), "tessera": self.tessera_status(), "mnemorph": self.mnemorph_status(), "metamorph": self.metamorph_status(), "chimera": self.chimera_status(), "hyperion": self.hyperion_status(), "titan": self.titan_status(), "trident": self.trident_status(), "hyper_agent": self.hyper_agent_status(), "ecosystem": self.ecosystem_status(), "poseidon_x": self.poseidon_x_status(), "external_adapter": self.external_adapter_status(), "nexus_omega": self.nexus_omega_status(), "discovery_lab": self.discovery_lab_status(), "omni_reasoner": self.omni_reasoner_status(), "pantheon": self.pantheon_status(), "noosphere": self.creative_status(), "athenaeum": self.athenaeum_status(), "hephaestus": self.hephaestus_status(), "hyperborea": self.hyperborea_status(), "neurograft": self.neurograft_status(), "aether": self.aether_status(), "chronos": self.chronos_status(), "noether": self.noether_status(), "reports": reports, "limits": "Experimental composite system. Controlled geometric media. Tool-assisted maths. Synthetic survival."} | source_status()
         if core_error:
             result["core_error"] = core_error
         return result
@@ -1588,7 +1588,7 @@ class Poseidon:
     def omni_reasoner_status(self):
         return {
             "ready": True,
-            "version": "stage-25-omni-reasoner-v6",
+            "version": "stage-26-omni-reasoner-v7",
             "prover": "Tessera LTL Bounded Model Checker",
             "deliberation": "GhostInTheMachine Cognitive Monologue + 4-Agent Dialectical Tribunal",
             "intents": [
@@ -1606,6 +1606,7 @@ class Poseidon:
                 "neurograft_connectome",
                 "aether_gauge_thermo",
                 "chronos_quantum_geometry",
+                "noether_invariant_symmetries",
                 "general_hyper_reasoning",
             ],
         }
@@ -1922,6 +1923,27 @@ class Poseidon:
             engine = ChronosEngine()
             return engine.synthesize(seed=seed)
 
+    def noether_status(self):
+        return {
+            "ready": True,
+            "version": "v3.7.0-NOETHER-70",
+            "stage": 26,
+            "subsystems": {
+                "noether_symmetry_conservation": True,
+                "modular_tensor_category": True,
+                "clifford_spacetime_algebra": True,
+                "batalin_vilkovisky_quantization": True,
+                "active_matter_nonequilibrium": True,
+            },
+            "total_verified_domains": 70,
+        }
+
+    def noether_synthesize(self, seed: int = 42):
+        with self.lock:
+            from .noether import NoetherEngine
+            engine = NoetherEngine()
+            return engine.synthesize(seed=seed)
+
     def _memory(self):
         from .memory import MemoryBank
         return MemoryBank.load(self.memory_path) if self.memory_path.exists() else MemoryBank()
@@ -1942,6 +1964,8 @@ class Poseidon:
         if type(seed) is not int or not 0 <= seed < 2**63:
             raise ValueError("Seed must be a nonnegative integer below 2^63.")
         with self.lock:
+            if mode == "noether":
+                return self.noether_synthesize(seed=seed)
             if mode == "chronos":
                 return self.chronos_synthesize(seed=seed)
             if mode == "aether":

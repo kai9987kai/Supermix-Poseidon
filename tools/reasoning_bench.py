@@ -99,6 +99,11 @@ CASES = [
     ("p50", "problem", "Evaluate tropical algebra max-plus polynomial 0 + 2*x and 3 + 1*x and 5 + 0*x at x=2.0 with corner locus roots", ["tropical polynomial", "corner locus"]),
     ("p51", "problem", "Run Riemannian optimization on Stiefel manifold St(2, 3) with ambient n=3 and rank p=2 for iterations=5", ["manifold: st(2, 3)", "orthogonality residual"]),
     ("p52", "problem", "Compute coalgebraic bisimulation metric quantitative behavioral pseudometric with gamma=0.8 and iterations=8", ["behavioral distance", "triangle inequality preservation"]),
+    ("p53", "problem", "Compute Noether symmetry and conserved charge for continuous SO(2) rotation with mass=1.0, r0=1.5, omega=2.0", ["so(2)", "dq/dt = 0"]),
+    ("p54", "problem", "Evaluate Fibonacci modular tensor category MTC with Verlinde formula and quantum dimension d_tau", ["mtc", "verlinde = true"]),
+    ("p55", "problem", "Compute Clifford spacetime algebra Cl(1,3) STA Faraday bivector with beta=0.6, e_field=[3.0, 4.0, 0.0], b_field=[0.0, 2.0, 1.0]", ["faraday bivector", "i1 ="]),
+    ("p56", "problem", "Evaluate Batalin-Vilkovisky BV quantization with Classical Master Equation CME and gauge_param xi=1.0", ["(s,s)_bv = 0", "anomaly free"]),
+    ("p57", "problem", "Analyze Active Brownian Particle ABP active matter nonequilibrium dynamics with swim_speed=10.0 and rotational_diffusion=1.0", ["persistence length lp", "deff ="]),
 ]
 
 

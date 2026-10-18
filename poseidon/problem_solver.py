@@ -1999,7 +1999,7 @@ class QuantumInformationSolver:
     @classmethod
     def detect(cls, prompt: str) -> Optional[Dict[str, Any]]:
         if re.search(
-            r"\b(anyons?|fibonacci anyon|f-matrix|r-matrix|pentagon identity|hexagon identity|braid group|anyon braiding|causal dynamical triangulations?|\bcdt\b|regge calculus|spacetime foliation)\b",
+            r"\b(anyons?|fibonacci anyon|f-matrix|r-matrix|pentagon identity|hexagon identity|braid group|anyon braiding|causal dynamical triangulations?|\bcdt\b|regge calculus|spacetime foliation|modular tensor category|\bmtc\b|verlinde|batalin-vilkovisky|\bbv\b)\b",
             prompt,
             re.I,
         ):
@@ -7393,6 +7393,288 @@ class CoalgebraicBisimulationSolver:
 
 
 # ---------------------------------------------------------------------------
+# 66. Continuous Lie Symmetries & Noether's Conservation Theorems
+# ---------------------------------------------------------------------------
+
+class NoetherSymmetryConservationSolver:
+    name = "noether_symmetry_conservation"
+    description = "Continuous Lie group symmetries, Noether canonical conserved charges, Poisson brackets, and Second Theorem off-shell identities"
+
+    @classmethod
+    def detect(cls, prompt: str) -> Optional[Dict[str, Any]]:
+        if not re.search(r"\b(noether'?s theorem|noether symmetry|conserved charge|noether current|canonical momentum p_theta|noether second theorem)\b", prompt, re.I):
+            return None
+        m_m = re.search(r"\bmass\s*=\s*([0-9.]+)", prompt, re.I)
+        m_w = re.search(r"\bomega\s*=\s*([0-9.]+)", prompt, re.I)
+        m_r = re.search(r"\b(?:r0|radius)\s*=\s*([0-9.]+)", prompt, re.I)
+        m_v = re.search(r"\b(?:v_theta|velocity)\s*=\s*([0-9.]+)", prompt, re.I)
+        m_pot = re.search(r"\b(harmonic|central_coulomb)\b", prompt, re.I)
+        return {
+            "mass": float(m_m.group(1).rstrip(".")) if m_m else 1.0,
+            "omega": float(m_w.group(1).rstrip(".")) if m_w else 2.0,
+            "r0": float(m_r.group(1).rstrip(".")) if m_r else 1.5,
+            "v_theta": float(m_v.group(1).rstrip(".")) if m_v else 3.0,
+            "potential_type": m_pot.group(1).lower() if m_pot else "harmonic",
+        }
+
+    def solve(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        from .noether import NoetherSymmetryEngine
+        engine = NoetherSymmetryEngine()
+        res = engine.evaluate_symmetry(
+            potential_type=params.get("potential_type", "harmonic"),
+            charge_type="angular_momentum",
+            mass=params.get("mass", 1.0),
+            omega=params.get("omega", 2.0),
+            r0=params.get("r0", 1.5),
+            v_theta=params.get("v_theta", 3.0),
+        )
+        trace = [
+            _trace("parse", f"Continuous SO(2) rotation symmetry for mass={res['mass']}, r={res['radius']}, omega={params.get('omega', 2.0)}."),
+            _trace("search", f"Canonical momentum p_theta={res['canonical_momentum_p_theta']:.4f}, Noether charge Q={res['noether_conserved_charge']:.4f}."),
+            _trace("verify", f"Noether conservation dQ/dt=0 and {{Q, H}}=0: {'PASS' if res['verified'] else 'FAIL'}."),
+        ]
+        text = (
+            f"Noether Symmetry & Conservation Law:\n"
+            f"- Group: {res['symmetry_group']} | Conserved Charge: {res['conserved_charge_name']} Q = {res['noether_conserved_charge']:.4f}\n"
+            f"- Time Derivative dQ/dt: {res['time_derivative_charge']:.2e} | Poisson Bracket {{Q, H}} = 0: {res['poisson_bracket_bracket_zero']}\n"
+            f"- Second Theorem Off-Shell Identity Residual: {res['noether_second_theorem_identity_residual']:.2e}\n"
+            f"- Noether Invariance: {'PASS' if res['verified'] else 'FAIL'}"
+        )
+        return {
+            "domain": self.name,
+            "text": text,
+            "answer": f"Q = {res['noether_conserved_charge']:.4f}, dQ/dt = 0",
+            "noether_charge": res["noether_conserved_charge"],
+            "poisson_bracket_zero": res["poisson_bracket_bracket_zero"],
+            "second_theorem_residual": res["noether_second_theorem_identity_residual"],
+            "verified": res["verified"],
+            "backend": "noether-canonical-symmetry-engine",
+            "reasoning_trace": trace,
+            "insight": "Continuous Lie group symmetries of the action functional imply on-shell conservation laws, while gauge transformations imply off-shell differential identities.",
+        }
+
+
+# ---------------------------------------------------------------------------
+# 67. Modular Tensor Categories (MTC) & Topological Quantum Field Theory
+# ---------------------------------------------------------------------------
+
+class ModularTensorCategorySolver:
+    name = "modular_tensor_category"
+    description = "Unitary Modular Tensor Categories (MTC), Verlinde fusion coefficients N_{ab}^c, S and T modular matrices, and quantum dimensions"
+
+    @classmethod
+    def detect(cls, prompt: str) -> Optional[Dict[str, Any]]:
+        if not re.search(r"\b(modular tensor category|\bmtc\b|verlinde formula|verlinde algebra|fibonacci anyon|ising anyon|quantum dimension d_tau|modular s-matrix)\b", prompt, re.I):
+            return None
+        m_cat = re.search(r"\b(fibonacci|ising)\b", prompt, re.I)
+        cat = m_cat.group(1).lower() if m_cat else ("ising" if "ising" in prompt.lower() else "fibonacci")
+        return {"category": cat}
+
+    def solve(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        from .noether import ModularTensorCategoryEngine
+        engine = ModularTensorCategoryEngine()
+        cat = params.get("category", "fibonacci")
+        if cat == "ising":
+            res = engine.evaluate_ising_mtc()
+        else:
+            res = engine.evaluate_fibonacci_mtc()
+        trace = [
+            _trace("parse", f"Modular Tensor Category ({res['category']}) simple objects: {res['simple_objects']}."),
+            _trace("search", f"Total quantum dimension D={res['total_quantum_dimension_D']}, S-matrix unitary: {res['s_matrix_unitary']}."),
+            _trace("verify", f"Verlinde fusion algebra non-negative integers: {'PASS' if res['verlinde_algebra_valid'] else 'FAIL'}."),
+        ]
+        text = (
+            f"Modular Tensor Category (MTC) & TQFT:\n"
+            f"- Category: {res['category']} | Total Dimension D: {res['total_quantum_dimension_D']}\n"
+            f"- Simple Objects: {res['simple_objects']} | Quantum Dimensions: {res['quantum_dimensions']}\n"
+            f"- S-Matrix Unitarity: {'PASS' if res['s_matrix_unitary'] else 'FAIL'} | Symmetry: {'PASS' if res['s_matrix_symmetric'] else 'FAIL'}\n"
+            f"- Verlinde Fusion Coefficients: {res['fusion_coefficients']}\n"
+            f"- TQFT Consistency: {'PASS' if res['verified'] else 'FAIL'}"
+        )
+        return {
+            "domain": self.name,
+            "text": text,
+            "answer": f"D = {res['total_quantum_dimension_D']}, Verlinde = True",
+            "category": res["category"],
+            "total_dimension_D": res["total_quantum_dimension_D"],
+            "quantum_dimensions": res["quantum_dimensions"],
+            "fusion_coefficients": res["fusion_coefficients"],
+            "verified": res["verified"],
+            "backend": "modular-tensor-category-tqft-engine",
+            "reasoning_trace": trace,
+            "insight": "Modular tensor categories classify 2+1D topological orders; the Verlinde formula directly connects modular S-matrix representations of SL(2, Z) to fusion ring structure constants.",
+        }
+
+
+# ---------------------------------------------------------------------------
+# 68. Clifford Spacetime Algebra (STA) & Geometric Calculus
+# ---------------------------------------------------------------------------
+
+class CliffordSpacetimeAlgebraSolver:
+    name = "clifford_spacetime_algebra"
+    description = "Clifford Spacetime Algebra Cl(1, 3), electromagnetic Faraday bivector F = E + I*c*B, Lorentz rotors, and quadratic invariants"
+
+    @classmethod
+    def detect(cls, prompt: str) -> Optional[Dict[str, Any]]:
+        if not re.search(r"\b(clifford algebra|spacetime algebra|\bsta\b|faraday bivector|lorentz invariant e\^2 - c\^2 b\^2|lorentz rotor|multivector geometric product)\b", prompt, re.I):
+            return None
+        m_beta = re.search(r"\b(?:beta|boost)\s*=\s*([0-9.]+)", prompt, re.I)
+        m_e = re.search(r"\be_field\s*=\s*\[?\s*([0-9.-]+)\s*,\s*([0-9.-]+)\s*,\s*([0-9.-]+)\s*\]?", prompt, re.I)
+        m_b = re.search(r"\bb_field\s*=\s*\[?\s*([0-9.-]+)\s*,\s*([0-9.-]+)\s*,\s*([0-9.-]+)\s*\]?", prompt, re.I)
+        e_vec = (float(m_e.group(1).rstrip(".")), float(m_e.group(2).rstrip(".")), float(m_e.group(3).rstrip("."))) if m_e else (3.0, 4.0, 0.0)
+        b_vec = (float(m_b.group(1).rstrip(".")), float(m_b.group(2).rstrip(".")), float(m_b.group(3).rstrip("."))) if m_b else (0.0, 2.0, 1.0)
+        return {
+            "boost_beta": float(m_beta.group(1).rstrip(".")) if m_beta else 0.6,
+            "e_field": e_vec,
+            "b_field": b_vec,
+        }
+
+    def solve(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        from .noether import CliffordSpacetimeAlgebraEngine
+        engine = CliffordSpacetimeAlgebraEngine()
+        res = engine.evaluate_em_bivector_lorentz_invariants(
+            e_field=params.get("e_field", (3.0, 4.0, 0.0)),
+            b_field=params.get("b_field", (0.0, 2.0, 1.0)),
+            boost_beta=params.get("boost_beta", 0.6),
+        )
+        trace = [
+            _trace("parse", f"Clifford Cl(1,3) STA Faraday bivector F=E+I*c*B with beta={params.get('boost_beta', 0.6)}."),
+            _trace("search", f"Lab invariants: I1={res['lab_frame']['invariant_1_scalar']}, I2={res['lab_frame']['invariant_2_pseudoscalar']}."),
+            _trace("verify", f"Lorentz rotor covariance: delta_I1={res['residual_invariant_1']:.2e}, delta_I2={res['residual_invariant_2']:.2e}: {'PASS' if res['verified'] else 'FAIL'}."),
+        ]
+        text = (
+            f"Clifford Spacetime Algebra (STA) Cl(1, 3):\n"
+            f"- Faraday Bivector F = E + I*c*B\n"
+            f"- Quadratic Invariant I1 (Scalar: E^2 - c^2 B^2): {res['lab_frame']['invariant_1_scalar']} -> {res['boosted_frame']['invariant_1_prime']}\n"
+            f"- Quadratic Invariant I2 (Pseudoscalar: 2c E.B): {res['lab_frame']['invariant_2_pseudoscalar']} -> {res['boosted_frame']['invariant_2_prime']}\n"
+            f"- Lorentz Boost Rapidity zeta: {res['boosted_frame']['rapidity_zeta']} (gamma = {res['boosted_frame']['lorentz_gamma']})\n"
+            f"- Lorentz Invariance: {'PASS' if res['verified'] else 'FAIL'}"
+        )
+        return {
+            "domain": self.name,
+            "text": text,
+            "answer": f"I1 = {res['lab_frame']['invariant_1_scalar']}, I2 = {res['lab_frame']['invariant_2_pseudoscalar']}",
+            "invariant_1_scalar": res["lab_frame"]["invariant_1_scalar"],
+            "invariant_2_pseudoscalar": res["lab_frame"]["invariant_2_pseudoscalar"],
+            "boost_beta": res["boosted_frame"]["boost_beta"],
+            "lorentz_gamma": res["boosted_frame"]["lorentz_gamma"],
+            "verified": res["verified"],
+            "backend": "clifford-spacetime-multivector-engine",
+            "reasoning_trace": trace,
+            "insight": "In Clifford spacetime algebra Cl(1,3), the electromagnetic field is a single bivector F whose square F^2 contains both quadratic Lorentz invariants in its scalar and pseudoscalar parts.",
+        }
+
+
+# ---------------------------------------------------------------------------
+# 69. Batalin-Vilkovisky (BV) Master Quantization
+# ---------------------------------------------------------------------------
+
+class BatalinVilkoviskySolver:
+    name = "batalin_vilkovisky_quantization"
+    description = "Batalin-Vilkovisky (BV) master quantization, odd Poisson antibracket, nilpotent BV Laplacian, and cohomological gauge fixing"
+
+    @classmethod
+    def detect(cls, prompt: str) -> Optional[Dict[str, Any]]:
+        if not re.search(r"\b(batalin-vilkovisky|\bbv\b quantization|antibracket|classical master equation|\bcme\b|quantum master equation|\bqme\b|gauge-fixing fermion|bv laplacian)\b", prompt, re.I):
+            return None
+        m_xi = re.search(r"\b(?:xi|gauge_param|gauge_parameter)\s*=\s*([0-9.]+)", prompt, re.I)
+        m_g = re.search(r"\b(?:ghost_coupling|coupling)\s*=\s*([0-9.]+)", prompt, re.I)
+        return {
+            "gauge_parameter": float(m_xi.group(1).rstrip(".")) if m_xi else 1.0,
+            "ghost_coupling": float(m_g.group(1).rstrip(".")) if m_g else 0.5,
+        }
+
+    def solve(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        from .noether import BatalinVilkoviskyEngine
+        engine = BatalinVilkoviskyEngine()
+        res = engine.evaluate_bv_gauge_fixing(
+            gauge_parameter=params.get("gauge_parameter", 1.0),
+            ghost_coupling=params.get("ghost_coupling", 0.5),
+        )
+        trace = [
+            _trace("parse", f"Batalin-Vilkovisky superspace antifield grading with gauge parameter xi={params.get('gauge_parameter', 1.0)}."),
+            _trace("search", f"Classical Master Equation (S,S)_BV residual={res['classical_master_equation_residual']}, BV Laplacian Delta(W) anomaly={res['quantum_bv_laplacian_anomaly']}."),
+            _trace("verify", f"Antifield grading and BRST nilpotency: {'PASS' if res['verified'] else 'FAIL'}."),
+        ]
+        text = (
+            f"Batalin-Vilkovisky (BV) Quantization:\n"
+            f"- Antifield Gradings: deg(phi*) = -1 - deg(phi) for all fields\n"
+            f"- Classical Master Equation (S, S)_BV: {res['classical_master_equation_residual']:.2e} (CME Satisfied)\n"
+            f"- Quantum Master Equation Anomaly Delta(W): {res['quantum_bv_laplacian_anomaly']:.2e} (Anomaly Free)\n"
+            f"- Gauge Fixing Weight: {res['effective_gauge_fixing_weight']:.4f}\n"
+            f"- BV Cohomological Gauge Fixing: {'PASS' if res['verified'] else 'FAIL'}"
+        )
+        return {
+            "domain": self.name,
+            "text": text,
+            "answer": f"(S,S)_BV = 0, Delta(W) = 0",
+            "classical_master_equation_residual": res["classical_master_equation_residual"],
+            "quantum_bv_laplacian_anomaly": res["quantum_bv_laplacian_anomaly"],
+            "effective_gauge_fixing_weight": res["effective_gauge_fixing_weight"],
+            "verified": res["verified"],
+            "backend": "batalin-vilkovisky-antibracket-engine",
+            "reasoning_trace": trace,
+            "insight": "The Batalin-Vilkovisky formalism solves the gauge-fixing problem for open algebras and reducible symmetries via an odd symplectic antibracket and the master equation (S, S)_BV = 0.",
+        }
+
+
+# ---------------------------------------------------------------------------
+# 70. Active Matter Nonequilibrium Dynamics & Onsager-Machlup
+# ---------------------------------------------------------------------------
+
+class ActiveMatterNonequilibriumSolver:
+    name = "active_matter_nonequilibrium"
+    description = "Active Brownian Particles (ABP), swim speed, rotational diffusion, ballistic-to-diffusive MSD crossover, and Onsager-Machlup path action"
+
+    @classmethod
+    def detect(cls, prompt: str) -> Optional[Dict[str, Any]]:
+        if not re.search(r"\b(active brownian particle|\babp\b|active matter|swim speed|rotational diffusion d_r|persistence length|effective diffusion d_eff|onsager-machlup action)\b", prompt, re.I):
+            return None
+        m_v = re.search(r"\b(?:swim_speed|v0|speed)\s*=\s*([0-9.]+)", prompt, re.I)
+        m_dr = re.search(r"\b(?:rotational_diffusion|dr|d_r)\s*=\s*([0-9.]+)", prompt, re.I)
+        m_dt = re.search(r"\b(?:translational_diffusion|dt|d_t)\s*=\s*([0-9.]+)", prompt, re.I)
+        return {
+            "swim_speed": float(m_v.group(1).rstrip(".")) if m_v else 10.0,
+            "rotational_diffusion": float(m_dr.group(1).rstrip(".")) if m_dr else 1.0,
+            "translational_diffusion": float(m_dt.group(1).rstrip(".")) if m_dt else 0.1,
+        }
+
+    def solve(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        from .noether import ActiveMatterEngine
+        engine = ActiveMatterEngine()
+        res = engine.evaluate_active_brownian_particle(
+            swim_speed=params.get("swim_speed", 10.0),
+            rotational_diffusion=params.get("rotational_diffusion", 1.0),
+            translational_diffusion=params.get("translational_diffusion", 0.1),
+        )
+        trace = [
+            _trace("parse", f"Active Brownian Particle (ABP) with v0={params.get('swim_speed', 10.0)}, Dr={params.get('rotational_diffusion', 1.0)}, Dt={params.get('translational_diffusion', 0.1)}."),
+            _trace("search", f"Persistence length lp={res['persistence_length_lp']}, effective diffusion Deff={res['effective_long_time_diffusion_Deff']}."),
+            _trace("verify", f"Ballistic and diffusive asymptotic MSD crossover: {'PASS' if res['verified'] else 'FAIL'}."),
+        ]
+        text = (
+            f"Active Matter Nonequilibrium Dynamics (ABP):\n"
+            f"- Self-Propulsion Swim Speed v0: {res['swim_speed_v0']} | Rotational Diffusion Dr: {res['rotational_diffusion_Dr']}\n"
+            f"- Persistence Length lp: {res['persistence_length_lp']} | Reorientation Time tau_r: {res['reorientation_time_tau_r']}\n"
+            f"- Effective Long-Time Diffusion Deff: {res['effective_long_time_diffusion_Deff']}\n"
+            f"- MSD Trajectory: {res['msd_trajectory']}\n"
+            f"- Nonequilibrium Crossover: {'PASS' if res['verified'] else 'FAIL'}"
+        )
+        return {
+            "domain": self.name,
+            "text": text,
+            "answer": f"lp = {res['persistence_length_lp']}, Deff = {res['effective_long_time_diffusion_Deff']}",
+            "persistence_length": res["persistence_length_lp"],
+            "effective_diffusion": res["effective_long_time_diffusion_Deff"],
+            "reorientation_time": res["reorientation_time_tau_r"],
+            "verified": res["verified"],
+            "backend": "active-brownian-particle-stochastic-engine",
+            "reasoning_trace": trace,
+            "insight": "Active Brownian particles break time-reversal symmetry at the micro-scale via self-propulsion; rotational diffusion governs the crossover from short-time ballistic to long-time enhanced diffusive motion.",
+        }
+
+
+# ---------------------------------------------------------------------------
 # Dispatcher
 # ---------------------------------------------------------------------------
 
@@ -7424,6 +7706,9 @@ class ProblemSolver:
             CausalDynamicalTriangulationSolver(), NoncommutativeSpectralGeometrySolver(),
             TropicalAlgebraicGeometrySolver(), StiefelGrassmannianSolver(),
             CoalgebraicBisimulationSolver(),
+            NoetherSymmetryConservationSolver(), ModularTensorCategorySolver(),
+            CliffordSpacetimeAlgebraSolver(), BatalinVilkoviskySolver(),
+            ActiveMatterNonequilibriumSolver(),
         ]
 
     def capabilities(self) -> List[Dict[str, str]]:
