@@ -293,3 +293,106 @@ test('checksum-only receipt checks do not claim replay verification', async () =
   assert.match(text, /checksum_only/);
   assert.doesNotMatch(text, /replay verified|independently/i);
 });
+
+for (const protocol of ['mco', 'tessera', 'mnemorph']) test(protocol + ' submission describes its fixed protocol without invented counts', async () => {
+  let accept;
+  const ui = await workbench(call => {
+    if (call.url === '/api/jobs' && call.method === 'GET') return {status: 200, data: {jobs: []}};
+    if (call.url === '/api/jobs' && call.method === 'POST') return new Promise(resolve => {accept = resolve;});
+    if (call.url === '/api/jobs/' + jobId) return {status: 200, data: {...listedJob('completed'), result: receipt}};
+    return null;
+  });
+  ui.elements.get('experimentType').value = protocol;
+  const submission = ui.elements.get('experimentForm').onsubmit({preventDefault() {}});
+  await ui.flush();
+  const text = ui.elements.get('experimentStatus').textContent;
+  assert.match(text, /fixed.*protocol|fixed.*benchmark/i);
+  assert.doesNotMatch(text, /controllers|paired episodes|steps/i);
+  accept({status: 202, data: listedJob('queued')});
+  await submission;
+});
+
+test('MCO setup follows receipt availability while the benchmark remains runnable', async () => {
+  let receiptReady = false;
+  const ui = await workbench(({url}) => url === '/api/status' ? {status: 200, data: {
+    core_ready: false, mco: {ready: true, receipt_ready: receiptReady},
+  }} : url === '/api/jobs' ? {status: 200, data: {jobs: []}} : null);
+  ui.elements.get('experimentType').value = 'mco';
+  ui.elements.get('experimentType').onchange();
+  assert.equal(ui.elements.get('mcoSetup').hidden, false);
+  assert.equal(ui.elements.get('runExperiment').disabled, false);
+  receiptReady = true; await vm.runInContext('refreshStatus()', ui.context); await ui.flush();
+  assert.equal(ui.elements.get('mcoSetup').hidden, true);
+  assert.equal(ui.elements.get('runExperiment').disabled, false);
+});
+
+test('a delayed saved result cannot replace a newly monitored job', async () => {
+  const savedId = 'b'.repeat(32);
+  let deliverSavedResult;
+  const ui = await workbench(({url}) => url === '/api/jobs' ? {status: 200, data: {jobs: [
+    {...listedJob('completed'), id: savedId}, listedJob('running'),
+  ]}} : url === '/api/jobs/' + savedId ? new Promise(resolve => {deliverSavedResult = resolve;})
+    : url === '/api/jobs/' + jobId ? {status: 200, data: listedJob('running')} : null);
+  const opening = ui.buttons().find(item => /view result/i.test(item.textContent)).onclick();
+  await ui.flush();
+  await ui.buttons().find(item => /monitor/i.test(item.textContent)).onclick();
+  deliverSavedResult({status: 200, data: {...listedJob('completed'), id: savedId, result: receipt}});
+  await opening; await ui.flush();
+  assert.match(ui.elements.get('jobIdentity').textContent, new RegExp(jobId + '.*running'));
+  assert.equal(ui.elements.get('experimentResults').hidden, true);
+  assert.equal(ui.elements.get('send').disabled, true);
+});
+
+test('the latest saved-result selection owns the display when reads finish out of order', async () => {
+  const olderId = 'b'.repeat(32), newerId = 'c'.repeat(32);
+  let deliverOlder;
+  const ui = await workbench(({url}) => url === '/api/jobs' ? {status: 200, data: {jobs: [
+    {...listedJob('completed'), id: olderId}, {...listedJob('completed'), id: newerId},
+  ]}} : url === '/api/jobs/' + olderId ? new Promise(resolve => {deliverOlder = resolve;})
+    : url === '/api/jobs/' + newerId ? {status: 200, data: {...listedJob('completed'), id: newerId, result: {...receipt, experiment_id: 'newest-selection'}}} : null);
+  const opening = ui.buttons()[0].onclick(); await ui.flush();
+  await ui.buttons()[1].onclick();
+  deliverOlder({status: 200, data: {...listedJob('completed'), id: olderId, result: receipt}});
+  await opening; await ui.flush();
+  assert.match(ui.elements.get('experimentIdentity').textContent, /newest-selection/);
+  assert.match(ui.elements.get('jobIdentity').textContent, new RegExp(newerId));
+});
+
+test('MCO history renders its actual retrieval metrics and restores controller views when switched', async () => {
+  const controllerId = 'b'.repeat(32);
+  const conditions = {
+    intact: {trials: 256, mean_hit_at_1: .5, mean_hit_at_3: .75, mean_mrr: .625, mean_grounded_score: .51953125, mean_retrieval_ms: 60.35},
+    shuffled: {trials: 256, mean_hit_at_1: .25, mean_hit_at_3: .5, mean_mrr: .375, mean_grounded_score: .3, mean_retrieval_ms: 59},
+    irrelevant: {trials: 256, mean_hit_at_1: 0, mean_hit_at_3: 0, mean_mrr: 0, mean_grounded_score: 0, mean_retrieval_ms: 55},
+    erased: {trials: 256, mean_hit_at_1: 0, mean_hit_at_3: 0, mean_mrr: 0, mean_grounded_score: 0, mean_retrieval_ms: 3},
+  };
+  const mco = {schema: 'poseidon-mco-experiment-v1', experiment_id: 'mco-fixture',
+    best_subset: 'episodic+body+habitat+social', condition_comparison: conditions,
+    carrier_contributions: {episodic: {carrier: 'episodic', mean_with: .625, mean_without: .5, marginal_grounded_delta: .125}},
+    verification: {verified: true}, artifact_url: '/artifacts/mco_experiments/RECEIPT.json'};
+  const controller = {schema: 'poseidon-titan-experiment-v2', experiment_id: 'controller-fixture', summary: {
+    policy: {episodes: 1, survival_rate: 1, mean_steps: 32, mean_reward: 2},
+  }, paired: {}};
+  const ui = await workbench(({url}) => url === '/api/jobs' ? {status: 200, data: {jobs: [
+    listedJob('completed'), {...listedJob('completed'), id: controllerId},
+  ]}} : url === '/api/jobs/' + jobId ? {status: 200, data: {...listedJob('completed'), result: mco}}
+    : url === '/api/jobs/' + controllerId ? {status: 200, data: {...listedJob('completed'), id: controllerId, result: controller}} : null);
+  await ui.buttons()[0].onclick();
+  await ui.flush();
+  assert.ok(ui.elements.get('mcoResults'), 'MCO must have a retrieval-results panel');
+  assert.equal(ui.elements.get('mcoResults').hidden, false);
+  assert.equal(ui.elements.get('mcoConditions').children.length, 4);
+  assert.match(renderedText(ui.elements.get('mcoConditions')), /intact.*256.*50\.0%.*75\.0%.*0\.625.*0\.5195.*60\.35/);
+  assert.match(renderedText(ui.elements.get('mcoCarriers')), /episodic.*0\.625.*0\.500.*\+0\.125/);
+  assert.match(ui.elements.get('mcoBestSubset').textContent, /episodic.*body.*habitat.*social/);
+  assert.equal(ui.elements.get('controllerResults').hidden, true);
+  assert.equal(ui.elements.get('pairedResults').hidden, true);
+  assert.match(ui.elements.get('resultCaution').textContent, /retrieval benchmark/i);
+  await ui.buttons()[1].onclick();
+  await ui.flush();
+  assert.equal(ui.elements.get('mcoResults').hidden, true);
+  assert.equal(ui.elements.get('controllerResults').hidden, false);
+  assert.equal(ui.elements.get('pairedResults').hidden, false);
+  assert.equal(ui.elements.get('experimentSummary').children.length, 1);
+  assert.match(ui.elements.get('comparisonTitle').textContent, /Controller comparison/);
+});

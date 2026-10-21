@@ -1,8 +1,9 @@
 # Local workbench reliability and evidence upgrade
 
 This upgrade strengthens the existing CPU-local research workbench. It does not
-train new weights or promote an experimental controller. The runtime source
-identity remains 3.7.0.
+train new weights or promote an experimental controller. Distribution metadata
+follows the runtime source identity; integrated validation uses the shared
+checkout's 3.8.0 version.
 
 ## Changes
 

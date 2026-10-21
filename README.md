@@ -53,6 +53,10 @@ The receipt records all six arms and is sealed to the core checkpoint and TidePo
 
 ## Verify changes
 
+The [21 October workbench upgrade](docs/PROJECT_UPGRADE_2026-10-21.md) describes
+saved-job recovery, resilient status diagnostics, source tracking, and the
+distinction between answer checks, synthetic demonstrations, checksums and replay.
+
 Install the optional test tools and run the focused integrity checks or the full suite:
 
 ```powershell

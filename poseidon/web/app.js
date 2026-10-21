@@ -242,8 +242,26 @@ function showRiskCoverage(risk){
     }
   }
 }
+function showMCOResults(data){
+  const conditions=$('#mcoConditions'),carriers=$('#mcoCarriers');
+  conditions.replaceChildren();carriers.replaceChildren();
+  $('#mcoBestSubset').textContent='Best observed carrier subset: '+(typeof data.best_subset==='string'?data.best_subset.replace(/\+/g,' + '):'Not reported');
+  for(const [condition,row]of Object.entries(data.condition_comparison||{})){
+    if(!row||typeof row!=='object')continue;
+    conditions.append(resultRow([condition,numeric(row.trials)?row.trials:'—',percentage(row.mean_hit_at_1),percentage(row.mean_hit_at_3),decimal(row.mean_mrr,3),decimal(row.mean_grounded_score,4),decimal(row.mean_retrieval_ms,2)],condition));
+  }
+  for(const [carrier,row]of Object.entries(data.carrier_contributions||{})){
+    if(!row||typeof row!=='object')continue;
+    carriers.append(resultRow([carrier,decimal(row.mean_with,3),decimal(row.mean_without,3),signed(row.marginal_grounded_delta)],carrier));
+  }
+}
 function showExperiment(data){
   currentExperiment=data;
+  const mco=data.schema==='poseidon-mco-experiment-v1';
+  $('#comparisonTitle').textContent=mco?'Memory carrier comparison':'Controller comparison';
+  $('#mcoResults').hidden=!mco;$('#controllerResults').hidden=mco;$('#pairedResults').hidden=mco;$('#pairedHeading').hidden=mco;
+  if(mco)showMCOResults(data);
+  $('#resultCaution').textContent=mco?'This deterministic retrieval benchmark compares the fixed memory-carrier protocol and its controls. Its scores do not establish language-model improvements or real-world memory performance.':'A small paired experiment describes these seeds and this horizon. It does not establish general superiority or real-world survival ability.';
   const returns=data.schema==='poseidon-horizon-experiment-v1'||data.schema==='poseidon-odyssey-experiment-v1'||data.schema==='poseidon-helm-experiment-v1';
   const summary=$('#experimentSummary'),paired=$('#experimentPaired');
   summary.replaceChildren();paired.replaceChildren();
@@ -285,10 +303,10 @@ function showExperiment(data){
   if(returns){const item=document.createElement('li');item.textContent='Branch utility gain covers one-step reserve utility. Decision return scores estimate multi-step reward; these measures have different units.';limits.append(item);}
   $('#experimentResults').hidden=false;
 }
-let jobMonitorGeneration=0;
+let jobMonitorGeneration=0,jobResultGeneration=0;
 function stopJobMonitoring(){
   if(jobPollHandle!==null)clearInterval(jobPollHandle);
-  jobPollHandle=null;activeJobId=null;jobMonitorGeneration++;
+  jobPollHandle=null;activeJobId=null;jobMonitorGeneration++;jobResultGeneration++;
   $('#cancelJob').hidden=true;$('#cancelJob').disabled=false;
 }
 function finishJobMonitoring(job){
@@ -343,12 +361,14 @@ async function monitorJob(jobId){
   await poll();
 }
 async function viewJobResult(jobId){
+  const generation=++jobResultGeneration;
   try{
     const job=await apiJSON('/api/jobs/'+encodeURIComponent(jobId));
+    if(generation!==jobResultGeneration||experimentBusy||requestBusy)return;
     if(job.state!=='completed'||!job.result||typeof job.result!=='object')throw Error('This job has no completed result.');
     showExperiment(job.result);$('#jobIdentity').textContent='Job '+job.id+' · '+job.state;
     $('#jobStatus').textContent='Saved result loaded from local job history.';
-  }catch(error){$('#jobStatus').textContent='Could not open result: '+error.message;}
+  }catch(error){if(generation===jobResultGeneration&&!experimentBusy&&!requestBusy)$('#jobStatus').textContent='Could not open result: '+error.message;}
 }
 async function refreshJobs(){
   const list=$('#jobHistory');
@@ -389,6 +409,7 @@ $('#cancelJob').onclick=async()=>{
 $('#experimentForm').onsubmit=async event=>{
   event.preventDefault();if(experimentBusy||requestBusy||serverBusy||restartRequired||!protocolReady())return;
   if(!$('#experimentForm').checkValidity()){$('#experimentForm').reportValidity();return;}
+  jobResultGeneration++;
   const protocol=selectedProtocol();
   const payload={kind:protocol==='trident'?'trident-experiment':protocol==='titan'?'titan-experiment':protocol==='hyperion'?'hyperion-experiment':protocol==='aura'?'aura-experiment':protocol==='tessera'?'tessera-experiment':protocol==='mnemorph'?'mnemorph-experiment':protocol==='helm'?'helm-experiment':protocol,seed:Number($('#experimentSeed').value),scarcity:Number($('#scarcity').value),episodes:Number($('#episodes').value),max_steps:Number($('#maxSteps').value)};
   stopWorld();
@@ -396,7 +417,7 @@ $('#experimentForm').onsubmit=async event=>{
   $('#decisionPanel').hidden=true;
   $('#experimentPanel').setAttribute('aria-busy','true');
   $('#experimentStatus').classList.remove('error');
-  $('#experimentStatus').textContent='Running '+(protocol==='cognitive'||protocol==='trident'||protocol==='titan'||protocol==='atlas'||protocol==='helm'||protocol==='odysseus'?'six':protocol==='hyperion'||protocol==='aura'?'five':protocol==='chimera'?'four':protocol==='contrast'||protocol==='horizon'?'nine':'ten')+' controllers on '+payload.episodes+' paired episodes each, up to '+payload.max_steps+' steps. Local CPU work may take a while…';
+  $('#experimentStatus').textContent=['mco','tessera','mnemorph'].includes(protocol)?'Submitting '+protocol.toUpperCase()+' fixed benchmark protocol. Local CPU work may take a while…':'Running '+(protocol==='cognitive'||protocol==='trident'||protocol==='titan'||protocol==='atlas'||protocol==='helm'||protocol==='odysseus'?'six':protocol==='hyperion'||protocol==='aura'?'five':protocol==='chimera'?'four':protocol==='contrast'||protocol==='horizon'?'nine':'ten')+' controllers on '+payload.episodes+' paired episodes each, up to '+payload.max_steps+' steps. Local CPU work may take a while…';
   syncControls();
   if(protocol==='cognitive'||protocol==='trident'||protocol==='titan'||protocol==='hyperion'||protocol==='chimera'||protocol==='metamorph'||protocol==='aura'||protocol==='tessera'||protocol==='mnemorph'||protocol==='helm'||protocol==='odysseus'||protocol==='mco'){
     try{
@@ -461,7 +482,7 @@ async function refreshStatus(){
     setCandidateStatus('atlas',data.atlas);setCandidateStatus('contrast',data.contrast);setCandidateStatus('horizon',data.horizon);setCandidateStatus('odyssey',data.odyssey);setCandidateStatus('helm',data.helm);setCandidateStatus('odysseus',data.odysseus);
     setCandidateStatus('cognitive',data.cognitive);setCandidateStatus('aura',data.aura);setCandidateStatus('tessera',data.tessera);setCandidateStatus('mnemorph',data.mnemorph);setCandidateStatus('metamorph',data.metamorph);setCandidateStatus('chimera',data.chimera);setCandidateStatus('hyperion',data.hyperion);setCandidateStatus('titan',data.titan);setCandidateStatus('trident',data.trident);
     if(data.neurograft?.ready && $('#neurograftState')){$('#neurograftState').textContent='ACTIVE';$('#neurograftState').style.background='#059669';$('#neurograftState').style.color='white';}
-    if(data.mco?.ready)mcoReady=true;
+    mcoReady=data.mco?.receipt_ready===true;
     if(!protocolChosen){$('#experimentType').value='cognitive';protocolChosen=true;}
     updateProtocol();
   }catch{$('#connection').textContent='Offline · start the local server';}
