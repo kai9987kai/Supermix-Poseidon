@@ -248,6 +248,12 @@ def make_handler(runtime, port):
                 except Exception as error:
                     self.send_json(500, {"error": str(error), "type": type(error).__name__})
                 return
+            if path == "/api/cartan/status":
+                try:
+                    self.send_json(200, runtime.cartan_status())
+                except Exception as error:
+                    self.send_json(500, {"error": str(error), "type": type(error).__name__})
+                return
             if path in ("/", "/index.html", "/style.css", "/app.js"):
                 file = WEB/("index.html" if path in ("/", "/index.html") else path[1:])
             elif path.startswith("/artifacts/"):
@@ -681,6 +687,14 @@ def make_handler(runtime, port):
                 try:
                     seed = int(payload.get("seed", 42))
                     res = runtime.noether_synthesize(seed=seed)
+                    self.send_json(200, res)
+                except Exception as error:
+                    self.send_json(500, {"error": str(error), "type": type(error).__name__})
+                return
+            if path == "/api/cartan/synthesize":
+                try:
+                    seed = int(payload.get("seed", 42))
+                    res = runtime.cartan_synthesize(seed=seed)
                     self.send_json(200, res)
                 except Exception as error:
                     self.send_json(500, {"error": str(error), "type": type(error).__name__})

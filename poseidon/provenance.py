@@ -17,8 +17,8 @@ class StaleSourceError(RuntimeError):
 
 def capture_sources(directory: str | Path | None = None) -> dict[str, str]:
     root = Path(directory) if directory is not None else Path(__file__).parent
-    return {path.name: hashlib.sha256(path.read_bytes()).hexdigest()
-            for path in sorted(root.glob("*.py"))}
+    return {path.relative_to(root).as_posix(): hashlib.sha256(path.read_bytes()).hexdigest()
+            for path in sorted(root.rglob("*.py"))}
 
 
 def source_status() -> dict:

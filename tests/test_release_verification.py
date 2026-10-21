@@ -212,3 +212,16 @@ def test_case_colliding_manifest_entries_rejected_on_all_platforms(tmp_path):
 
 def test_isolated_smoke_script_is_valid_python():
     compile(release.SMOKE_SCRIPT, "packaged-release-smoke", "exec")
+
+
+@pytest.mark.parametrize("version", tuple(f"3.{minor}.0" for minor in range(8)))
+def test_v3_releases_preserve_full_evidence_requirements(tmp_path, version):
+    manifest = _package(tmp_path, "2.0.0")
+    manifest["version"] = version
+    _seal(tmp_path, manifest)
+    _, receipt = release.verify_hashes(tmp_path)
+    assert receipt["version"] == version
+    manifest.pop("trident_experiment_verification")
+    _seal(tmp_path, manifest)
+    with pytest.raises(ValueError, match="TRIDENT replay verification"):
+        release.verify_hashes(tmp_path)

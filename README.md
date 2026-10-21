@@ -1,13 +1,15 @@
-# Supermix Poseidon v2.0: Cognitive Platform
+# Supermix Poseidon v3.8.0: Local Research Workbench
 
 [![Hugging Face](https://img.shields.io/badge/Hugging%20Face-Supermix--Poseidon-yellow)](https://huggingface.co/Kai9987kai/Supermix-Poseidon)
 [![GitHub](https://img.shields.io/badge/GitHub-Supermix--Poseidon-blue)](https://github.com/kai9987kai/Supermix-Poseidon)
 
-Poseidon is an experimental **cognitive AI workbench** combining a trained Tidal core with optional prediction, memory, planning and adaptation modules. The [learning foundation report](docs/research/learning-foundation-2026-10-12.md) records the trained-predictor integration, replay verification and measured limitations. The [11 October architecture audit](docs/research/architecture-audit-2026-10-11.md) preserves the earlier baseline findings.
+Poseidon is an experimental **cognitive AI workbench** combining a trained Tidal core with optional prediction, memory, planning, adaptation, exact reasoning, and synthetic research tools. It runs locally on a conventional CPU. Version 3.8.0 is the current source identity; a source version or a passing local check does not establish a published model release.
 
-## v2.0 Cognitive Platform Architecture
+Use the CLI or browser workbench to inspect available artifacts, run seeded synthetic episodes, compare experimental controllers, and replay recorded evidence. The [learning foundation report](docs/research/learning-foundation-2026-10-12.md) records the trained-predictor integration and its measured limitations. The [research index](docs/research/README.md) links subsequent experiments; the [11 October architecture audit](docs/research/architecture-audit-2026-10-11.md) preserves the earlier baseline findings.
 
-The v2.0 coordinator instantiates six experimental subsystems around the frozen Tidal core checkpoint:
+## Core architecture and experimental extensions
+
+The cognitive coordinator combines six experimental subsystems around the frozen Tidal core checkpoint:
 
 1. **ORACLE**: CognitiveAgent and HyperAgent accept an explicit trained research artifact through `--oracle-checkpoint`. The episode-bootstrap ensemble predicts state changes, reward and an uncalibrated death target. Artifact/source checks and training-action support gate its use. Without a selected artifact, both controllers exactly preserve frozen Tidal actions. No candidate is automatically promoted.
 2. **MNEMOSYNE (`poseidon/mnemosyne.py`)**: Biologically inspired 3-tier memory hierarchy:
@@ -20,11 +22,11 @@ The v2.0 coordinator instantiates six experimental subsystems around the frozen 
 5. **NEURO (`poseidon/neuro.py`)**: Sparse routing with graph masks and gain scaling. The v2 coordinator reports its outputs as telemetry; they do not currently alter the planner input.
 6. **WORLDLAB (`poseidon/worldlab.py`)**: Synthetic partially observed TidePool with fog, sensor noise, tidal effects and an external simulation bridge contract. It is not a validated physical or biological model.
 
-See the [subsystem documentation](docs/POSEIDON_V2_RESEARCH.md), [24-project source review](docs/research/portfolio-refresh-2026-10-11.md) and [learning and transfer design](docs/superpowers/specs/2026-10-11-learning-transfer-design.md). Cognitive v3 receipts replay every environment transition and controller decision, including noisy sensor RNG, and bind core/model/source identities. Parameter search uses isolated copies and retains inactive candidates. Additional v3/OmniPlane modules remain experimental.
+See the [subsystem documentation](docs/POSEIDON_V2_RESEARCH.md), [24-project source review](docs/research/portfolio-refresh-2026-10-11.md) and [learning and transfer design](docs/superpowers/specs/2026-10-11-learning-transfer-design.md). Cognitive v3 receipts replay environment transitions and controller decisions, including noisy sensor RNG, and bind core/model/source identities. Parameter search uses isolated copies and retains inactive candidates. Later modules, including NEXUS-Ω, CHRONOS, NOETHER, and CARTAN, expose additional synthetic experiments and mathematical tools. Their names and status telemetry do not establish general learning or scientific discovery capabilities.
 
 ## Run locally
 
-Use Python 3.10 or newer with a compatible CPU PyTorch installation. From the repository root:
+Use Python 3.10 or newer with a compatible CPU PyTorch installation. The declared runtime dependencies include SciPy for the scientific audit modules. From the repository root:
 
 ```powershell
 python -m pip install -e .
@@ -32,7 +34,9 @@ python -m poseidon status
 python -m poseidon serve --port 8792
 ```
 
-Open `http://127.0.0.1:8792`. The workbench can run a seeded TRIDENT episode from the command line:
+Open `http://127.0.0.1:8792`. Installing the source package does not fetch model weights. Model-backed commands require their local artifacts under `runs/` and `models/`; `status` reports availability. A verified model release includes its packaged artifacts. The source launch scripts use port 8787.
+
+The workbench can run a seeded TRIDENT episode from the command line when the selected Tidal checkpoint is present:
 
 ```powershell
 python -m poseidon world --planner trident --seed 42 --max-steps 64 --scarcity 2.5
@@ -46,6 +50,18 @@ python -m poseidon verify-trident outputs/trident_experiments/RECEIPT.json
 ```
 
 The receipt records all six arms and is sealed to the core checkpoint and TidePool source hashes. A short benchmark is useful for reproducibility checks, not for a robust performance conclusion.
+
+## Verify changes
+
+Install the optional test tools and run the focused integrity checks or the full suite:
+
+```powershell
+python -m pip install -e ".[test]"
+python -m pytest tests/test_packaging.py tests/test_release_verification.py tests/test_jobs.py tests/test_provenance.py -q
+python -m pytest -q
+```
+
+The packaging checks generate metadata in a temporary project and verify that the distribution version matches `poseidon.__version__` without importing the runtime. Release integrity tests require no model download. The full suite also exercises synthetic controllers, protocol validation, and local server behavior; passing tests establish the checked software behavior rather than new model performance.
 
 ## Model components and boundaries
 
@@ -61,6 +77,6 @@ TidePool is a deterministic toy environment. TITAN's ecology, fluid, quantum-ins
 
 ## Release and licensing
 
-The release manifest binds packaged files to a source commit and SHA-256 inventory. Use the [release guide](docs/HUGGINGFACE_RELEASE.md) to package, verify, and publish a version. The Hub repository root is a custom PyTorch application package; `AutoModel.from_pretrained` is not its runtime interface.
+The release manifest binds packaged files to a source commit and SHA-256 inventory. Distribution metadata reads its version from `poseidon.__version__`; the release builder and verifier share their supported version list. Use the [release guide](docs/HUGGINGFACE_RELEASE.md) to package, verify, and publish a version after its evidence requirements pass. The Hub repository root is a custom PyTorch application package; `AutoModel.from_pretrained` is not its runtime interface.
 
 Poseidon code and Tidal artifacts use MIT terms. Bundled pretrained language weights and tokenizer retain their upstream Apache-2.0 terms and attribution. See the packaged license files and upstream model card before redistribution.

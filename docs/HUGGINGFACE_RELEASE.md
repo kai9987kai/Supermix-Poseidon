@@ -1,19 +1,23 @@
 # Hugging Face release procedure
 
-Poseidon is a custom PyTorch runtime package hosted at [Kai9987kai/Supermix-Poseidon](https://huggingface.co/Kai9987kai/Supermix-Poseidon). The repository root is not a Transformers `AutoModel` checkpoint. The v2.0.0 release adds the Supermix Poseidon Cognitive Platform and Apex Singularity Kernel, integrating Active Inference, Clifford Cl(3,0) Geometric Kinematics, Autopoietic Affective Homeostasis, Inductive Logic Theorem Discovery, and Formal Safety Guardrails around the unchanged selected Tidal core.
+Poseidon is a custom PyTorch runtime package hosted at [Kai9987kai/Supermix-Poseidon](https://huggingface.co/Kai9987kai/Supermix-Poseidon). The repository root is not a Transformers `AutoModel` checkpoint. The current source identifies itself as **3.8.0**, with additional experimental mathematical and synthetic research modules around the unchanged selected Tidal core. This guide describes release preparation; it does not assert that a v3.8.0 Hub tag has been published.
+
+`poseidon.__version__` is the version source for both runtime and distribution metadata. The release builder and verifier share the supported version list, including historical v3.0.0 through v3.8.0 profiles. New v3 profiles retain the required artifact digests and replay evidence from v2.0.0.
 
 ## Download and run
 
 ```powershell
 python -m pip install huggingface-hub
-hf download Kai9987kai/Supermix-Poseidon --revision v2.0.0 --local-dir Poseidon-release
+$HubRevision = "REPLACE_WITH_A_VERIFIED_HUB_COMMIT_SHA"
+hf download Kai9987kai/Supermix-Poseidon --revision $HubRevision --local-dir Poseidon-release
 Set-Location Poseidon-release
+python tools/verify_huggingface_release.py .
 python -m pip install -e .
 python tools/verify_huggingface_release.py . --smoke
 python -m poseidon serve --port 8792
 ```
 
-Pin the immutable Hub commit SHA instead of the tag when exact revision provenance is needed. Use Python 3.10+ with compatible CPU PyTorch. The packaged snapshot contains the default runtime weights and tokenizer; loading the custom project uses the Poseidon runtime rather than `AutoModel.from_pretrained`.
+Replace `$HubRevision` with the immutable commit SHA of the release you have verified. Hash verification uses only the Python standard library and can run before installing the package; smoke verification requires its runtime dependencies, including SciPy. Use Python 3.10+ with compatible CPU PyTorch. The packaged snapshot contains the default runtime weights and tokenizer; loading the custom project uses the Poseidon runtime rather than `AutoModel.from_pretrained`.
 
 To evaluate TRIDENT locally:
 
@@ -27,15 +31,23 @@ The receipt is bound to the active Tidal checkpoint and TidePool source bytes. I
 
 ## Build, verify, and upload
 
-Start with a clean Git checkout and a completed `outputs/trident_experiments/RECEIPT.json`. The packager checks the active checkpoints, pinned upstream language files, existing experiment evidence, and the TRIDENT receipt. It rejects dirty source so the manifest can bind a commit.
+Start with a clean Git checkout and a completed `outputs/trident_experiments/RECEIPT.json`. The packager checks the active checkpoints, pinned upstream language files, existing experiment evidence, and the TRIDENT receipt. It rejects dirty source so the manifest can bind a commit. A source checkout, wheel build, or passing unit suite alone does not satisfy these model-release requirements. The build may download pinned historical release assets when they are absent from the local Hub cache.
 
 ```powershell
-python tools/package_huggingface.py --output outputs/releases/poseidon-v2.0.0
-python tools/verify_huggingface_release.py outputs/releases/poseidon-v2.0.0 --smoke
-hf upload Kai9987kai/Supermix-Poseidon outputs/releases/poseidon-v2.0.0 . --commit-message "Release Poseidon v2.0.0 Cognitive Platform & Apex Singularity Kernel"
+python tools/package_huggingface.py --output outputs/releases/poseidon-v3.8.0
+python tools/verify_huggingface_release.py outputs/releases/poseidon-v3.8.0 --smoke
+hf upload Kai9987kai/Supermix-Poseidon outputs/releases/poseidon-v3.8.0 . --commit-message "Release Poseidon v3.8.0"
 ```
 
-After upload, verify the Hub's new commit SHA, `v2.0.0` tag, model card, manifest, file inventory, and remote file hashes against the local release package. A local package or successful CLI upload alone is not proof that publication completed. Preserve the existing Hub history and release assets; do not force-push.
+After upload, verify the Hub's new commit SHA, intended version tag, model card, manifest, file inventory, and remote file hashes against the local release package. Upload does not itself create a version tag. A local package or successful CLI upload alone is not proof that publication completed. Preserve the existing Hub history and release assets; do not force-push.
+
+To check a source wheel without downloading model artifacts or installing the result:
+
+```powershell
+python -m pip wheel . --no-deps --no-build-isolation --wheel-dir outputs/upgrade-build
+```
+
+This wheel contains application source and web assets. Model checkpoints remain separate release artifacts. Build tooling reads the literal runtime version without importing the package's scientific modules.
 
 ## Scope and licensing
 

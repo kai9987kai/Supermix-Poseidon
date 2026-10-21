@@ -116,7 +116,7 @@ def test_pantheon_runtime_and_omni_reasoner_integration() -> None:
     reasoner = OmniReasoner(seed=42)
     assert reasoner.classify_intent("Run a 24-pillar Pantheon synthesis for quantum entanglement") == "pantheon_24_pillar_synthesis"
     res = reasoner.reason("Run a 24-pillar Pantheon synthesis for quantum entanglement amplitudes [1, 0, 0, 1]", seed=42)
-    assert res.verified is True
+    assert res.empirical_simulation["pantheon_receipt"]["verified"] is True
     assert res.empirical_simulation["pillars_verified"] == 24
     assert len(res.empirical_simulation["quibble_merkle_root"]) == 64
 

@@ -93,9 +93,9 @@ tags:
 - synthetic-simulation
 ---
 
-# Supermix Poseidon v{version}: Cognitive Platform & Apex Kernel
+# Supermix Poseidon v{version}: Local Research Workbench
 
-Version {version} introduces the **Supermix Poseidon Cognitive Platform and Apex Singularity Kernel**, unifying Active Inference, Clifford $\mathcal{{C}}\ell_{{3,0}}(\mathbb{{R}})$ Geometric Kinematics, Autopoietic Affective Homeostasis, Inductive Logic Theorem Discovery, and Formal Safety Guardrails around the frozen Tidal core.
+Version {version} packages a local experimental workbench around the frozen Tidal core, with a separate pretrained conversation backend, optional synthetic controllers, and mathematical research tools. Runtime availability, replay integrity, and measured model performance are separate checks. Additional modules do not imply that the selected core was retrained or that a candidate was promoted.
 
 TRIDENT remains available as an opt-in identity-gated controller around the unchanged Tidal checkpoint. It corrects one-step predictions with recent observed prediction errors, admits directed travel only after enough local visits unless that transition has been observed, and requires an override to beat erased and time-shifted residual controls by configured margins. TRIDENT is experimental software for synthetic TidePool; it does not modify or train model weights.
 
@@ -116,8 +116,9 @@ Additional modules are software simulations or heuristics: Archimedes computes s
 | Supervised baseline | `runs/tidal/core.pt` | Comparison checkpoint, original embedded training state |
 | SmolLM2: 134,515,008 stored parameters | `models/language/model.safetensors` | Separate unchanged pretrained conversation backend |
 | LoRA: 61,440 parameters | `runs/language/adapter/` | Experimental candidate, inactive by default |
-| Poseidon-X Apex Kernel | `poseidon/poseidon_x.py` | Unified Apex Multivector Autopoietic Cognitive Kernel; opt-in |
-| 50-Domain Problem Forge | `poseidon/problem_solver.py` | 50-domain zero-eval mathematical, topological, physical & computational problem solver |
+| Poseidon-X | `poseidon/poseidon_x.py` | Experimental geometric and homeostatic controller; opt-in |
+| Problem Forge | `poseidon/problem_solver.py` | Bounded exact and numerical tools; inspect runtime status for supported domains |
+| CHRONOS and NOETHER | `poseidon/chronos.py`, `poseidon/noether.py` | Experimental mathematical constructions and synthetic telemetry |
 | Project HYPERBOREA | `poseidon/hyperborea.py` | Cellular sheaf cohomology, Port-Hamiltonian Dirac structures, Wilsonian RG & Fibonacci anyon braiding |
 | Project HEPHAESTUS | `poseidon/hephaestus.py` | Wake-sleep library synthesis, GFlowNet DAG sampling, Koopman EDMD & persistent homology |
 | Project ATHENAEUM | `poseidon/athenaeum.py` | Equality saturation e-graphs, Process-Reward MCTS & SINDy equation discovery |
@@ -127,8 +128,8 @@ Additional modules are software simulations or heuristics: Archimedes computes s
 | Autopoietic Affective System | `poseidon/autopoiesis.py` | Autopoietic homeostasis, PAD affective appraisal & micro-sleep self-repair |
 | Hypergraph Theorem Discovery | `poseidon/hypergraph_discovery.py` | Neural-symbolic inductive logic programming with Laplace confidence |
 | Continuous 3D OmniEcosystem | `poseidon/ecosystem_3d.py` | Multi-agent trophic dynamics (grazers, predators, symbionts) & duty-cycled pulse signaling |
-| Tessera LTL Prover | `poseidon/tessera_prover.py` | Formal Linear Temporal Logic (LTL) safety contract prover & invariant shielding |
-| Universal Modder & Reactive Actors | `poseidon/universal_reactive.py` | Dynamic bytecode hot-patching with rollback & decoupled reactive message passing |
+| Tessera LTL Prover | `poseidon/tessera_prover.py` | Bounded synthetic contract and invariant checks |
+| Universal Modder & Reactive Actors | `poseidon/universal_reactive.py` | Static Python hooks with rollback and reactive message passing |
 | Active Inference & Free Energy | `poseidon/active_inference.py` | Expected free energy minimization, epistemic curiosity & reserve override |
 | Metacognitive Monitor | `poseidon/metacognition.py` | Metacognitive error calibration & dynamic confidence monitoring |
 | TRIDENT Identity-Gated Controller | `poseidon/trident.py` | Identity-gated, observed-topology causal residual controller around frozen core; opt-in |
@@ -295,7 +296,8 @@ to avoid relicensing upstream artifacts as MIT.
 def package(output: Path, repo_id: str = REPO_ID) -> dict:
     sys.path.insert(0, str(ROOT))
     from poseidon import __version__
-    if __version__ not in ("1.3.0", "2.0.0", "3.0.0", "3.1.0", "3.2.0", "3.3.0", "3.4.0", "3.5.0", "3.6.0", "3.7.0"):
+    from tools.verify_huggingface_release import BUILDABLE_RELEASE_VERSIONS
+    if __version__ not in BUILDABLE_RELEASE_VERSIONS:
         raise ValueError(f"unsupported version {__version__}")
     if repo_id != REPO_ID:
         raise ValueError("this release card is bound to Kai9987kai/Supermix-Poseidon")
@@ -594,7 +596,7 @@ See runs/language/report.json, data/language/SOURCE_CARD.md and the root model c
         "trident_receipt_sha256": trident_receipt_hash,
         "trident_experiment_verification": trident_experiment_verification,
         "build_environment": {name: importlib.metadata.version(name) for name in
-                              ("torch", "transformers", "peft", "safetensors", "numpy", "huggingface-hub")},
+                              ("torch", "transformers", "peft", "safetensors", "numpy", "scipy", "huggingface-hub")},
         "activation": {"core": "existing-dagger-selection", "language": "unchanged-upstream-base",
                        "language_adapter": "inactive-candidate", "atlas": "opt-in-experiment",
                        "contrast": "opt-in-experiment", "horizon": "opt-in-experiment",

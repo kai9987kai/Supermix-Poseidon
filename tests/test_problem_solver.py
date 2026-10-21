@@ -161,11 +161,16 @@ def test_problem_solver_unknown():
         solve_problem("What is the capital of France?")
 
 
-def test_problem_solver_70_capabilities():
+def test_problem_solver_75_capabilities():
     solver = ProblemSolver()
     caps = solver.capabilities()
-    assert len(caps) == 70
+    assert len(caps) == 75
     domains = [c["domain"] for c in caps]
+    assert "cartan_exterior_systems" in domains
+    assert "non_hermitian_pt_symmetry" in domains
+    assert "exceptional_jordan_algebra" in domains
+    assert "holographic_ryu_takayanagi" in domains
+    assert "morphogenetic_turing_reaction" in domains
     assert "logic_knights_knaves" in domains
     assert "knapsack" in domains
     assert "task_scheduling" in domains
@@ -992,3 +997,50 @@ def test_active_matter_nonequilibrium():
     assert res["verified"] is True
     assert res["persistence_length"] > 0
     assert res["effective_diffusion"] > 0
+
+
+def test_cartan_exterior_systems():
+    prompt = "Analyze Cartan exterior differential system and moving frames for dimension=3."
+    res = solve_problem(prompt)
+    assert res["domain"] == "cartan_exterior_systems"
+    assert res["verified"] is True
+    assert res["manifold_dimension"] == 3
+    assert res["metric_compatible"] is True
+    assert res["is_involutive"] is True
+
+
+def test_non_hermitian_pt_symmetry():
+    prompt = "Evaluate non-hermitian PT-symmetric quantum Hamiltonian with delta=0.0, gamma=1.0, and coupling_g=1.5."
+    res = solve_problem(prompt)
+    assert res["domain"] == "non_hermitian_pt_symmetry"
+    assert res["verified"] is True
+    assert res["pt_broken"] is False
+    assert "Unbroken" in res["phase"]
+
+
+def test_exceptional_jordan_algebra():
+    prompt = "Compute exceptional Jordan algebra Albert algebra h3(O) with diagonal=[2.0, 3.0, 1.0]."
+    res = solve_problem(prompt)
+    assert res["domain"] == "exceptional_jordan_algebra"
+    assert res["verified"] is True
+    assert res["jordan_trace"] == 6.0
+    assert res["freudenthal_determinant"] > 0.0
+
+
+def test_holographic_ryu_takayanagi():
+    prompt = "Compute holographic Ryu-Takayanagi entanglement entropy with central_charge=12.0, length=100.0, and subsystem=25.0."
+    res = solve_problem(prompt)
+    assert res["domain"] == "holographic_ryu_takayanagi"
+    assert res["verified"] is True
+    assert res["entanglement_entropy_nats"] > 0
+    assert res["bulk_geodesic_length"] > 0
+
+
+def test_morphogenetic_turing_reaction():
+    prompt = "Analyze morphogenetic Turing reaction-diffusion instability with Du=0.01, Dv=0.50, fu=0.6, and gv=-1.1."
+    res = solve_problem(prompt)
+    assert res["domain"] == "morphogenetic_turing_reaction"
+    assert res["verified"] is True
+    assert res["turing_active"] is True
+    assert res["critical_wavenumber"] > 0
+

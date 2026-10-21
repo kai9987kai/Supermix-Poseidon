@@ -706,3 +706,39 @@ def test_noether_server_endpoints(server):
     assert resp["verified"] is True
 
 
+
+
+def test_cartan_server_endpoints(server):
+    url, _ = server
+
+    # 1. GET /api/cartan/status
+    stat = json.load(urlopen(url + "/api/cartan/status"))
+    assert stat["ready"] is True
+    assert stat["version"] == "v3.8.0-CARTAN-75"
+    assert stat["subsystems"]["cartan_exterior_systems"] is True
+    assert stat["subsystems"]["non_hermitian_pt_symmetry"] is True
+    assert stat["subsystems"]["exceptional_jordan_algebra"] is True
+    assert stat["subsystems"]["holographic_ryu_takayanagi"] is True
+    assert stat["subsystems"]["morphogenetic_turing_reaction"] is True
+    assert stat["total_verified_domains"] == 75
+
+    # 2. POST /api/cartan/synthesize
+    res_car = json.load(post(url + "/api/cartan/synthesize", {
+        "seed": 42,
+    }))
+    assert res_car["project"] == "CARTAN"
+    assert res_car["verified"] is True
+    assert res_car["cartan_exterior"]["is_involutive_system"] is True
+    assert res_car["non_hermitian_pt"]["pt_commutator_zero"] is True
+    assert res_car["exceptional_jordan"]["hurwitz_norm_identity_verified"] is True
+    assert res_car["holographic_entanglement"]["verified"] is True
+    assert res_car["morphogenetic_turing"]["turing_instability_active"] is True
+    assert len(res_car["receipt_sha256"]) == 64
+
+    # 3. POST /api/respond with mode="cartan"
+    resp = json.load(post(url + "/api/respond", {
+        "prompt": "Synthesize Project CARTAN",
+        "mode": "cartan",
+    }))
+    assert resp["project"] == "CARTAN"
+    assert resp["verified"] is True

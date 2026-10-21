@@ -15,7 +15,7 @@ Stage 14 Frontier Cognitive Architecture:
    - Causeway Quantum Superposition & Causal do-calculus
 4. Formal Safety Verification (TESSERA & Odysseus):
    - Linear Temporal Logic (LTL) Bounded Model Checking
-   - Cryptographic SHA-256 proof certificates of invariant satisfaction
+   - SHA-256 fingerprints of session data and scoped synthetic safety checks
 """
 from __future__ import annotations
 
@@ -70,7 +70,11 @@ class ThoughtStep:
 
 @dataclass
 class OmniReasoningResult:
-    """Certified result of an introspective neuro-symbolic reasoning session."""
+    """Reasoning output with separate answer, demonstration and hash scopes.
+
+    ``verified`` describes the domain solver's result for its parsed problem.
+    It does not certify natural-language interpretation or generated prose.
+    """
     query: str
     intent: str
     drives: Dict[str, float]
@@ -81,6 +85,7 @@ class OmniReasoningResult:
     verified: bool
     certificate_sha256: str
     backend: str = "Poseidon Stage 14 Omni-Reasoner (Ghost Monologue + SCM + Tessera BMC)"
+    verification: Dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -94,6 +99,7 @@ class OmniReasoningResult:
             "verified": self.verified,
             "certificate_sha256": self.certificate_sha256,
             "backend": self.backend,
+            "verification": self.verification,
         }
 
 
@@ -129,6 +135,8 @@ class OmniReasoner:
     def classify_intent(self, query: str) -> str:
         """Classifies the semantic intent of the query to select domain co-processors."""
         q = query.lower()
+        if any(k in q for k in ("cartan", "moving frame", "exterior differential", "cartan-kahler", "non-hermitian", "pt-symmetry", "pt-symmetric", "exceptional point", "petermann", "albert algebra", "exceptional jordan", "fano plane", "ryu-takayanagi", "thermofield double", "turing pattern", "chemical morphogenesis", "reaction-diffusion instability")):
+            return "cartan_differential_systems"
         if any(k in q for k in ("noether", "lie symmetry", "conserved charge", "poisson bracket", "modular tensor category", "mtc", "verlinde", "clifford sta", "spacetime algebra", "faraday bivector", "batalin-vilkovisky", "bv quantization", "active brownian particle", "active matter")):
             return "noether_invariant_symmetries"
         if any(k in q for k in ("chronos", "causal dynamical triangulation", "cdt", "regge calculus", "noncommutative geometry", "spectral triple", "connes", "tropical algebra", "tropical geometry", "stiefel", "grassmannian", "coalgebraic", "bisimulation metric")):
@@ -317,7 +325,10 @@ class OmniReasoner:
                 "search_stats": res.get("search_stats", {}),
                 "alternatives_count": len(res.get("alternatives", [])),
                 "full_result": res,
-                "conclusion": f"Optimal verified solution discovered in domain '{domain}': {answer} (backend: {backend}). {insight}",
+                "conclusion": (
+                    f"{'Solver check passed' if verified else 'Solver result remains unverified'} "
+                    f"for parsed domain '{domain}': {answer} (backend: {backend}). {insight}"
+                ),
             }
         except Exception as e:
             return {
@@ -457,6 +468,34 @@ class OmniReasoner:
             ),
         }
 
+    def _simulate_cartan(self, seed: int = 42) -> Dict[str, Any]:
+        """Runs Stage 27 Project CARTAN Exterior Systems, PT Symmetry, Jordan Algebras, Holographic Entanglement & Turing Morphogenesis."""
+        from .cartan import CartanEngine
+        engine = CartanEngine()
+        res = engine.synthesize(seed=seed)
+        ext = res["cartan_exterior"]
+        pt = res["non_hermitian_pt"]
+        jordan = res["exceptional_jordan"]
+        holo = res["holographic_entanglement"]
+        turing = res["morphogenetic_turing"]
+        return {
+            "simulation_type": "Stage 27 Project CARTAN Exterior Systems, PT Symmetry, Jordan Algebras, Holographic Entanglement & Turing Morphogenesis",
+            "cartan_receipt": res,
+            "cartan_characters": ext["cartan_characters"],
+            "pt_unbroken": not pt["pt_broken"],
+            "hurwitz_verified": jordan["hurwitz_norm_identity_verified"],
+            "ryu_takayanagi_entropy": holo["entanglement_entropy_nats"],
+            "turing_active": turing["turing_instability_active"],
+            "receipt_sha256": res["receipt_sha256"],
+            "conclusion": (
+                f"Project CARTAN synthesized: Cartan moving frames (s0={ext['cartan_characters'][0]}, involutive={ext['is_involutive_system']}), "
+                f"Non-Hermitian PT-symmetry (phase={pt['phase']}, EP2 threshold={pt['ep_threshold_g']}), "
+                f"Exceptional Jordan algebra h3(O) Hurwitz norm={jordan['hurwitz_norm_identity_verified']}, "
+                f"Holographic Ryu-Takayanagi S_A={holo['entanglement_entropy_nats']:.4f} nats, "
+                f"Turing reaction-diffusion pattern={turing['predicted_morphology']} (kc={turing['critical_wavenumber_kc']:.4f})."
+            ),
+        }
+
     def _simulate_noether(self, seed: int = 42) -> Dict[str, Any]:
         """Runs Stage 26 Project NOETHER Lie Symmetries, Modular Tensor Categories, Clifford STA, BV Quantization & Active Matter."""
         from .noether import NoetherEngine
@@ -465,8 +504,8 @@ class OmniReasoner:
         return {
             "simulation_type": "Stage 26 Project NOETHER Lie Symmetries, Modular Tensor Categories, Clifford STA, BV Quantization & Active Matter",
             "noether_receipt": res,
-            "conserved_charge": res["noether_symmetries"]["noether_conserved_charge"],
-            "poisson_zero": res["noether_symmetries"]["poisson_bracket_bracket_zero"],
+            "conserved_charge": res["noether_symmetry"]["noether_conserved_charge"],
+            "poisson_zero": res["noether_symmetry"]["poisson_bracket_bracket_zero"],
             "mtc_total_dim": res["modular_tensor_category"]["total_quantum_dimension_D"],
             "sta_invariant_1": res["clifford_spacetime_algebra"]["lab_frame"]["invariant_1_scalar"],
             "bv_classical_residual": res["batalin_vilkovisky"]["classical_master_equation_residual"],
@@ -474,8 +513,8 @@ class OmniReasoner:
             "active_matter_deff": res["active_matter"]["effective_long_time_diffusion_Deff"],
             "receipt_sha256": res["receipt_sha256"],
             "conclusion": (
-                f"Project NOETHER synthesized: SO(2) conserved Q={res['noether_symmetries']['noether_conserved_charge']:.4f} "
-                f"({{Q,H}}=0: {res['noether_symmetries']['poisson_bracket_bracket_zero']}), "
+                f"Project NOETHER synthesized: SO(2) conserved Q={res['noether_symmetry']['noether_conserved_charge']:.4f} "
+                f"({{Q,H}}=0: {res['noether_symmetry']['poisson_bracket_bracket_zero']}), "
                 f"Fibonacci MTC total dimension D={res['modular_tensor_category']['total_quantum_dimension_D']:.4f}, "
                 f"Clifford STA I1={res['clifford_spacetime_algebra']['lab_frame']['invariant_1_scalar']:.2f}, "
                 f"BV CME residual={res['batalin_vilkovisky']['classical_master_equation_residual']:.2e}, "
@@ -575,7 +614,7 @@ class OmniReasoner:
         }
 
     def _verify_formal_safety(self, intent: str) -> Dict[str, Any]:
-        """Executes Tessera Bounded Model Checking (BMC) across formal LTL survival contracts."""
+        """Checks a fixed synthetic example, independent of the user query."""
         spec = SafetyContractSpec(
             min_health=0.05,
             min_energy=0.08,
@@ -594,6 +633,10 @@ class OmniReasoner:
         cert_hash = receipt.compute_hash()
 
         return {
+            "scope": "fixed_synthetic_trajectory",
+            "query_bound": False,
+            "initial_observation": test_obs,
+            "actions": test_plan,
             "prover": "Tessera LTL Bounded Model Checker v2.0",
             "formal_specification": "G(health >= 0.05 & energy >= 0.08 & hydration >= 0.08 & sep_dist >= 0.15) & F(stable)",
             "lookahead_depth": receipt.lookahead_depth,
@@ -611,7 +654,7 @@ class OmniReasoner:
         language_runtime: Optional[Any] = None,
         max_new_tokens: int = 1024,
     ) -> OmniReasoningResult:
-        """Executes complete System 2 introspective reasoning session with ground-truth verification."""
+        """Run domain tools while preserving the scope of their evidence."""
         self.session_count += 1
         intent = self.classify_intent(prompt)
         drives = self.compute_cognitive_drives(prompt, intent)
@@ -669,7 +712,7 @@ class OmniReasoner:
             hypo_text = (
                 "Hypothesis H1: The query defines a structured combinatorial or state-space challenge. "
                 "By formulating formal state invariants, admissible heuristics, and an independent verification oracle, "
-                "an optimal or certified impossible solution can be established without hallucination."
+                "the solver can check its result within the parsed problem model and search budget."
             )
         elif intent == "pantheon_24_pillar_synthesis":
             hypo_text = (
@@ -698,6 +741,15 @@ class OmniReasoner:
                 "will maintain strict gauge invariance, satisfy thermodynamic fluctuation theorems, "
                 "preserve phase-space differential 2-forms, and yield optic Nash equilibrium fixpoints."
             )
+        elif intent == "cartan_differential_systems":
+            hypo_text = (
+                "Hypothesis H1: Cartan's exterior differential systems on moving frames combined with "
+                "non-Hermitian PT-symmetric spectral transitions, exceptional Jordan Albert algebra h3(O) "
+                "Freudenthal cubic invariants, holographic Ryu-Takayanagi minimal geodesic area surfaces, "
+                "and Turing reaction-diffusion chemical morphogenesis will preserve differential 2-form integrability, "
+                "bound Petermann noise divergence, satisfy Hurwitz octonionic norm composition, "
+                "and govern self-organizing biological pattern formation."
+            )
         elif intent == "noether_invariant_symmetries":
             hypo_text = (
                 "Hypothesis H1: Continuous Lie symmetry groups (SO(2) rotation) combined with "
@@ -716,8 +768,8 @@ class OmniReasoner:
             )
         else:
             hypo_text = (
-                "Hypothesis H1: System 2 deliberation combined with 24-Pillar Pantheon synthesis and formal bounded model checking will resolve the query with provable safety invariants, "
-                "eliminating hallucinations and establishing an auditable proof receipt."
+                "Check whether a supported tool can model the query. Fixed synthetic demonstrations "
+                "and a session fingerprint cannot verify an unsupported answer."
             )
 
         thought_steps.append(ThoughtStep(
@@ -773,94 +825,20 @@ class OmniReasoner:
             sim_result = self._simulate_neurograft(seed)
         elif intent == "aether_gauge_thermo":
             sim_result = self._simulate_aether(seed)
+        elif intent == "cartan_differential_systems":
+            sim_result = self._simulate_cartan(seed)
         elif intent == "noether_invariant_symmetries":
             sim_result = self._simulate_noether(seed)
         elif intent == "chronos_quantum_geometry":
             sim_result = self._simulate_chronos(seed)
         else:
-            from .pantheon import PantheonEngine
-            from .creative_synthesis import DialecticalTribunal
-            from .athenaeum import AthenaeumEngine
-            from .hephaestus import HephaestusEngine
-            from .hyperborea import HyperboreaEngine
-            from .neurograft import NeurograftEngine
-            from .aether import AetherEngine
-            from .chronos import ChronosEngine
-            from .noether import NoetherEngine
-            p_res = PantheonEngine(seed=seed).synthesize(prompt, seed=seed)
-            c_res = DialecticalTribunal().deliberate(prompt, seed=seed)
-            a_res = AthenaeumEngine().synthesize(budget_rollouts=12)
-            h_res = HephaestusEngine().synthesize()
-            hb_res = HyperboreaEngine().synthesize()
-            ng_res = NeurograftEngine(seed=seed).synthesize(horizon=3)
-            ae_res = AetherEngine(seed=seed).synthesize()
-            ch_res = ChronosEngine().synthesize(seed=seed)
-            noe_res = NoetherEngine().synthesize(seed=seed)
             sim_result = {
-                "simulation_type": "Multi-Plane Epistemic, 24-Pillar Pantheon, Athenaeum E-Graph/MCTS, Hephaestus Stitch/GFlowNet/Koopman, Hyperborea Sheaf/Port-Hamiltonian/RG/Anyon, Neurograft Connectome, AETHER Gauge/Thermo, CHRONOS Quantum/Noncommutative, NOETHER Invariant Symmetries & Noosphere Bisociation Synthesis",
-                "physical_cross_check": self._simulate_physical_discovery(seed)["wide_channel"],
-                "causal_flux": self._simulate_causal_superposition()["optimal_collapsed_action"],
-                "pantheon_quibble_merkle_root": p_res["quibble_merkle_root"],
-                "pantheon_dream_twin": p_res["counterfactual_dream"],
-                "athenaeum_neuro_symbolic": {
-                    "egraph_simplified": a_res["egraph_saturation"]["simplified_expression"],
-                    "mcts_best_q": a_res["test_time_compute_mcts"]["best_q_value"],
-                    "sindy_law": a_res["sindy_discovery"]["discovered_equation"],
-                },
-                "hephaestus_synthesis": {
-                    "stitch_compression_ratio": h_res["wake_sleep_library"]["compression_ratio"],
-                    "gflownet_partition_z": h_res["gflownet_sampler"]["partition_function_Z"],
-                    "koopman_eigenvalues": h_res["koopman_edmd"]["koopman_eigenvalues"],
-                    "groebner_basis": h_res["groebner_basis"]["reduced_groebner_basis"],
-                },
-                "hyperborea_synthesis": {
-                    "sheaf_dim_h0": hb_res["cellular_sheaf"]["dim_H0_global_sections"],
-                    "port_hamiltonian_hd_final": hb_res["port_hamiltonian"]["shaped_hamiltonian_final"],
-                    "rg_critical_Kc": hb_res["renormalization_group"]["critical_coupling_Kc"],
-                    "anyon_quantum_dim": hb_res["anyon_braiding"]["golden_ratio_quantum_dim_d_tau"],
-                },
-                "neurograft_connectome": {
-                    "regime": ng_res["tri_neuromodulation"]["behavioral_regime"],
-                    "critical_lesion": ng_res["virtual_lesion_audit"]["critical_lesion_target"],
-                    "routing_entropy": ng_res["cross_graft_routing"]["routing_entropy"],
-                },
-                "aether_synthesis": {
-                    "yang_mills_action": ae_res["gauge_holonomy"]["yang_mills_action"],
-                    "dissipated_work": ae_res["non_equilibrium_thermodynamics"]["dissipated_work"],
-                    "fisher_curvature": ae_res["information_geometry"]["gaussian_curvature"],
-                    "symplectic_conserved": ae_res["symplectic_mechanics"]["symplectic_2form_conserved"],
-                },
-                "chronos_synthesis": {
-                    "euler_characteristic": ch_res["causal_dynamical_triangulation"]["euler_characteristic"],
-                    "regge_action": ch_res["causal_dynamical_triangulation"]["lorentzian_regge_action"],
-                    "spectral_action_tr_d2": ch_res["spectral_geometry"]["spectral_action_tr_d2"],
-                    "tropical_value": ch_res["tropical_algebra"]["tropical_value"],
-                    "stiefel_objective": ch_res["stiefel_optimization"]["optimized_objective"],
-                    "bisim_dist_s0_s1": ch_res["coalgebraic_bisimulation"]["dist_s0_s1"],
-                },
-                "noether_synthesis": {
-                    "conserved_charge": noe_res["noether_symmetries"]["noether_conserved_charge"],
-                    "mtc_total_dim": noe_res["modular_tensor_category"]["total_quantum_dimension_D"],
-                    "sta_invariant_1": noe_res["clifford_spacetime_algebra"]["lab_frame"]["invariant_1_scalar"],
-                    "bv_cme_residual": noe_res["batalin_vilkovisky"]["classical_master_equation_residual"],
-                    "active_matter_deff": noe_res["active_matter"]["effective_long_time_diffusion_Deff"],
-                },
-                "noosphere_bisociation": {
-                    "hybrid_operator": c_res["blended_concept"]["hybrid_name"],
-                    "koestler_score": c_res["primary_bisociation"]["koestler_bisociation_score"],
-                    "top_hcri": c_res["creative_portfolio"][0]["hcri_score"],
-                },
+                "simulation_type": "Unsupported query" if intent == "general_hyper_reasoning" else "Synthetic safety demonstration",
+                "verified": False,
                 "conclusion": (
-                    f"Integrated 24-Pillar Pantheon synthesis, Athenaeum E-Graph/PRM-MCTS (Q*={a_res['test_time_compute_mcts']['best_q_value']:.3f}, "
-                    f"SINDy law: y={a_res['sindy_discovery']['discovered_equation']}), Hephaestus Stitch/GFlowNet/Koopman/Gröbner "
-                    f"(MDL ratio={h_res['wake_sleep_library']['compression_ratio']:.2f}x, Z={h_res['gflownet_sampler']['partition_function_Z']:.1f}), "
-                    f"Hyperborea Sheaf/Port-Hamiltonian/RG/Anyon (dim H^0={hb_res['cellular_sheaf']['dim_H0_global_sections']}, K_c={hb_res['renormalization_group']['critical_coupling_Kc']:.4f}, d_tau={hb_res['anyon_braiding']['golden_ratio_quantum_dim_d_tau']:.4f}), "
-                    f"Neurograft Connectome ('{ng_res['tri_neuromodulation']['behavioral_regime']}', critical={ng_res['virtual_lesion_audit']['critical_lesion_target']}), "
-                    f"AETHER Gauge/Thermo/Optics (S={ae_res['gauge_holonomy']['yang_mills_action']:.4f}, W_diss={ae_res['non_equilibrium_thermodynamics']['dissipated_work']:.4f}, K={ae_res['information_geometry']['gaussian_curvature']:.2f}, Symplectic={ae_res['symplectic_mechanics']['symplectic_2form_conserved']}), "
-                    f"CHRONOS Spacetime/Spectral/Tropical/Stiefel/Bisimulation (CDT chi={ch_res['causal_dynamical_triangulation']['euler_characteristic']}, Tr(D^2)={ch_res['spectral_geometry']['spectral_action_tr_d2']:.2f}, Trop={ch_res['tropical_algebra']['tropical_value']:.2f}, Stiefel={ch_res['stiefel_optimization']['optimized_objective']:.4f}), "
-                    f"NOETHER Symmetries/MTC/STA/BV/ActiveMatter (Q={noe_res['noether_symmetries']['noether_conserved_charge']:.4f}, MTC D={noe_res['modular_tensor_category']['total_quantum_dimension_D']:.4f}, STA I1={noe_res['clifford_spacetime_algebra']['lab_frame']['invariant_1_scalar']:.2f}, BV resid={noe_res['batalin_vilkovisky']['classical_master_equation_residual']:.2e}, ABP Deff={noe_res['active_matter']['effective_long_time_diffusion_Deff']:.2f}), "
-                    f"Noosphere Bisociation ('{c_res['blended_concept']['hybrid_name']}', HCRI={c_res['creative_portfolio'][0]['hcri_score']}), "
-                    f"and causal superposition verified (Quibble Merkle Root: {p_res['quibble_merkle_root'][:16]}...)."
+                    "No answer-specific verifier is available for this query. "
+                    "The fixed survival trajectory below demonstrates the safety checker only; "
+                    "it does not model or prove the user's claim."
                 ),
             }
 
@@ -873,15 +851,16 @@ class OmniReasoner:
             confidence=0.99,
         ))
 
-        # Phase 4: Formal LTL Verification & Invariant Proof
+        # Phase 4: a fixed safety-check demonstration, never an answer proof.
         formal_proof = self._verify_formal_safety(intent)
         if formal_proof.get("contract_satisfied", False):
             self.verified_proof_count += 1
 
         thought_steps.append(ThoughtStep(
             step_number=4,
-            phase_name="Tessera LTL Bounded Model Checking",
+            phase_name="Tessera Synthetic Safety Demonstration",
             content=(
+                "Fixed synthetic trajectory, independent of the user query. "
                 f"Formal specification: {formal_proof['formal_specification']}. "
                 f"Verdict: {formal_proof['verdict']} at lookahead depth {formal_proof['lookahead_depth']}. "
                 f"Certificate SHA-256: {formal_proof['certificate_sha256'][:16]}..."
@@ -889,6 +868,35 @@ class OmniReasoner:
             telemetry=formal_proof,
             confidence=1.0,
         ))
+
+        is_solver = intent == "heuristic_problem_solving"
+        solver_result = sim_result.get("full_result", {}) if is_solver else {}
+        answer_verified = (is_solver and solver_result.get("verified") is True
+                           and not sim_result.get("error"))
+        verification = {
+            "answer": {
+                "verified": answer_verified,
+                "status": "verified" if answer_verified else ("failed" if is_solver else "not_verified"),
+                "scope": ("parsed_problem_model" if is_solver else
+                          "unsupported_query" if intent == "general_hyper_reasoning" else "synthetic_demonstration"),
+                "query_bound": bool(solver_result),
+                "domain": solver_result.get("domain"),
+                "backend": solver_result.get("backend"),
+                "parsed_problem": solver_result.get("parsed"),
+                "input_interpretation_verified": False,
+                "limitations": "Solver checks apply to the parsed model only; natural-language interpretation and generated prose are not verified.",
+            },
+            "safety_demo": {
+                "verified": formal_proof.get("contract_satisfied") is True,
+                "scope": formal_proof["scope"],
+                "query_bound": False,
+            },
+            "certificate": {
+                "scope": "session_data_fingerprint",
+                "proves_answer_correctness": False,
+            },
+            "language_synthesis": {"present": False, "verified": False},
+        }
 
         # Phase 5: Grounded Conclusion, Dialectical Sublation & Language Synthesis
         from .creative_synthesis import DialecticalTribunal
@@ -899,17 +907,31 @@ class OmniReasoner:
         if intent == "heuristic_problem_solving" and "full_result" in sim_result:
             p_text = sim_result["full_result"].get("text", "")
             if p_text:
-                problem_detail = f"\n\n### Verified Problem Solution Plan:\n{p_text}\n"
+                problem_detail = f"\n\n### Solver Result for the Parsed Problem:\n{p_text}\n"
+
+        if answer_verified:
+            evidence_conclusion = (
+                "The domain solver reports a successful check of the result for the parsed problem above. "
+                "This does not verify the natural-language interpretation or any generated explanation."
+            )
+        elif is_solver:
+            evidence_conclusion = "The solver did not verify an answer. The safety demonstration cannot establish one."
+        else:
+            evidence_conclusion = (
+                "There is no answer-specific verifier for this query. These synthetic demonstrations "
+                "do not establish the requested answer or real-world validity."
+            )
 
         summary_conclusion = (
-            f"**Autonomous Cognitive Discovery & Formal Proof Summary**\n\n"
+            f"**Reasoning and Evidence Summary**\n\n"
             f"1. **Semantic Intent & Drives:** Classified as `{intent}` with curiosity index {drives['curiosity']} and epistemic rigor {drives['rigor_pressure']}.\n"
-            f"2. **Empirical Finding:** {sim_result.get('conclusion', 'Empirical domain simulations executed cleanly.')}{problem_detail}\n"
+            f"2. **Tool Output:** {sim_result.get('conclusion', 'Synthetic domain tools completed.')}{problem_detail}\n"
             f"3. **Noosphere Creative Bisociation:** Bridged `{top_blend.get('bridge', 'cross-domain morphism')}` "
             f"to synthesize `{top_blend['title']}` (Bisociation $B = {dialectical_audit['primary_bisociation']['koestler_bisociation_score']}$, HCRI $= {top_blend['hcri_score']}$).\n"
-            f"4. **Formal Verification:** {formal_proof['formal_specification']} certified under {formal_proof['verdict']} "
-            f"(Receipt: `{formal_proof['certificate_sha256'][:24]}...`).\n"
-            f"5. **Actionable Resolution:** Validated physical mechanics, dialectical boundary checks, and formal safety invariants confirm the solution is provably robust against environmental phase shifts."
+            f"4. **Synthetic Safety Demonstration:** The fixed example satisfies `{formal_proof['verdict']}` "
+            f"under {formal_proof['formal_specification']} (Fingerprint: `{formal_proof['certificate_sha256'][:24]}...`). "
+            f"Its inputs are independent of this query.\n"
+            f"5. **Answer Verification:** {evidence_conclusion}"
         )
 
         thought_steps.append(ThoughtStep(
@@ -917,12 +939,12 @@ class OmniReasoner:
             phase_name="Metacognitive Synthesis & Dialectical Sublation",
             content=summary_conclusion,
             telemetry={
-                "status": "CERTIFIED_VALID",
+                "status": "PARSED_MODEL_CHECK_PASSED" if answer_verified else "ANSWER_UNVERIFIED",
                 "noosphere_hybrid_operator": top_blend["title"],
                 "koestler_bisociation_score": dialectical_audit["primary_bisociation"]["koestler_bisociation_score"],
                 "hcri_score": top_blend["hcri_score"],
             },
-            confidence=0.99,
+            confidence=1.0 if answer_verified else 0.0,
         ))
 
         # Optional System 1 Generative Augmentation via SmolLM2
@@ -933,23 +955,26 @@ class OmniReasoner:
                     f"System 2 Cognitive Deliberation Finding:\n"
                     f"Domain Intent: {intent}\n"
                     f"Simulation Finding: {sim_result.get('conclusion', '')}\n"
-                    f"Formal Safety: {formal_proof.get('verdict', '')} (Certificate: {formal_proof.get('certificate_sha256', '')[:16]})\n\n"
+                    f"Evidence scope: {evidence_conclusion}\n"
+                    "The fixed survival safety demonstration is independent of the query.\n\n"
                     f"User Query: {prompt}\n\n"
-                    f"Provide an authoritative, clear scientific explanation answering the user's question directly:"
+                    "Explain the tool output clearly, state its limits, and do not claim an unsupported answer is verified:"
                 )
                 lang_res = language_runtime.generate(cond_prompt, max_new_tokens=max_new_tokens or 1024)
                 if lang_res and "text" in lang_res and lang_res["text"]:
-                    final_text = f"{summary_conclusion}\n\n### Generative Synthesis (SmolLM2-135M System 1):\n{lang_res['text']}"
+                    verification["language_synthesis"]["present"] = True
+                    final_text = f"{summary_conclusion}\n\n### Unverified Generative Synthesis (SmolLM2-135M System 1):\n{lang_res['text']}"
             except Exception:
                 pass
 
-        # Build master cryptographic certificate
+        # Fingerprint session data; a hash alone does not check semantic truth.
         session_blob = {
             "query": prompt,
             "intent": intent,
             "drives": drives,
             "simulation": sim_result,
             "formal_proof": formal_proof,
+            "verification": verification,
             "seed": seed,
         }
         master_cert = hashlib.sha256(json.dumps(session_blob, sort_keys=True).encode("utf-8")).hexdigest()
@@ -962,6 +987,7 @@ class OmniReasoner:
             empirical_simulation=sim_result,
             formal_proof=formal_proof,
             text=final_text,
-            verified=True,
+            verified=answer_verified,
             certificate_sha256=master_cert,
+            verification=verification,
         )

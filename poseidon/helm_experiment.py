@@ -459,7 +459,8 @@ def _verify(receipt, progress):
     if not isinstance(sources, dict) or not sources:
         raise ValueError("Missing source identity")
     for name, value in sources.items():
-        if not isinstance(name, str) or Path(name).name != name:
+        p = Path(name)
+        if not isinstance(name, str) or p.is_absolute() or ".." in p.parts or not name.endswith(".py"):
             raise ValueError("Invalid source name")
         _hash(value, "source")
     for name in ("world.py", "helm_experiment.py"):

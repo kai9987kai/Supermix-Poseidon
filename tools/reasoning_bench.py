@@ -104,6 +104,11 @@ CASES = [
     ("p55", "problem", "Compute Clifford spacetime algebra Cl(1,3) STA Faraday bivector with beta=0.6, e_field=[3.0, 4.0, 0.0], b_field=[0.0, 2.0, 1.0]", ["faraday bivector", "i1 ="]),
     ("p56", "problem", "Evaluate Batalin-Vilkovisky BV quantization with Classical Master Equation CME and gauge_param xi=1.0", ["(s,s)_bv = 0", "anomaly free"]),
     ("p57", "problem", "Analyze Active Brownian Particle ABP active matter nonequilibrium dynamics with swim_speed=10.0 and rotational_diffusion=1.0", ["persistence length lp", "deff ="]),
+    ("p58", "problem", "Analyze Cartan exterior differential system and moving frames for dimension=3", ["cartan", "characters", "involutive"]),
+    ("p59", "problem", "Evaluate non-hermitian PT-symmetric quantum Hamiltonian with delta=0.0, gamma=1.0, and coupling_g=1.5", ["unbroken", "phase"]),
+    ("p60", "problem", "Compute exceptional Jordan algebra Albert algebra h3(O) with diagonal=[2.0, 3.0, 1.0]", ["albert algebra", "det(a) ="]),
+    ("p61", "problem", "Compute holographic Ryu-Takayanagi entanglement entropy with central_charge=12.0, length=100.0, and subsystem=25.0", ["ryu-takayanagi", "nats"]),
+    ("p62", "problem", "Analyze morphogenetic Turing reaction-diffusion instability with Du=0.01, Dv=0.50, fu=0.6, and gv=-1.1", ["turing active", "kc ="]),
 ]
 
 

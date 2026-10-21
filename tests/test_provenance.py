@@ -30,3 +30,32 @@ def test_capture_and_return_are_detached(monkeypatch, tmp_path):
     returned = provenance.assert_source_current()
     returned["core.py"] = "changed"
     assert poseidon._SOURCE_SNAPSHOT["core.py"] != "changed"
+
+
+def test_nested_sources_are_captured_with_collision_free_relative_paths(tmp_path):
+    (tmp_path / "research").mkdir()
+    (tmp_path / "nexus_omega").mkdir()
+    (tmp_path / "research/model.py").write_text("x=1\n", encoding="utf-8")
+    (tmp_path / "nexus_omega/model.py").write_text("x=2\n", encoding="utf-8")
+    captured = provenance.capture_sources(tmp_path)
+    assert set(captured) == {"research/model.py", "nexus_omega/model.py"}
+    assert captured["research/model.py"] != captured["nexus_omega/model.py"]
+
+
+@pytest.mark.parametrize("operation", ["edit", "add", "remove"])
+def test_nested_source_changes_require_restart(tmp_path, monkeypatch, operation):
+    nested = tmp_path / "research"
+    nested.mkdir()
+    source = nested / "predictor.py"
+    source.write_text("version=1\n", encoding="utf-8")
+    monkeypatch.setattr(poseidon, "_SOURCE_SNAPSHOT", provenance.capture_sources(tmp_path))
+    if operation == "edit":
+        source.write_text("version=2\n", encoding="utf-8")
+    elif operation == "add":
+        (nested / "new.py").write_text("version=1\n", encoding="utf-8")
+    else:
+        source.unlink()
+    capture = provenance.capture_sources
+    monkeypatch.setattr(provenance, "capture_sources", lambda: capture(tmp_path))
+    with pytest.raises(provenance.StaleSourceError, match="Restart"):
+        provenance.assert_source_current()

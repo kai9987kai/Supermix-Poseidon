@@ -1,0 +1,295 @@
+/* Run the shipped workbench in a small DOM with controlled HTTP responses.
+ * No model, checkpoint, browser install, or background experiment is needed. */
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const vm = require('node:vm');
+const {test} = require('node:test');
+
+const web = path.join(__dirname, '..', 'poseidon', 'web');
+const html = fs.readFileSync(path.join(web, 'index.html'), 'utf8');
+const source = fs.readFileSync(path.join(web, 'app.js'), 'utf8');
+const jobId = 'a'.repeat(32);
+const receipt = {schema: 'poseidon-mco-v1', experiment_id: 'restored-receipt', summary: {}, paired: {}, limits: ['Synthetic benchmark only.']};
+const listedJob = state => ({id: jobId, kind: 'mco-experiment', state, settings: {},
+  created_at: '2026-10-21T12:00:00+00:00', finished_at: state === 'completed' ? '2026-10-21T12:01:00+00:00' : null,
+  progress: {}, error: null});
+
+class Element {
+  constructor(tag = 'div') {
+    this.tagName = tag.toUpperCase(); this.children = []; this.attributes = {}; this.style = {};
+    this.value = ''; this.textContent = ''; this.hidden = false; this.disabled = false;
+    const classes = new Set();
+    this.classList = {add: value => classes.add(value), remove: value => classes.delete(value),
+      contains: value => classes.has(value), toggle: (value, on) => on ? classes.add(value) : classes.delete(value)};
+  }
+  append(...items) {this.children.push(...items);}
+  replaceChildren(...items) {this.children = items; this.textContent = '';}
+  setAttribute(key, value) {this.attributes[key] = String(value);}
+  removeAttribute(key) {delete this.attributes[key];}
+  addEventListener() {}
+  querySelectorAll() {return [];}
+  checkValidity() {return true;}
+  reportValidity() {return true;}
+  getContext() {return new Proxy({}, {get: () => () => {}});}
+  scrollIntoView() {}
+}
+
+async function workbench(route) {
+  const elements = new Map([...html.matchAll(/<([\w-]+)\b[^>]*\bid="([^"]+)"/g)].map(match => [match[2], new Element(match[1])]));
+  const calls = [], timers = new Map();
+  let timerId = 0;
+  const document = {
+    querySelector(selector) {return selector.startsWith('#') ? elements.get(selector.slice(1)) || null : null;},
+    querySelectorAll() {return [];}, createElement: tag => new Element(tag),
+  };
+  elements.get('experimentType').value = 'cognitive';
+  elements.get('experimentSeed').value = '90000000';
+  elements.get('episodes').value = '1'; elements.get('maxSteps').value = '32'; elements.get('scarcity').value = '2.5';
+  elements.get('experimentForm').querySelectorAll = () => ['experimentType', 'experimentSeed', 'episodes', 'maxSteps', 'scarcity'].map(id => elements.get(id));
+  const context = vm.createContext({document, console, URL, location: {href: 'http://127.0.0.1:8787/'},
+    matchMedia: () => ({matches: true}), requestAnimationFrame: () => 0, cancelAnimationFrame() {},
+    setInterval(fn, ms) {const id = ++timerId; timers.set(id, {fn, ms}); return id;},
+    clearInterval(id) {timers.delete(id);},
+    async fetch(url, options = {}) {
+      const call = {url, method: options.method || 'GET', body: options.body ? JSON.parse(options.body) : undefined};
+      calls.push(call);
+      const response = await route(call);
+      return {ok: response?.status >= 200 && response.status < 300, status: response?.status || 404,
+        statusText: response?.statusText || 'Unavailable', json: async () => response?.data || {error: 'Unavailable'}};
+    },
+  });
+  vm.runInContext(source, context, {filename: 'app.js'});
+  const flush = async () => {for (let i = 0; i < 20; i++) await Promise.resolve();};
+  await flush();
+  return {elements, calls, context, flush,
+    async tick() {for (const {fn, ms} of [...timers.values()]) if (ms < 15000) await fn(); await flush();},
+    buttons() {return elements.get('jobHistory').children.flatMap(item => item.children).filter(item => item.tagName === 'BUTTON');},
+  };
+}
+
+test('completed history fetches its full result only when opened after reload', async () => {
+  const ui = await workbench(({url}) => url === '/api/jobs' ? {status: 200, data: {jobs: [listedJob('completed')]}}
+    : url === '/api/jobs/' + jobId ? {status: 200, data: {...listedJob('completed'), result: receipt}} : null);
+  assert.equal(ui.calls.filter(call => call.url === '/api/jobs/' + jobId).length, 0, 'history must remain lightweight');
+  const button = ui.buttons().find(item => /view result/i.test(item.textContent));
+  assert.ok(button, 'completed history must let the user reopen its result');
+  await button.onclick(); await ui.flush();
+  assert.match(ui.elements.get('experimentIdentity').textContent, /restored-receipt/);
+  assert.equal(ui.elements.get('experimentResults').hidden, false);
+});
+
+test('running history reconnects monitoring without submitting duplicate work', async () => {
+  let complete = false;
+  const ui = await workbench(({url}) => url === '/api/jobs' ? {status: 200, data: {jobs: [listedJob('running')]}}
+    : url === '/api/jobs/' + jobId ? {status: 200, data: {...listedJob(complete ? 'completed' : 'running'), result: complete ? receipt : null}} : null);
+  const button = ui.buttons().find(item => /monitor|reconnect|resume/i.test(item.textContent));
+  assert.ok(button, 'a running job must be attachable after reload');
+  await button.onclick(); await ui.flush();
+  assert.equal(ui.elements.get('send').disabled, true);
+  assert.equal(ui.elements.get('cancelJob').hidden, false);
+  complete = true; await ui.tick();
+  assert.match(ui.elements.get('experimentIdentity').textContent, /restored-receipt/);
+  assert.equal(ui.elements.get('send').disabled, false);
+  assert.equal(ui.calls.filter(call => call.method === 'POST').length, 0);
+});
+
+test('MCO submission follows the kind-only server contract', async () => {
+  let accepted = false;
+  const ui = await workbench(call => {
+    if (call.url === '/api/jobs' && call.method === 'GET') return {status: 200, data: {jobs: []}};
+    if (call.url === '/api/jobs' && call.method === 'POST') {
+      accepted = JSON.stringify(call.body) === '{"kind":"mco-experiment"}';
+      return accepted ? {status: 202, data: listedJob('queued')} : {status: 400, data: {error: 'Unknown job setting.'}};
+    }
+    if (call.url === '/api/jobs/' + jobId) return {status: 200, data: {...listedJob('completed'), result: receipt}};
+    return null;
+  });
+  ui.elements.get('experimentType').value = 'mco';
+  await ui.elements.get('experimentForm').onsubmit({preventDefault() {}}); await ui.tick();
+  assert.ok(accepted, 'the actual form must submit only the accepted MCO kind');
+  assert.match(ui.elements.get('experimentIdentity').textContent, /restored-receipt/);
+  assert.equal(ui.elements.get('send').disabled, false);
+});
+
+test('status remains connected with optional candidate cards absent and keeps Atlas unavailable', async () => {
+  const ui = await workbench(({url}) => url === '/api/status' ? {status: 200, data: {
+    core_ready: false, reports: {}, atlas: {ready: false}, contrast: {ready: false}, horizon: {ready: false},
+    odyssey: {ready: false}, helm: {ready: false}, odysseus: {ready: false}, cognitive: {ready: true},
+    aura: {ready: true}, tessera: {ready: true}, metamorph: {ready: true}, chimera: {ready: true},
+    hyperion: {ready: true}, titan: {ready: true}, trident: {ready: true}, mnemorph: {ready: false},
+  }} : url === '/api/jobs' ? {status: 200, data: {jobs: []}} : null);
+  assert.match(ui.elements.get('connection').textContent, /Connected/);
+  ui.elements.get('experimentType').value = 'atlas';
+  ui.elements.get('experimentType').onchange();
+  assert.equal(ui.elements.get('runExperiment').disabled, true, 'available composites must not mark missing Atlas fitted');
+});
+
+for (const protocol of ['tessera', 'mnemorph']) test(protocol + ' uses its fixed benchmark contract', async () => {
+  let accepted = false;
+  const ui = await workbench(call => {
+    if (call.url === '/api/jobs' && call.method === 'GET') return {status: 200, data: {jobs: []}};
+    if (call.url === '/api/jobs' && call.method === 'POST') {
+      accepted = JSON.stringify(call.body) === JSON.stringify({kind: protocol + '-experiment'});
+      return accepted ? {status: 202, data: listedJob('queued')} : {status: 400, data: {error: 'Unknown job setting.'}};
+    }
+    if (call.url === '/api/jobs/' + jobId) return {status: 200, data: {...listedJob('completed'), result: receipt}};
+    return null;
+  });
+  ui.elements.get('experimentType').value = protocol;
+  ui.elements.get('experimentType').onchange();
+  assert.equal(ui.elements.get('maxSteps').disabled, true, 'fixed benchmark controls must not imply adjustable settings');
+  await ui.elements.get('experimentForm').onsubmit({preventDefault() {}}); await ui.tick();
+  assert.ok(accepted);
+  assert.match(ui.elements.get('experimentIdentity').textContent, /restored-receipt/);
+});
+
+test('METAMORPH uses a cancellable durable job', async () => {
+  const ui = await workbench(call => {
+    if (call.url === '/api/status') return {status: 200, data: {core_ready: true, metamorph: {ready: true}}};
+    if (call.url === '/api/jobs' && call.method === 'GET') return {status: 200, data: {jobs: []}};
+    if (call.url === '/api/jobs' && call.method === 'POST' && call.body.kind === 'metamorph-experiment') return {status: 202, data: listedJob('queued')};
+    if (call.url === '/api/jobs/' + jobId) return {status: 200, data: {...listedJob('completed'), result: receipt}};
+    return null;
+  });
+  ui.elements.get('experimentType').value = 'metamorph';
+  await ui.elements.get('experimentForm').onsubmit({preventDefault() {}}); await ui.tick();
+  assert.match(ui.elements.get('experimentIdentity').textContent, /restored-receipt/);
+  assert.equal(ui.calls.some(call => call.url === '/api/metamorph-experiment'), false);
+});
+
+test('unsupported paired protocol never falls through to an Atlas run', async () => {
+  const ui = await workbench(({url}) => url === '/api/jobs' ? {status: 200, data: {jobs: []}} : null);
+  vm.runInContext("coreReady=true;atlasReady=true", ui.context);
+  ui.elements.get('experimentType').value = 'nexus_omega';
+  ui.elements.get('experimentType').onchange();
+  assert.equal(ui.elements.get('runExperiment').disabled, true);
+  await ui.elements.get('experimentForm').onsubmit({preventDefault() {}});
+  assert.equal(ui.calls.filter(call => call.method === 'POST').length, 0);
+});
+
+test('cognitive availability follows returned readiness', async () => {
+  const ui = await workbench(({url}) => url === '/api/jobs' ? {status: 200, data: {jobs: []}} : null);
+  vm.runInContext("setCandidateStatus('cognitive',{ready:false,error:'No core checkpoint'});updateProtocol()", ui.context);
+  assert.equal(ui.elements.get('runExperiment').disabled, true);
+  assert.match(ui.elements.get('cognitiveNote').textContent, /unavailable|No core checkpoint/i);
+});
+
+test('polling reports temporary API errors and recovers to a terminal failure', async () => {
+  let status = 503;
+  const ui = await workbench(({url}) => url === '/api/jobs' ? {status: 200, data: {jobs: [listedJob('running')]}}
+    : url === '/api/jobs/' + jobId ? status === 503 ? {status: 503, data: {error: 'Temporary maintenance'}}
+      : {status: 200, data: {...listedJob('failed'), error: {type: 'JobTimeout', message: 'The absolute experiment deadline elapsed'}}} : null);
+  await ui.buttons().find(item => /monitor/i.test(item.textContent)).onclick();
+  assert.match(ui.elements.get('jobStatus').textContent, /Temporary maintenance/);
+  assert.equal(ui.elements.get('send').disabled, true, 'a retry must retain the selected job');
+  status = 200; await ui.tick();
+  assert.equal(ui.elements.get('send').disabled, false);
+  assert.equal(ui.elements.get('cancelJob').hidden, true);
+  assert.match(ui.elements.get('experimentStatus').textContent, /deadline elapsed/);
+  assert.equal(ui.elements.get('experimentStatus').classList.contains('error'), true);
+});
+
+test('cancellation errors remain visible and a successful retry releases the controls', async () => {
+  let canCancel = false;
+  const ui = await workbench(({url}) => url === '/api/jobs' ? {status: 200, data: {jobs: [listedJob('queued')]}}
+    : url === '/api/jobs/' + jobId ? {status: 200, data: listedJob('queued')}
+    : url === '/api/jobs/' + jobId + '/cancel' ? canCancel ? {status: 200, data: {...listedJob('cancelled'), error: {type: 'JobCancelled', message: 'Queued job cancelled'}}}
+      : {status: 409, data: {error: 'Cancellation temporarily unavailable'}} : null);
+  await ui.buttons().find(item => /monitor/i.test(item.textContent)).onclick();
+  await ui.elements.get('cancelJob').onclick();
+  assert.match(ui.elements.get('jobStatus').textContent, /Cancellation temporarily unavailable/);
+  assert.equal(ui.elements.get('cancelJob').disabled, false);
+  assert.equal(ui.elements.get('send').disabled, true);
+  canCancel = true; await ui.elements.get('cancelJob').onclick();
+  assert.equal(ui.elements.get('send').disabled, false);
+  assert.equal(ui.elements.get('cancelJob').hidden, true);
+  assert.match(ui.elements.get('experimentStatus').textContent, /cancelled/);
+  assert.equal(ui.elements.get('experimentSummary').children.length, 0, 'cancelled work cannot be shown as completed evidence');
+});
+
+test('a disappeared job ends monitoring and leaves a useful error', async () => {
+  const ui = await workbench(({url}) => url === '/api/jobs' ? {status: 200, data: {jobs: [listedJob('running')]}}
+    : url === '/api/jobs/' + jobId ? {status: 404, data: {error: 'Unknown experiment job.'}} : null);
+  await ui.buttons().find(item => /monitor/i.test(item.textContent)).onclick();
+  assert.equal(ui.elements.get('send').disabled, false);
+  assert.equal(ui.elements.get('cancelJob').hidden, true);
+  assert.match(ui.elements.get('experimentStatus').textContent, /no longer available/);
+});
+
+test('lazy result errors are shown instead of disappearing silently', async () => {
+  const ui = await workbench(({url}) => url === '/api/jobs' ? {status: 200, data: {jobs: [listedJob('completed')]}}
+    : url === '/api/jobs/' + jobId ? {status: 500, data: {error: 'Saved job could not be read'}} : null);
+  const button = ui.buttons().find(item => /view result/i.test(item.textContent));
+  await button.onclick();
+  assert.match(ui.elements.get('jobStatus').textContent, /Saved job could not be read/);
+  assert.equal(button.disabled, false);
+});
+
+test('local status diagnostics remain visible while the server stays connected', async () => {
+  let issues = {'reports.core': 'Invalid JSON: <unclosed object>'};
+  const ui = await workbench(({url}) => url === '/api/status' ? {status: 200, data: {reports: {}, status_errors: issues}}
+    : url === '/api/jobs' ? {status: 200, data: {jobs: []}} : null);
+  assert.match(ui.elements.get('connection').textContent, /Connected/);
+  assert.ok(ui.elements.get('statusDiagnostics'), 'the diagnostics must have a visible place in the page');
+  assert.equal(ui.elements.get('statusDiagnostics').hidden, false);
+  assert.equal(ui.elements.get('statusErrors').children[0].textContent, 'reports.core: Invalid JSON: <unclosed object>');
+  issues = {}; await vm.runInContext('refreshStatus()', ui.context); await ui.flush();
+  assert.equal(ui.elements.get('statusDiagnostics').hidden, true, 'resolved diagnostics should clear on refresh');
+});
+
+for (const kind of ['cognitive', 'titan', 'trident', 'hyperion', 'chimera', 'metamorph', 'aura']) {
+  for (const [coreReady, candidateReady] of [[false, true], [true, false]]) {
+    test(kind + ' requires both a checkpoint and candidate readiness (' + coreReady + ', ' + candidateReady + ')', async () => {
+      const ui = await workbench(({url}) => url === '/api/status' ? {status: 200, data: {core_ready: coreReady, [kind]: {ready: candidateReady}}}
+        : url === '/api/jobs' ? {status: 200, data: {jobs: []}} : null);
+      ui.elements.get('experimentType').value = kind;
+      ui.elements.get('experimentType').onchange();
+      assert.equal(ui.elements.get('runExperiment').disabled, true);
+      await ui.elements.get('experimentForm').onsubmit({preventDefault() {}});
+      assert.equal(ui.calls.filter(call => call.method === 'POST').length, 0);
+    });
+  }
+}
+
+function renderedText(element) {
+  return [element.textContent, element.innerHTML || '', ...element.children.filter(item => typeof item !== 'string').map(renderedText)].join(' ');
+}
+
+test('an unsupported Omni answer labels its fixed safety proof as a demonstration', async () => {
+  const ui = await workbench(() => null);
+  ui.context.result = {
+    verified: false, plan: ['Inspect assumptions'],
+    verification: {answer: {verified: false, scope: 'unsupported_query', query_bound: false}},
+    formal_proof: {verdict: 'PROVEN_SAFE', contract_satisfied: true, query_bound: false, certificate_sha256: 'b'.repeat(64)},
+    thought_steps: [{step: 1, phase: 'safety', content: 'Check a fixed survival example'}],
+  };
+  vm.runInContext("message('assistant','A general suggestion','omni',result)", ui.context);
+  const text = renderedText(ui.elements.get('messages'));
+  assert.match(text, /Answer unverified/i);
+  assert.match(text, /Synthetic safety demonstration/i);
+  assert.doesNotMatch(text, /LTL Proof Certified|Verified Solution Plan/i);
+});
+
+test('a checked solver answer keeps parsed-model and generated-prose scopes separate', async () => {
+  const ui = await workbench(() => null);
+  ui.context.result = {verified: true, verification: {
+    answer: {verified: true, scope: 'parsed_problem_model', query_bound: true, input_interpretation_verified: false},
+    language_synthesis: {present: true, verified: false},
+  }};
+  vm.runInContext("message('assistant','Computed result and generated explanation','omni',result)", ui.context);
+  const text = renderedText(ui.elements.get('messages'));
+  assert.match(text, /Parsed-model answer verified/i);
+  assert.match(text, /generated prose.*unverified/i);
+});
+
+test('checksum-only receipt checks do not claim replay verification', async () => {
+  const result = {...receipt, verification: {verified: true, scope: 'checksum_only'}};
+  const ui = await workbench(({url}) => url === '/api/jobs' ? {status: 200, data: {jobs: [listedJob('completed')]}}
+    : url === '/api/jobs/' + jobId ? {status: 200, data: {...listedJob('completed'), result}} : null);
+  await ui.buttons().find(item => /view result/i.test(item.textContent)).onclick();
+  const text = ui.elements.get('experimentIdentity').textContent;
+  assert.match(text, /receipt checks passed/i);
+  assert.match(text, /checksum_only/);
+  assert.doesNotMatch(text, /replay verified|independently/i);
+});

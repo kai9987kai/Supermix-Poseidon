@@ -8,6 +8,53 @@ from . import __version__
 from .reasoning import extract_math, solve
 from .language import LanguageRuntime
 
+
+def _finite_json(text):
+    def reject_constant(value):
+        raise ValueError(f"Non-finite JSON value: {value}")
+    result = json.loads(text, parse_constant=reject_constant)
+    # Also reject overflowing finite literals such as 1e999.
+    json.dumps(result, allow_nan=False)
+    return result
+
+
+def _status_report(path, max_bytes=4 * 1024 * 1024):
+    with path.open("rb") as stream:
+        data = stream.read(max_bytes + 1)
+    if len(data) > max_bytes:
+        raise ValueError(f"Status report exceeds the {max_bytes}-byte read budget")
+    result = _finite_json(data.decode("utf-8"))
+    if not isinstance(result, dict):
+        raise ValueError("Status report must be a JSON object")
+    return result
+
+
+def _recent_metrics(path, max_bytes=256 * 1024):
+    """Read a bounded tail while tolerating an in-progress final JSONL write."""
+    with path.open("rb") as stream:
+        size = stream.seek(0, 2)
+        start = max(0, size - max_bytes)
+        stream.seek(start)
+        lines = stream.read(max_bytes).splitlines()
+    if start:
+        lines = lines[1:]  # The first fragment may start in the middle of a record.
+    rows, invalid = [], 0
+    for line in reversed(lines):
+        if not line.strip():
+            continue
+        try:
+            row = _finite_json(line.decode("utf-8"))
+            if not isinstance(row, dict):
+                raise ValueError("Metric must be an object")
+        except (ValueError, UnicodeError, RecursionError):
+            invalid += 1
+            continue
+        rows.append(row)
+        if len(rows) == 12:
+            break
+    return list(reversed(rows)), invalid
+
+
 class Poseidon:
     def __init__(self, root=".", adapter=None, oracle_checkpoint=None):
         self.root = Path(root).resolve()
@@ -171,109 +218,81 @@ class Poseidon:
         return ChimeraController(core=self.core(), tessera=self.tessera())
 
     def chimera_status(self):
-        relative = "outputs/chimera_experiments/RECEIPT.json"
-        path = self.root / relative
-        if not path.is_file():
-            return {"ready": True, "type": "unified_quantum_holographic_lattice_super_controller", "receipt_ready": False}
-        try:
-            receipt = json.loads(path.read_text(encoding="utf-8"))
-            return {
-                "ready": True,
-                "type": "unified_quantum_holographic_lattice_super_controller",
-                "receipt_ready": True,
-                "path": relative,
-                "receipt_sha256": receipt.get("receipt_sha256"),
-                "mean_quantum_entropy": receipt.get("chimera_telemetry", {}).get("mean_quantum_entropy"),
-                "mean_lattice_coherence": receipt.get("chimera_telemetry", {}).get("mean_lattice_coherence"),
-            }
-        except Exception:
-            return {"ready": True, "type": "unified_quantum_holographic_lattice_super_controller", "receipt_ready": False}
+        return self._controller_receipt_status("chimera", "unified_quantum_holographic_lattice_super_controller",
+                                               ("mean_quantum_entropy", "mean_lattice_coherence"))
 
     def hyperion(self):
         from .hyperion import HyperionController
         return HyperionController(core=self.core(), tessera=self.tessera())
 
     def hyperion_status(self):
-        relative = "outputs/hyperion_experiments/RECEIPT.json"
-        path = self.root / relative
-        if not path.is_file():
-            return {"ready": True, "type": "unified_frontier_morpheus_prometheus_intermittent_super_controller", "receipt_ready": False}
-        try:
-            receipt = json.loads(path.read_text(encoding="utf-8"))
-            return {
-                "ready": True,
-                "type": "unified_frontier_morpheus_prometheus_intermittent_super_controller",
-                "receipt_ready": True,
-                "path": relative,
-                "receipt_sha256": receipt.get("receipt_sha256"),
-                "mean_quantum_entropy": receipt.get("hyperion_telemetry", {}).get("mean_quantum_entropy"),
-                "mean_lattice_coherence": receipt.get("hyperion_telemetry", {}).get("mean_lattice_coherence"),
-                "total_sleep_cycles": receipt.get("hyperion_telemetry", {}).get("total_sleep_cycles"),
-                "total_harvested_energy": receipt.get("hyperion_telemetry", {}).get("total_harvested_energy"),
-            }
-        except Exception:
-            return {"ready": True, "type": "unified_frontier_morpheus_prometheus_intermittent_super_controller", "receipt_ready": False}
+        return self._controller_receipt_status("hyperion", "unified_frontier_morpheus_prometheus_intermittent_super_controller",
+            ("mean_quantum_entropy", "mean_lattice_coherence", "total_sleep_cycles", "total_harvested_energy"))
 
     def titan(self):
         from .titan import TitanController
         return TitanController(core=self.core(), tessera=self.tessera())
 
     def titan_status(self):
-        relative = "outputs/titan_experiments/RECEIPT.json"
-        path = self.root / relative
-        if not path.is_file():
-            return {"ready": True, "type": "experimental_composite_controller", "receipt_ready": False,
-                    "scope": "synthetic TidePool simulation", "promotion": False}
-        try:
-            receipt = json.loads(path.read_text(encoding="utf-8"))
-            if receipt.get("schema") not in ("poseidon-titan-experiment-v1", "poseidon-titan-experiment-v2"):
-                raise ValueError("Unsupported or incomplete TITAN receipt")
-            return {
-                "ready": True,
-                "type": "experimental_composite_controller",
-                "receipt_ready": True,
-                "scope": "synthetic TidePool simulation",
-                "promotion": False,
-                "path": relative,
-                "receipt_sha256": receipt.get("receipt_sha256") or receipt.get("sha256"),
-                "mean_bell_fidelity": receipt.get("titan_telemetry", {}).get("mean_bell_fidelity"),
-                "mean_buoyancy_force": receipt.get("titan_telemetry", {}).get("mean_buoyancy_force"),
-                "mean_trophic_richness": receipt.get("titan_telemetry", {}).get("mean_trophic_richness"),
-                "total_teleportations": receipt.get("titan_telemetry", {}).get("total_teleportations"),
-            }
-        except Exception:
-            return {"ready": True, "type": "experimental_composite_controller", "receipt_ready": False,
-                    "path": relative, "error": "TITAN receipt is malformed or from an unsupported schema."}
+        return self._controller_receipt_status("titan", "experimental_composite_controller",
+            ("mean_bell_fidelity", "mean_buoyancy_force", "mean_trophic_richness", "total_teleportations"))
 
     def trident(self):
         from .trident import TridentController
         return TridentController(core=self.core())
 
     def trident_status(self):
-        relative = "outputs/trident_experiments/RECEIPT.json"
-        path = self.root / relative
-        if not path.is_file():
-            return {"ready": True, "type": "identity_gated_directed_residual_controller", "receipt_ready": False,
-                    "scope": "synthetic TidePool simulation", "promotion": False}
+        return self._controller_receipt_status("trident", "identity_gated_directed_residual_controller",
+                                               ("override_count", "identity_specific_count", "mean_residual_norm"))
+
+    def _status_receipt(self, name):
+        """Check a bounded local seal. This never runs a controller or semantic replay."""
+        receipt = _status_report(self.root / f"outputs/{name}_experiments/RECEIPT.json", 32 * 1024 * 1024)
+        if name in ("titan", "trident"):
+            import hashlib
+            schema = f"poseidon-{name}-experiment-v" + ("2" if name == "titan" else "1")
+            if receipt.get("schema") != schema:
+                raise ValueError(f"Unsupported {name.upper()} receipt schema; run a current experiment for checked evidence")
+            unsigned = {key: value for key, value in receipt.items() if key != "sha256"}
+            checksum = hashlib.sha256(json.dumps(unsigned, sort_keys=True,
+                separators=(",", ":"), allow_nan=False).encode()).hexdigest()
+            if receipt.get("sha256") != checksum:
+                raise ValueError(f"{name.upper()} receipt checksum mismatch")
+            if (receipt.get("status") != "completed-observational-evaluation" or
+                    receipt.get("promotion") is not False or receipt.get("fitted_artifact_created") is not False):
+                raise ValueError("Receipt completion or activation boundary is invalid")
+        elif name == "chimera":
+            from .chimera_experiment import verify_chimera_receipt
+            verify_chimera_receipt(receipt)
+        elif name == "hyperion":
+            from .hyperion_experiment import verify_hyperion_receipt
+            verify_hyperion_receipt(receipt)
+        elif name == "mco":
+            from .mco import verify_mco_receipt
+            verify_mco_receipt(receipt)
+        else:
+            raise ValueError("Unknown status receipt protocol")
+        return receipt
+
+    def _controller_receipt_status(self, name, kind, telemetry_fields):
+        relative = f"outputs/{name}_experiments/RECEIPT.json"
+        status = {"ready": True, "type": kind, "path": relative, "receipt_ready": False,
+                  "receipt_integrity": False, "receipt_verified": False, "replay_verified": False,
+                  "verification_scope": "not_checked", "promotion": False,
+                  "scope": "synthetic TidePool simulation"}
+        if not (self.root / relative).is_file():
+            return status
         try:
-            receipt = json.loads(path.read_text(encoding="utf-8"))
-            if receipt.get("schema") != "poseidon-trident-experiment-v1":
-                raise ValueError("Unsupported or incomplete TRIDENT receipt")
-            return {
-                "ready": True,
-                "type": "identity_gated_directed_residual_controller",
-                "receipt_ready": True,
-                "scope": "synthetic TidePool simulation",
-                "promotion": False,
-                "path": relative,
-                "receipt_sha256": receipt.get("sha256"),
-                "override_count": receipt.get("trident_telemetry", {}).get("override_count"),
-                "identity_specific_count": receipt.get("trident_telemetry", {}).get("identity_specific_count"),
-                "mean_residual_norm": receipt.get("trident_telemetry", {}).get("mean_residual_norm"),
-            }
-        except Exception:
-            return {"ready": True, "type": "identity_gated_directed_residual_controller", "receipt_ready": False,
-                    "path": relative, "error": "TRIDENT receipt is malformed or from an unsupported schema."}
+            receipt = self._status_receipt(name)
+            telemetry = receipt.get(name + "_telemetry", {})
+            if not isinstance(telemetry, dict):
+                raise ValueError("Receipt telemetry must be a JSON object")
+            status.update({key: telemetry.get(key) for key in telemetry_fields})
+            status.update(receipt_ready=True, receipt_integrity=True, verification_scope="checksum_only",
+                          receipt_sha256=receipt.get("sha256") or receipt.get("receipt_sha256"))
+        except Exception as error:
+            status["error"] = str(error)
+        return status
 
     def cognitive_agent(self, mode: str = "intact"):
         from .cognitive_agent import CognitiveAgent
@@ -1542,37 +1561,41 @@ class Poseidon:
     def mco_status(self):
         relative = "outputs/mco_experiments/RECEIPT.json"
         path = self.root / relative
+        status = {"ready": True, "path": relative, "receipt_ready": False, "receipt_integrity": False,
+                  "receipt_verified": False, "replay_verified": False, "verification_scope": "not_checked"}
         if not path.is_file():
-            return {"ready": False, "path": relative}
+            return status
         try:
-            receipt = json.loads(path.read_text(encoding="utf-8"))
-            return {
-                "ready": receipt.get("status") == "completed",
-                "path": relative,
+            receipt = self._status_receipt("mco")
+            return status | {
+                "receipt_ready": True, "receipt_integrity": True,
+                "verification_scope": "checksum_and_summary_arithmetic",
                 "receipt_sha256": receipt.get("receipt_sha256"),
                 "best_subset": receipt.get("best_subset"),
                 "carrier_contributions": receipt.get("carrier_contributions"),
             }
         except Exception as error:
-            return {"ready": False, "path": relative, "error": str(error)}
+            return status | {"error": str(error)}
 
     def status(self):
-        reports = {}
+        reports, errors = {}, {}
         for name, relative in [("core", "runs/tidal/receipt.json"), ("language", "runs/language/report.json"), ("evaluation", "runs/evaluation.json"), ("language_data", "data/language/manifest.json"), ("dagger", "runs/tidal_dagger/report.json"), ("calibration", "runs/calibration.json"), ("active_core", "runs/active_core.json")]:
             path = self.root/relative
-            if path.exists():
-                try:
-                    reports[name] = json.loads(path.read_text(encoding="utf-8"))
-                except (ValueError, OSError):
-                    pass
+            try:
+                if path.exists():
+                    reports[name] = _status_report(path)
+            except (ValueError, OSError, RecursionError) as error:
+                errors["report:" + name] = str(error)
         for name in ("core", "language"):
             path = self.root/("runs/tidal/training.jsonl" if name == "core" else "runs/language/metrics.jsonl")
-            if path.exists():
-                try:
-                    lines = path.read_text(encoding="utf-8").splitlines()
-                    reports[name+"_recent"] = [json.loads(line) for line in lines[-12:]]
-                except (ValueError, OSError):
-                    pass
+            try:
+                if path.exists():
+                    rows, invalid = _recent_metrics(path)
+                    reports[name + "_recent"] = rows
+                    if invalid:
+                        errors["report:" + name + "_recent"] = f"Skipped {invalid} incomplete or invalid metric records in the recent log tail."
+            except (ValueError, OSError, RecursionError) as error:
+                errors["report:" + name + "_recent"] = str(error)
         from .core import active_core_path
         from .provenance import source_status
         core_error = None
@@ -1580,15 +1603,47 @@ class Poseidon:
             core_ready = active_core_path(self.root).is_file()
         except (ValueError, TypeError, OSError) as error:
             core_ready, core_error = False, str(error)
-        result = {"version": __version__, "name": "Supermix Poseidon", "language_ready": (self.root/"models/language/model.safetensors").exists(), "core_ready": core_ready, "atlas": self.atlas_status(), "contrast": self.contrast_status(), "horizon": self.horizon_status(), "odyssey": self.odyssey_status(), "helm": self.helm_status(), "odysseus": self.odysseus_status(), "mco": self.mco_status(), "aura": self.aura_status(), "tessera": self.tessera_status(), "mnemorph": self.mnemorph_status(), "metamorph": self.metamorph_status(), "chimera": self.chimera_status(), "hyperion": self.hyperion_status(), "titan": self.titan_status(), "trident": self.trident_status(), "hyper_agent": self.hyper_agent_status(), "ecosystem": self.ecosystem_status(), "poseidon_x": self.poseidon_x_status(), "external_adapter": self.external_adapter_status(), "nexus_omega": self.nexus_omega_status(), "discovery_lab": self.discovery_lab_status(), "omni_reasoner": self.omni_reasoner_status(), "pantheon": self.pantheon_status(), "noosphere": self.creative_status(), "athenaeum": self.athenaeum_status(), "hephaestus": self.hephaestus_status(), "hyperborea": self.hyperborea_status(), "neurograft": self.neurograft_status(), "aether": self.aether_status(), "chronos": self.chronos_status(), "noether": self.noether_status(), "reports": reports, "limits": "Experimental composite system. Controlled geometric media. Tool-assisted maths. Synthetic survival."} | source_status()
+        result = {"version": __version__, "name": "Supermix Poseidon",
+                  "language_ready": (self.root / "models/language/model.safetensors").is_file(),
+                  "core_ready": core_ready, "reports": reports,
+                  "limits": "Experimental composite system. Controlled geometric media. Tool-assisted maths. Synthetic survival."}
+        components = {name: name + "_status" for name in (
+            "atlas", "contrast", "horizon", "odyssey", "helm", "odysseus", "mco", "aura", "tessera",
+            "mnemorph", "metamorph", "chimera", "hyperion", "titan", "trident", "hyper_agent",
+            "ecosystem", "poseidon_x", "nexus_omega", "discovery_lab", "omni_reasoner", "pantheon",
+            "athenaeum", "hephaestus", "hyperborea", "neurograft", "aether", "chronos", "noether", "cartan")}
+        components.update(external_adapter="external_adapter_status", noosphere="creative_status")
+        for name, method in components.items():
+            try:
+                component = getattr(self, method)()
+                if not isinstance(component, dict):
+                    raise ValueError("Component status must be a JSON object")
+                json.dumps(component, allow_nan=False)
+                result[name] = component
+                if component.get("error"):
+                    errors[name] = str(component["error"])
+            except Exception as error:
+                errors[name] = str(error)
+                result[name] = {"ready": False, "error": str(error), "type": type(error).__name__}
+        # Readiness polling must not trigger the full cognitive replay verifier.
+        result["cognitive"] = {"ready": core_ready, "receipt_verified": False,
+                               "replay_verified": False, "verification_scope": "readiness_only",
+                               "promotion": False}
+        try:
+            result.update(source_status())
+        except (ValueError, OSError, RecursionError) as error:
+            errors["source"] = str(error)
+            result.update(source_current=False, restart_required=True, changed_source_files=[])
         if core_error:
             result["core_error"] = core_error
+            errors["core"] = core_error
+        result["status_errors"] = errors
         return result
 
     def omni_reasoner_status(self):
         return {
             "ready": True,
-            "version": "stage-26-omni-reasoner-v7",
+            "version": "stage-27-omni-reasoner-v8",
             "prover": "Tessera LTL Bounded Model Checker",
             "deliberation": "GhostInTheMachine Cognitive Monologue + 4-Agent Dialectical Tribunal",
             "intents": [
@@ -1607,6 +1662,7 @@ class Poseidon:
                 "aether_gauge_thermo",
                 "chronos_quantum_geometry",
                 "noether_invariant_symmetries",
+                "cartan_differential_systems",
                 "general_hyper_reasoning",
             ],
         }
@@ -1944,6 +2000,27 @@ class Poseidon:
             engine = NoetherEngine()
             return engine.synthesize(seed=seed)
 
+    def cartan_status(self):
+        return {
+            "ready": True,
+            "version": "v3.8.0-CARTAN-75",
+            "stage": 27,
+            "subsystems": {
+                "cartan_exterior_systems": True,
+                "non_hermitian_pt_symmetry": True,
+                "exceptional_jordan_algebra": True,
+                "holographic_ryu_takayanagi": True,
+                "morphogenetic_turing_reaction": True,
+            },
+            "total_verified_domains": 75,
+        }
+
+    def cartan_synthesize(self, seed: int = 42):
+        with self.lock:
+            from .cartan import CartanEngine
+            engine = CartanEngine()
+            return engine.synthesize(seed=seed)
+
     def _memory(self):
         from .memory import MemoryBank
         return MemoryBank.load(self.memory_path) if self.memory_path.exists() else MemoryBank()
@@ -1964,6 +2041,8 @@ class Poseidon:
         if type(seed) is not int or not 0 <= seed < 2**63:
             raise ValueError("Seed must be a nonnegative integer below 2^63.")
         with self.lock:
+            if mode == "cartan":
+                return self.cartan_synthesize(seed=seed)
             if mode == "noether":
                 return self.noether_synthesize(seed=seed)
             if mode == "chronos":

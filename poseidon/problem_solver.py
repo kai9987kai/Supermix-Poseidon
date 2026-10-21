@@ -1999,7 +1999,7 @@ class QuantumInformationSolver:
     @classmethod
     def detect(cls, prompt: str) -> Optional[Dict[str, Any]]:
         if re.search(
-            r"\b(anyons?|fibonacci anyon|f-matrix|r-matrix|pentagon identity|hexagon identity|braid group|anyon braiding|causal dynamical triangulations?|\bcdt\b|regge calculus|spacetime foliation|modular tensor category|\bmtc\b|verlinde|batalin-vilkovisky|\bbv\b)\b",
+            r"\b(anyons?|fibonacci anyon|f-matrix|r-matrix|pentagon identity|hexagon identity|braid group|anyon braiding|causal dynamical triangulations?|\bcdt\b|regge calculus|spacetime foliation|modular tensor category|\bmtc\b|verlinde|batalin-vilkovisky|\bbv\b|pt symmetry|pt-symmetric|non-hermitian|exceptional point|\bep2\b|\bep3\b|ryu-takayanagi|holographic entanglement|thermofield double|\btfd\b)\b",
             prompt,
             re.I,
         ):
@@ -4029,6 +4029,8 @@ class ReactionDiffusionSolver:
 
     @classmethod
     def detect(cls, prompt: str) -> Optional[Dict[str, Any]]:
+        if re.search(r"\b(morphogenetic turing|turing bifurcation|turing discriminant|wavenumber k_c|wavelength lambda_c|gierer-meinhardt)\b", prompt, re.I):
+            return None
         if not re.search(r"\b(turing\s+pattern|reaction[- ]diffusion|morphogenesis|activator[- ]inhibitor|turing\s+instability|fisher[- ]kpp|traveling\s+wave\s+front)\b", prompt, re.I):
             return None
         if re.search(r"\b(fisher|wave|front|kpp)\b", prompt, re.I):
@@ -7675,6 +7677,297 @@ class ActiveMatterNonequilibriumSolver:
 
 
 # ---------------------------------------------------------------------------
+# 71. Cartan Exterior Differential Systems & Moving Frames
+# ---------------------------------------------------------------------------
+
+class CartanExteriorSystemSolver:
+    name = "cartan_exterior_systems"
+    description = "Elie Cartan exterior differential systems, moving frames, connection 1-forms, curvature 2-forms, Bianchi identities, and involutivity characters"
+
+    @classmethod
+    def detect(cls, prompt: str) -> Optional[Dict[str, Any]]:
+        if not re.search(r"\b(cartan exterior|exterior differential systems?|moving frames?|connection 1-forms?|curvature 2-forms?|cartan structure equations?|bianchi identity|cartan-kahler|involutive system)\b", prompt, re.I):
+            return None
+        m_dim = re.search(r"\b(?:dim|dimension)\s*[:=]\s*([0-9]+)", prompt, re.I)
+        dim = int(m_dim.group(1)) if m_dim else 3
+        return {"dimension": max(2, min(4, dim))}
+
+    def solve(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        from .cartan import CartanExteriorSystemEngine
+        dim = params.get("dimension", 3)
+        engine = CartanExteriorSystemEngine(dim=dim)
+        res = engine.structure_equations()
+        trace = [
+            _trace("parse", f"Cartan moving frames on {dim}D manifold with connection 1-forms omega^i_j."),
+            _trace("search", f"Evaluated curvature 2-forms Omega^i_j and Ricci contraction (R={res['ricci_scalar_estimate']})."),
+            _trace("verify", f"Metric compatibility and first Bianchi identity: {'PASS' if res['metric_compatible'] else 'FAIL'}."),
+        ]
+        text = (
+            f"Cartan Exterior Differential System:\n"
+            f"- Manifold Dimension: {res['manifold_dimension']} | Metric Compatible: {res['metric_compatible']}\n"
+            f"- Curvature 2-Form Components: {res['curvature_2form_components']}\n"
+            f"- Ricci Scalar Estimate: {res['ricci_scalar_estimate']}\n"
+            f"- Cartan Involution Characters: {res['cartan_characters']} (Test Dim: {res['cartan_test_dimension']})\n"
+            f"- Cartan-Kahler Involutive: {'YES' if res['is_involutive_system'] else 'NO'} | Status: {res['structure_equation_status']}"
+        )
+        return {
+            "domain": self.name,
+            "text": text,
+            "answer": f"Cartan characters = {res['cartan_characters']}, involutive = {res['is_involutive_system']}",
+            "manifold_dimension": res["manifold_dimension"],
+            "metric_compatible": res["metric_compatible"],
+            "is_involutive": res["is_involutive_system"],
+            "cartan_characters": res["cartan_characters"],
+            "verified": res["metric_compatible"] and res["is_involutive_system"],
+            "backend": "cartan-moving-frame-exterior-system-engine",
+            "reasoning_trace": trace,
+            "insight": "Cartan's exterior differential systems replace local coordinates with geometric moving frames, where curvature and torsion 2-forms govern integrability via Cartan-Kahler involution.",
+        }
+
+
+# ---------------------------------------------------------------------------
+# 72. Non-Hermitian Quantum Systems & PT-Symmetric Exceptional Points
+# ---------------------------------------------------------------------------
+
+class NonHermitianPTSolver:
+    name = "non_hermitian_pt_symmetry"
+    description = "Non-Hermitian PT-symmetric Hamiltonians, exceptional points (EP2/EP3), spectral bifurcation, and Petermann factor divergence"
+
+    @classmethod
+    def detect(cls, prompt: str) -> Optional[Dict[str, Any]]:
+        if not re.search(r"\b(non-hermitian|pt symmetry|pt-symmetric|exceptional points?|\bep2\b|\bep3\b|petermann factor|skin effect|broken pt|unbroken pt)\b", prompt, re.I):
+            return None
+        m_delta = re.search(r"\b(?:delta|detuning)\s*[:=]\s*([-+]?\d+(?:\.\d+)?)", prompt, re.I)
+        m_gamma = re.search(r"\b(?:gamma|gain|loss)\s*[:=]\s*([-+]?\d+(?:\.\d+)?)", prompt, re.I)
+        m_g = re.search(r"\b(?:coupling_g|coupling|g)\s*[:=]\s*([-+]?\d+(?:\.\d+)?)", prompt, re.I)
+        return {
+            "delta": float(m_delta.group(1)) if m_delta else 0.0,
+            "gamma": float(m_gamma.group(1)) if m_gamma else 1.0,
+            "coupling_g": float(m_g.group(1)) if m_g else 1.0,
+        }
+
+    def solve(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        from .cartan import NonHermitianPTEngine
+        engine = NonHermitianPTEngine()
+        res = engine.analyze_pt_system(
+            delta=params.get("delta", 0.0),
+            gamma=params.get("gamma", 1.0),
+            coupling_g=params.get("coupling_g", 1.0),
+        )
+        trace = [
+            _trace("parse", f"2x2 PT-symmetric Hamiltonian with detuning delta={params.get('delta', 0.0)}, gain/loss gamma={params.get('gamma', 1.0)}, coupling g={params.get('coupling_g', 1.0)}."),
+            _trace("search", f"Eigenvalues: lambda_+={res['eigenvalue_plus']}, lambda_-={res['eigenvalue_minus']}, phase: {res['phase']}."),
+            _trace("verify", f"Commutator [H, PT] = 0 check: {'PASS' if res['pt_commutator_zero'] else 'FAIL'}."),
+        ]
+        text = (
+            f"Non-Hermitian PT-Symmetric Quantum System:\n"
+            f"- Parameters: delta = {res['delta']}, gamma = {res['gain_loss_gamma']}, g = {res['coupling_g']}\n"
+            f"- Eigenvalues: lambda_+ = {res['eigenvalue_plus']['real']} + {res['eigenvalue_plus']['imag']}i | lambda_- = {res['eigenvalue_minus']['real']} + {res['eigenvalue_minus']['imag']}i\n"
+            f"- Regime: {res['phase']} (PT broken: {res['pt_broken']})\n"
+            f"- Exceptional Point (EP2) Threshold: g_c = {res['ep_threshold_g']} (Distance: {res['distance_to_ep']})\n"
+            f"- Defective Jordan Block: {res['jordan_block_defective']} | Petermann Factor: {res['petermann_divergence_factor']}"
+        )
+        return {
+            "domain": self.name,
+            "text": text,
+            "answer": f"Phase = {res['phase']}, lambda = {res['eigenvalue_plus']['real']}+{res['eigenvalue_plus']['imag']}i",
+            "phase": res["phase"],
+            "pt_broken": res["pt_broken"],
+            "is_exceptional_point": res["is_exceptional_point"],
+            "eigenvalues": [res["eigenvalue_plus"], res["eigenvalue_minus"]],
+            "petermann_factor": res["petermann_divergence_factor"],
+            "verified": res["verified"],
+            "backend": "non-hermitian-pt-symmetric-engine",
+            "reasoning_trace": trace,
+            "insight": "At an exceptional point in non-Hermitian PT-symmetric quantum systems, both eigenvalues and eigenvectors coalesce, creating a defective Jordan block structure and divergent Petermann noise enhancement.",
+        }
+
+
+# ---------------------------------------------------------------------------
+# 73. Exceptional Jordan Algebras & Octonionic Albert Algebra
+# ---------------------------------------------------------------------------
+
+class ExceptionalJordanAlgebraSolver:
+    name = "exceptional_jordan_algebra"
+    description = "Albert algebra h3(O), non-associative octonion Cayley-Dickson multiplication, Hurwitz composition, and Freudenthal cubic determinant"
+
+    @classmethod
+    def detect(cls, prompt: str) -> Optional[Dict[str, Any]]:
+        if not re.search(r"\b(exceptional jordan algebra|albert algebra|\bh3\(o\)\b|octonions?|cayley-dickson|hurwitz theorem|freudenthal determinant|fano plane)\b", prompt, re.I):
+            return None
+        m_diag = re.findall(r"\b(?:diag|diagonal|xi)\s*[:=]\s*\[?([0-9.,\s-]+)\]?", prompt, re.I)
+        diag = (1.0, 2.0, 3.0)
+        if m_diag:
+            parts = [float(x.strip()) for x in m_diag[0].split(",") if x.strip()]
+            if len(parts) >= 3:
+                diag = (parts[0], parts[1], parts[2])
+        return {"diagonal": diag}
+
+    def solve(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        from .cartan import ExceptionalJordanAlgebraEngine
+        engine = ExceptionalJordanAlgebraEngine()
+        diag = params.get("diagonal", (1.0, 2.0, 3.0))
+        oct_res = engine.test_octonion_algebra(
+            a_vals=(1.0, 0.5, 0.0, -0.5, 0.0, 1.0, 0.0, 0.0),
+            b_vals=(0.0, 1.0, 0.0, 0.0, -1.0, 0.5, 0.0, 0.5),
+        )
+        freud_res = engine.freudenthal_determinant(diag=diag, off_norms=(0.5, 0.4, 0.3))
+        trace = [
+            _trace("parse", f"Albert algebra h3(O) element with diagonal ({diag[0]}, {diag[1]}, {diag[2]})."),
+            _trace("search", f"Freudenthal cubic determinant: det(A) = {freud_res['freudenthal_determinant']}, trace = {freud_res['jordan_trace']}."),
+            _trace("verify", f"Hurwitz norm composition: {'PASS' if oct_res['hurwitz_norm_identity_verified'] else 'FAIL'}."),
+        ]
+        text = (
+            f"Exceptional Jordan Algebra (Albert Algebra h3(O)):\n"
+            f"- Real Dimension: 27 | Automorphism Group: F4 (dim 52)\n"
+            f"- Octonionic Norm Composition (Hurwitz): {'VERIFIED' if oct_res['hurwitz_norm_identity_verified'] else 'FAILED'}\n"
+            f"- Non-Associative Associator Norm: {oct_res['associator_norm']}\n"
+            f"- Diagonal Elements: {freud_res['diagonal_elements']} | Jordan Trace: {freud_res['jordan_trace']}\n"
+            f"- Freudenthal Cubic Determinant: {freud_res['freudenthal_determinant']} (Rank: {freud_res['rank']})"
+        )
+        return {
+            "domain": self.name,
+            "text": text,
+            "answer": f"det(A) = {freud_res['freudenthal_determinant']}, trace = {freud_res['jordan_trace']}",
+            "jordan_trace": freud_res["jordan_trace"],
+            "freudenthal_determinant": freud_res["freudenthal_determinant"],
+            "albert_dimension": 27,
+            "automorphism_group": "F4",
+            "hurwitz_verified": oct_res["hurwitz_norm_identity_verified"],
+            "verified": oct_res["hurwitz_norm_identity_verified"],
+            "backend": "exceptional-jordan-albert-algebra-engine",
+            "reasoning_trace": trace,
+            "insight": "The 27-dimensional Albert algebra of 3x3 Hermitian octonionic matrices represents the unique exceptional Jordan algebra, whose automorphism group F4 underlies the E6/E7/E8 unified exceptional Lie groups.",
+        }
+
+
+# ---------------------------------------------------------------------------
+# 74. Holographic Ryu-Takayanagi Entanglement & Thermofield Double
+# ---------------------------------------------------------------------------
+
+class HolographicEntanglementSolver:
+    name = "holographic_ryu_takayanagi"
+    description = "AdS3/CFT2 Ryu-Takayanagi minimal geodesic area formula, Brown-Henneaux central charge, Thermofield Double (TFD), and Page curve phase transition"
+
+    @classmethod
+    def detect(cls, prompt: str) -> Optional[Dict[str, Any]]:
+        if not re.search(r"\b(ryu-takayanagi|holographic entanglement|ads/cft entanglement|brown-henneaux|thermofield double|\btfd\b|einstein-rosen bridge|page curve)\b", prompt, re.I):
+            return None
+        m_c = re.search(r"\b(?:central_charge|charge|c)\s*[:=]\s*([-+]?\d+(?:\.\d+)?)", prompt, re.I)
+        m_l = re.search(r"\b(?:total_length|length|l)\s*[:=]\s*([-+]?\d+(?:\.\d+)?)", prompt, re.I)
+        m_ell = re.search(r"\b(?:subsystem_length|subsystem|interval|ell)\s*[:=]\s*([-+]?\d+(?:\.\d+)?)", prompt, re.I)
+        m_t = re.search(r"\b(?:temperature|temp|t)\s*[:=]\s*([-+]?\d+(?:\.\d+)?)", prompt, re.I)
+        return {
+            "central_charge": float(m_c.group(1)) if m_c else 12.0,
+            "total_length": float(m_l.group(1)) if m_l else 100.0,
+            "subsystem_length": float(m_ell.group(1)) if m_ell else 25.0,
+            "temperature": float(m_t.group(1)) if m_t else 1.0,
+        }
+
+    def solve(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        from .cartan import HolographicEntanglementEngine
+        c = params.get("central_charge", 12.0)
+        L = params.get("total_length", 100.0)
+        ell = params.get("subsystem_length", 25.0)
+        temp = params.get("temperature", 1.0)
+        engine = HolographicEntanglementEngine(c_central_charge=c, total_length_L=L)
+        res_rt = engine.single_interval_entropy(interval_length_ell=ell)
+        res_tfd = engine.thermofield_double_horizon(temperature_T=temp, time_t=2.0)
+        trace = [
+            _trace("parse", f"AdS3/CFT2 geometry with Brown-Henneaux central charge c={c}, boundary L={L}, subsystem ell={ell}."),
+            _trace("search", f"Ryu-Takayanagi minimal geodesic length Area(gamma_A)={res_rt['bulk_geodesic_length']}, S_A={res_rt['entanglement_entropy_nats']} nats."),
+            _trace("verify", f"Subadditivity and Page curve transition check: {'PASS' if res_rt['verified'] else 'FAIL'}."),
+        ]
+        text = (
+            f"Holographic Ryu-Takayanagi Entanglement Entropy (AdS3/CFT2):\n"
+            f"- Central Charge c: {res_rt['central_charge_c']} | System Length L: {res_rt['total_system_length']}\n"
+            f"- Subsystem Interval ell: {res_rt['subsystem_length_ell']} | UV Cutoff epsilon: {res_rt['uv_cutoff_epsilon']}\n"
+            f"- Ryu-Takayanagi Geodesic Area: {res_rt['bulk_geodesic_length']}\n"
+            f"- Entanglement Entropy: {res_rt['entanglement_entropy_nats']} nats ({res_rt['entanglement_entropy_bits']} ebits)\n"
+            f"- Thermofield Double (TFD) Horizon Entropy: {res_tfd['thermal_bekenstein_hawking_entropy']} (Page Time: {res_tfd['page_transition_time']})"
+        )
+        return {
+            "domain": self.name,
+            "text": text,
+            "answer": f"S_A = {res_rt['entanglement_entropy_nats']} nats ({res_rt['entanglement_entropy_bits']} bits), Area = {res_rt['bulk_geodesic_length']}",
+            "entanglement_entropy_nats": res_rt["entanglement_entropy_nats"],
+            "entanglement_entropy_bits": res_rt["entanglement_entropy_bits"],
+            "bulk_geodesic_length": res_rt["bulk_geodesic_length"],
+            "page_transition_time": res_tfd["page_transition_time"],
+            "verified": res_rt["verified"],
+            "backend": "ryu-takayanagi-holographic-ads-cft-engine",
+            "reasoning_trace": trace,
+            "insight": "The Ryu-Takayanagi formula geometrizes quantum entanglement entropy in boundary CFT as the minimal codimension-2 geodesic surface Area(gamma_A) / 4G_N in bulk anti-de Sitter spacetime.",
+        }
+
+
+# ---------------------------------------------------------------------------
+# 75. Morphogenetic Turing Reaction-Diffusion Pattern Formation
+# ---------------------------------------------------------------------------
+
+class MorphogeneticTuringSolver:
+    name = "morphogenetic_turing_reaction"
+    description = "Alan Turing 1952 reaction-diffusion chemical morphogenesis, diffusion-driven instability criteria, critical wavevector k_c, and pattern morphology"
+
+    @classmethod
+    def detect(cls, prompt: str) -> Optional[Dict[str, Any]]:
+        if not re.search(r"\b(morphogenetic\s+turing|turing\s+pattern|turing\s+instability|morphogenesis|reaction[- ]diffusion\s+instability|activator[- ]inhibitor|gierer[- ]meinhardt|turing\s+discriminant|critical\s+wavenumber|turing\s+bifurcation)\b", prompt, re.I):
+            return None
+        m_du = re.search(r"\b(?:diffusivity_u|du|d_u)\s*[:=]\s*([-+]?\d+(?:\.\d+)?)", prompt, re.I)
+        m_dv = re.search(r"\b(?:diffusivity_v|dv|d_v)\s*[:=]\s*([-+]?\d+(?:\.\d+)?)", prompt, re.I)
+        m_fu = re.search(r"\b(?:fu|f_u)\s*[:=]\s*([-+]?\d+(?:\.\d+)?)", prompt, re.I)
+        m_fv = re.search(r"\b(?:fv|f_v)\s*[:=]\s*([-+]?\d+(?:\.\d+)?)", prompt, re.I)
+        m_gu = re.search(r"\b(?:gu|g_u)\s*[:=]\s*([-+]?\d+(?:\.\d+)?)", prompt, re.I)
+        m_gv = re.search(r"\b(?:gv|g_v)\s*[:=]\s*([-+]?\d+(?:\.\d+)?)", prompt, re.I)
+        return {
+            "diffusivity_u": float(m_du.group(1)) if m_du else 0.01,
+            "diffusivity_v": float(m_dv.group(1)) if m_dv else 0.50,
+            "fu": float(m_fu.group(1)) if m_fu else 0.6,
+            "fv": float(m_fv.group(1)) if m_fv else -0.8,
+            "gu": float(m_gu.group(1)) if m_gu else 1.0,
+            "gv": float(m_gv.group(1)) if m_gv else -1.1,
+        }
+
+    def solve(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        from .cartan import MorphogeneticTuringEngine
+        du = params.get("diffusivity_u", 0.01)
+        dv = params.get("diffusivity_v", 0.50)
+        fu = params.get("fu", 0.6)
+        fv = params.get("fv", -0.8)
+        gu = params.get("gu", 1.0)
+        gv = params.get("gv", -1.1)
+        engine = MorphogeneticTuringEngine(diffusivity_u=du, diffusivity_v=dv)
+        res = engine.analyze_turing_instability(fu=fu, fv=fv, gu=gu, gv=gv)
+        trace = [
+            _trace("parse", f"Reaction-diffusion activator-inhibitor system with Du={du}, Dv={dv} (ratio d={res['diffusivity_ratio_d']})."),
+            _trace("search", f"Jacobian tr={res['trace_jacobian']}, det={res['determinant_jacobian']}, critical wavenumber kc={res['critical_wavenumber_kc']}."),
+            _trace("verify", f"Four Turing conditions satisfied: {'PASS' if res['turing_instability_active'] else 'FAIL'}."),
+        ]
+        text = (
+            f"Morphogenetic Turing Reaction-Diffusion Instability:\n"
+            f"- Diffusivity Ratio d = Dv / Du: {res['diffusivity_ratio_d']}\n"
+            f"- Homogeneous Stability: tr(J) = {res['trace_jacobian']} < 0 ({res['condition_1_homogeneous_trace_negative']}) | det(J) = {res['determinant_jacobian']} > 0 ({res['condition_2_homogeneous_det_positive']})\n"
+            f"- Diffusion-Driven Instability: Weighted Trace = {res['diffusion_weighted_trace']} > 0 ({res['condition_3_diffusion_destabilizing']}) | Discriminant = {res['turing_discriminant']} > 0 ({res['condition_4_bifurcation_positive']})\n"
+            f"- Turing Instability Active: {'YES' if res['turing_instability_active'] else 'NO'}\n"
+            f"- Critical Wavenumber kc: {res['critical_wavenumber_kc']} | Spatial Wavelength lambda_c: {res['critical_wavelength_lambda_c']}\n"
+            f"- Predicted Morphology: {res['predicted_morphology']}"
+        )
+        return {
+            "domain": self.name,
+            "text": text,
+            "answer": f"Turing active = {res['turing_instability_active']}, kc = {res['critical_wavenumber_kc']}, lambda_c = {res['critical_wavelength_lambda_c']}, pattern = {res['predicted_morphology']}",
+            "turing_active": res["turing_instability_active"],
+            "critical_wavenumber": res["critical_wavenumber_kc"],
+            "critical_wavelength": res["critical_wavelength_lambda_c"],
+            "predicted_morphology": res["predicted_morphology"],
+            "verified": res["verified"],
+            "backend": "turing-morphogenetic-reaction-diffusion-engine",
+            "reasoning_trace": trace,
+            "insight": "Alan Turing discovered that two stable chemical substances can spontaneously generate biological patterns (spots, stripes) when the inhibitor diffuses significantly faster than the self-catalyzing activator.",
+        }
+
+
+# ---------------------------------------------------------------------------
 # Dispatcher
 # ---------------------------------------------------------------------------
 
@@ -7709,6 +8002,9 @@ class ProblemSolver:
             NoetherSymmetryConservationSolver(), ModularTensorCategorySolver(),
             CliffordSpacetimeAlgebraSolver(), BatalinVilkoviskySolver(),
             ActiveMatterNonequilibriumSolver(),
+            CartanExteriorSystemSolver(), NonHermitianPTSolver(),
+            ExceptionalJordanAlgebraSolver(), HolographicEntanglementSolver(),
+            MorphogeneticTuringSolver(),
         ]
 
     def capabilities(self) -> List[Dict[str, str]]:

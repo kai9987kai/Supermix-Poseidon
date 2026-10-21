@@ -103,16 +103,17 @@ def test_full_reasoning_pipeline(tmp_path):
     runtime = Poseidon(tmp_path)
     res = runtime.reason("How do I cross a 10m wide river when stepping stones submerge?")
     assert res["intent"] == "physical_discovery"
-    assert res["verified"] is True
+    assert res["verified"] is False
+    assert res["verification"]["answer"]["scope"] == "synthetic_demonstration"
     assert len(res["thought_steps"]) == 5
     assert len(res["certificate_sha256"]) == 64
     assert res["formal_proof"]["verdict"] == "PROVEN_SAFE"
-    assert "Autonomous Cognitive Discovery" in res["text"]
+    assert "Reasoning and Evidence Summary" in res["text"]
 
     # Test via respond with mode="reason"
     resp = runtime.respond("Synthesize an enzyme for wood crosslinking", mode="reason")
     assert resp["intent"] == "biocatalytic_synthesis"
-    assert resp["verified"] is True
+    assert resp["verified"] is False
 
 
 def test_server_reasoning_endpoints(test_server):
@@ -130,7 +131,8 @@ def test_server_reasoning_endpoints(test_server):
         "seed": 42
     }
     reason_res = json.load(post_json(url + "/api/reason", payload))
-    assert reason_res["verified"] is True
+    assert reason_res["verified"] is False
+    assert reason_res["formal_proof"]["query_bound"] is False
     assert reason_res["intent"] == "physical_discovery"
     assert len(reason_res["thought_steps"]) == 5
     assert len(reason_res["certificate_sha256"]) == 64
@@ -179,13 +181,13 @@ def test_omni_reasoner_extended_domains():
     # Biomechanical query
     res_bio = reasoner.reason("Evaluate humanoid articulated gait, stride reach limits, and wet rock slip hazard")
     assert res_bio.intent == "biomechanical_kinematics"
-    assert res_bio.verified is True
+    assert res_bio.verified is False
     assert "gait" in res_bio.empirical_simulation["simulation_type"].lower()
 
     # Naval stability query
     res_naval = reasoner.reason("Analyze transverse metacentric height GM and righting moment for log raft hull stability")
     assert res_naval.intent == "naval_stability"
-    assert res_naval.verified is True
+    assert res_naval.verified is False
     assert res_naval.empirical_simulation["catamaran_raft_3log"]["is_stably_righting"] is True
 
     # Multi-substrate enzyme generation
@@ -205,7 +207,7 @@ def test_omni_reasoner_scientific_hypothesis_falsification():
     reasoner = OmniReasoner(seed=42)
     res = reasoner.reason("Formulate Popperian falsifiable hypothesis and design crucial experiment with Lakatos research programme analysis")
     assert res.intent == "scientific_hypothesis_falsification"
-    assert res.verified is True
+    assert res.verified is False
     assert "OLYMPUS" in res.empirical_simulation["simulation_type"]
     assert res.empirical_simulation["receipt_verified"] is True
     assert "paradigm_synthesis" in res.empirical_simulation
@@ -215,7 +217,7 @@ def test_omni_reasoner_aether_synthesis():
     reasoner = OmniReasoner(seed=42)
     res = reasoner.reason("Execute Project AETHER lattice gauge field holonomy, Jarzynski non-equilibrium thermodynamics, and open game optics")
     assert res.intent == "aether_gauge_thermo"
-    assert res.verified is True
+    assert res.verified is False
     assert "AETHER" in res.empirical_simulation["simulation_type"]
     assert res.empirical_simulation["symplectic_conserved"] is True
     assert len(res.empirical_simulation["receipt_sha256"]) == 64
@@ -225,10 +227,22 @@ def test_omni_reasoner_chronos_synthesis():
     reasoner = OmniReasoner(seed=42)
     res = reasoner.reason("Execute Project CHRONOS Causal Dynamical Triangulations, Connes spectral triple noncommutative geometry, and Stiefel optimization")
     assert res.intent == "chronos_quantum_geometry"
-    assert res.verified is True
+    assert res.verified is False
     assert "CHRONOS" in res.empirical_simulation["simulation_type"]
     assert res.empirical_simulation["euler_characteristic"] == 0
     assert len(res.empirical_simulation["receipt_sha256"]) == 64
+
+
+def test_omni_reasoner_cartan_synthesis():
+    reasoner = OmniReasoner(seed=42)
+    res = reasoner.reason("Execute Project CARTAN exterior differential systems, PT-symmetric exceptional points, Albert algebra, and Turing morphogenesis")
+    assert res.intent == "cartan_differential_systems"
+    assert res.verified is False
+    assert "CARTAN" in res.empirical_simulation["simulation_type"]
+    assert res.empirical_simulation["pt_unbroken"] is True
+    assert res.empirical_simulation["turing_active"] is True
+    assert len(res.empirical_simulation["receipt_sha256"]) == 64
+
 
 
 
