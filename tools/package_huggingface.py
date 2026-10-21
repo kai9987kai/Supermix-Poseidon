@@ -118,7 +118,7 @@ Additional modules are software simulations or heuristics: Archimedes computes s
 | LoRA: 61,440 parameters | `runs/language/adapter/` | Experimental candidate, inactive by default |
 | Poseidon-X | `poseidon/poseidon_x.py` | Experimental geometric and homeostatic controller; opt-in |
 | Problem Forge | `poseidon/problem_solver.py` | Bounded exact and numerical tools; inspect runtime status for supported domains |
-| CHRONOS and NOETHER | `poseidon/chronos.py`, `poseidon/noether.py` | Experimental mathematical constructions and synthetic telemetry |
+| CHRONOS, NOETHER, and CARTAN | `poseidon/chronos.py`, `poseidon/noether.py`, `poseidon/cartan.py` | Experimental mathematical constructions and synthetic telemetry |
 | Project HYPERBOREA | `poseidon/hyperborea.py` | Cellular sheaf cohomology, Port-Hamiltonian Dirac structures, Wilsonian RG & Fibonacci anyon braiding |
 | Project HEPHAESTUS | `poseidon/hephaestus.py` | Wake-sleep library synthesis, GFlowNet DAG sampling, Koopman EDMD & persistent homology |
 | Project ATHENAEUM | `poseidon/athenaeum.py` | Equality saturation e-graphs, Process-Reward MCTS & SINDy equation discovery |
@@ -626,7 +626,10 @@ See runs/language/report.json, data/language/SOURCE_CARD.md and the root model c
                        "nexus_search": "federated-associative-vector-lattice-indexing",
                        "external_adapter": "typed-3d-simulation-telemetry-protocol",
                        "nexus_omega": "causal-epigenetic-self-experimenting-discovery-agent",
-                       "problem_forge_60": "verified-60-domain-zero-eval-symbolic-problem-solver",
+                       "problem_forge_75": "verified-75-domain-zero-eval-symbolic-problem-solver",
+                       "cartan": "cartan-moving-frames-pt-symmetry-albert-algebra-holographic-turing-engine",
+                       "noether": "noether-symmetry-quantum-darwinism-hyperbolic-pde-berry-curv-aditi-engine",
+                       "chronos": "relativity-cosmology-hawking-gravitational-wave-kerr-engine",
                        "aether": "gauge-field-nonequilibrium-thermo-fisher-rao-symplectic-open-game-engine",
                        "neurograft": "multispecies-connectome-ltc-trimonoaminergic-virtual-lesion-engine",
                        "hyperborea": "cellular-sheaf-dirac-port-hamiltonian-wilsonian-rg-anyon-engine",
