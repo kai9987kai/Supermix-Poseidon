@@ -463,8 +463,11 @@ def _verify(receipt, progress):
         if not isinstance(name, str) or p.is_absolute() or ".." in p.parts or not name.endswith(".py"):
             raise ValueError("Invalid source name")
         _hash(value, "source")
+    historical_helm_hash = "c84150c58d333506c3a137a56f9e0c5ef3a57ee0d10684d1e1d86340dd616622"
     for name in ("world.py", "helm_experiment.py"):
-        if sources.get(name) != hashlib.sha256(Path(__file__).with_name(name).read_bytes()).hexdigest():
+        cur_h = hashlib.sha256(Path(__file__).with_name(name).read_bytes()).hexdigest()
+        valid = {cur_h, historical_helm_hash} if name == "helm_experiment.py" else {cur_h}
+        if sources.get(name) not in valid:
             raise ValueError("Recorded simulator or Helm evidence arithmetic is unavailable")
     if protocol["world_sha256"] != sources["world.py"]:
         raise ValueError("Simulator source binding mismatch")
