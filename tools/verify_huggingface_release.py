@@ -22,7 +22,7 @@ import subprocess
 import sys
 
 SCHEMA = "poseidon-huggingface-release-v1"
-V3_RELEASE_VERSIONS = tuple(f"3.{minor}.0" for minor in range(12))
+V3_RELEASE_VERSIONS = tuple(f"3.{minor}.0" for minor in range(15))
 BUILDABLE_RELEASE_VERSIONS = ("1.3.0", "2.0.0", *V3_RELEASE_VERSIONS)
 SUPPORTED_RELEASE_VERSIONS = (
     "0.2.0", "0.4.0", "0.5.0", "0.5.1", "0.6.0", "0.7.0", "0.8.0",

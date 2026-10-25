@@ -161,11 +161,16 @@ def test_problem_solver_unknown():
         solve_problem("What is the capital of France?")
 
 
-def test_problem_solver_90_capabilities():
+def test_problem_solver_95_capabilities():
     solver = ProblemSolver()
     caps = solver.capabilities()
-    assert len(caps) == 90
+    assert len(caps) == 95
     domains = [c["domain"] for c in caps]
+    assert "successor_representation_td_learning" in domains
+    assert "successor_reward_revaluation" in domains
+    assert "sharp_wave_ripple_reverse_replay" in domains
+    assert "graph_laplacian_spatial_eigenvectors" in domains
+    assert "trainable_neural_graft_routing" in domains
     assert "crosswire_version_space_pruning" in domains
     assert "active_diagnostic_probing" in domains
     assert "interface_contract_all_hypothesis_verification" in domains
@@ -1190,6 +1195,51 @@ def test_unfamiliar_protocol_interoperability():
     assert res["verified"] is True
     assert res["interoperability_certified"] is True
     assert res["zero_hazard_violations"] is True
+
+
+def test_successor_representation_td_learning():
+    prompt = "Update successor representation TD learning with state=2, next_state=3, discount=0.9, and learning_rate=0.2"
+    res = solve_problem(prompt)
+    assert res["domain"] == "successor_representation_td_learning"
+    assert res["verified"] is True
+    assert "updated_row" in res
+    assert res["state_td_error_norm"] > 0.0
+
+
+def test_successor_reward_revaluation():
+    prompt = "Compute successor reward revaluation with num_states=4 and reward vector: [0.0, 1.0, 5.0, -2.0]"
+    res = solve_problem(prompt)
+    assert res["domain"] == "successor_reward_revaluation"
+    assert res["verified"] is True
+    assert res["best_state"] == 2
+    assert len(res["revalued_values"]) == 4
+
+
+def test_sharp_wave_ripple_reverse_replay():
+    prompt = "Run sharp-wave ripple reverse replay with sweeps=4, decay=0.8, and threshold=0.1"
+    res = solve_problem(prompt)
+    assert res["domain"] == "sharp_wave_ripple_reverse_replay"
+    assert res["verified"] is True
+    assert res["sweeps_executed"] == 4
+    assert res["total_updates"] > 0
+
+
+def test_graph_laplacian_spatial_eigenvectors():
+    prompt = "Compute graph Laplacian spatial eigenvectors with num_states=5, tau=1.0, and seed=42"
+    res = solve_problem(prompt)
+    assert res["domain"] == "graph_laplacian_spatial_eigenvectors"
+    assert res["verified"] is True
+    assert res["fiedler_value"] > 0.0
+    assert res["algebraic_connectivity_positive"] is True
+
+
+def test_trainable_neural_graft_routing():
+    prompt = "Run trainable neural graft routing with num_sources=4, null_route_bias=0.5, and top_k=2"
+    res = solve_problem(prompt)
+    assert res["domain"] == "trainable_neural_graft_routing"
+    assert res["verified"] is True
+    assert res["routing_entropy"] > 0.0
+    assert res["num_parameters"] > 0
 
 
 

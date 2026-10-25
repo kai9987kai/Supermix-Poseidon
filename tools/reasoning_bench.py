@@ -124,6 +124,11 @@ CASES = [
     ("p75", "problem", "Verify interface contract all-hypothesis verification for plan=[1, 1] with surviving hypotheses=6 and hazard=4", ["plan admitted", "satisfying"]),
     ("p76", "problem", "Execute closed-loop runtime shield with intended action=2, surviving count=4, and safe fallback=0", ["decision", "dispatched action"]),
     ("p77", "problem", "Synthesize unfamiliar protocol interoperability with actions=4, probing_budget=12, and seed=42", ["interoperability certified", "probing steps"]),
+    ("p78", "problem", "Update successor representation TD learning with state=2, next_state=3, discount=0.9, and learning_rate=0.2", ["updated m", "td error norm"]),
+    ("p79", "problem", "Compute successor reward revaluation with num_states=4 and reward vector: [0.0, 1.0, 5.0, -2.0]", ["best state", "revalued values"]),
+    ("p80", "problem", "Run sharp-wave ripple reverse replay with sweeps=4, decay=0.8, and threshold=0.1", ["propagated value s0", "sweeps executed"]),
+    ("p81", "problem", "Compute graph Laplacian spatial eigenvectors with num_states=5, tau=1.0, and seed=42", ["fiedler eigenvalue", "mean diffusion distance"]),
+    ("p82", "problem", "Run trainable neural graft routing with num_sources=4, null_route_bias=0.5, and top_k=2", ["routing entropy", "mean null weight"]),
 ]
 
 

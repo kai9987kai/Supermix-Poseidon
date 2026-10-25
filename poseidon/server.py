@@ -657,14 +657,20 @@ def make_handler(runtime, port):
             if path == "/api/neurograft/synthesize":
                 try:
                     seed = int(payload.get("seed", 42))
-                    horizon = int(payload.get("horizon", 6))
-                    modulator_overrides = payload.get("modulator_overrides")
-                    lesion_source = payload.get("lesion_source")
+                    discount = float(payload["discount"]) if "discount" in payload else None
+                    learning_rate = float(payload["learning_rate"]) if "learning_rate" in payload else None
+                    kwargs = {}
+                    if "horizon" in payload:
+                        kwargs["horizon"] = int(payload["horizon"])
+                    if "modulator_overrides" in payload:
+                        kwargs["modulator_overrides"] = payload["modulator_overrides"]
+                    if "lesion_source" in payload:
+                        kwargs["lesion_source"] = payload["lesion_source"]
                     res = runtime.neurograft_synthesize(
                         seed=seed,
-                        horizon=horizon,
-                        modulator_overrides=modulator_overrides,
-                        lesion_source=lesion_source,
+                        discount=discount,
+                        learning_rate=learning_rate,
+                        **kwargs,
                     )
                     self.send_json(200, res)
                 except (ValueError, TypeError) as error:

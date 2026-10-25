@@ -278,6 +278,21 @@ def test_omni_reasoner_crosswire_synthesis():
     assert len(res.empirical_simulation["receipt_sha256"]) == 64
 
 
+def test_omni_reasoner_neurograft_synthesis():
+    reasoner = OmniReasoner(seed=42)
+    res = reasoner.reason("Execute Project NEUROGRAFT successor representation, sharp-wave ripple replay, and graph Laplacian spatial synthesis")
+    assert res.intent == "neurograft_connectome"
+    assert res.verified is False
+    assert "NEUROGRAFT" in res.empirical_simulation["simulation_type"]
+    assert res.empirical_simulation["swr_sweeps_executed"] == 6
+    assert res.empirical_simulation["swr_total_updates"] > 0
+    assert res.empirical_simulation["fiedler_value"] > 0.0
+    assert res.empirical_simulation["mean_diffusion_distance"] > 0.0
+    assert res.empirical_simulation["algebraic_connectivity_positive"] is True
+    assert res.empirical_simulation["routing_entropy"] > 0.0
+    assert len(res.empirical_simulation["receipt_sha256"]) == 64
+
+
 
 
 

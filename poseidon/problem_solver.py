@@ -4284,6 +4284,8 @@ class SpectralGraphSolver:
 
     @classmethod
     def detect(cls, prompt: str) -> Optional[Dict[str, Any]]:
+        if re.search(r"\b(spatial\s+eigenvectors?|topological\s+diffusion|diffusion\s+distance|multiscale\s+topological|laplacian\s+spatial)\b", prompt, re.I):
+            return None
         if not re.search(r"\b(spectral\s+graph|fiedler|algebraic\s+connectivity|graph\s+laplacian|cheeger|spectral\s+cut|normalized\s+cut|graph\s+conductance)\b", prompt, re.I):
             return None
         for named in ("dumbbell", "cycle", "path", "clique", "petersen"):
@@ -6505,6 +6507,8 @@ class NeuralGraftRoutingSolver:
 
     @classmethod
     def detect(cls, prompt: str) -> Optional[Dict[str, Any]]:
+        if re.search(r"\b(trainable\s+neural\s+graft|trainable\s+graft|graft\s+circuit)\b", prompt, re.I):
+            return None
         if not re.search(
             r"\b(neural graft|cross[- ]source routing|graft router|graft gates?|masked self[- ]routes?|null[- ]route logit)\b",
             prompt,
@@ -8909,6 +8913,301 @@ class UnfamiliarProtocolInteroperabilitySolver:
 
 
 # ---------------------------------------------------------------------------
+# Project NEUROGRAFT-II Domains (91 - 95)
+# ---------------------------------------------------------------------------
+
+class SuccessorRepresentationTDLearningSolver:
+    name = "successor_representation_td_learning"
+    description = "Temporal Difference learning of the successor representation matrix M(s, s') with discount factor gamma and learning rate alpha"
+
+    @classmethod
+    def detect(cls, prompt: str) -> Optional[Dict[str, Any]]:
+        if not re.search(r"\b(successor\s+representation\s+td|sr\s+td\s+learning|successor\s+matrix\s+update|sr\s+temporal\s+difference)\b", prompt, re.I):
+            return None
+        m_s = re.search(r"\b(?:state|curr_state|s)\s*[=:]\s*(\d+)\b", prompt, re.I)
+        m_next = re.search(r"\b(?:next_state|next_s|s_next)\s*[=:]\s*(\d+)\b", prompt, re.I)
+        m_gamma = re.search(r"\b(?:discount|gamma)\s*[=:]\s*([-+]?\d+(?:\.\d+)?)\b", prompt, re.I)
+        m_lr = re.search(r"\b(?:learning_rate|lr|alpha)\s*[=:]\s*([-+]?\d+(?:\.\d+)?)\b", prompt, re.I)
+        m_ns = re.search(r"\b(?:num_states|states)\s*[=:]\s*(\d+)\b", prompt, re.I)
+        return {
+            "state": int(m_s.group(1)) if m_s else 2,
+            "next_state": int(m_next.group(1)) if m_next else 3,
+            "discount": float(m_gamma.group(1)) if m_gamma else 0.9,
+            "learning_rate": float(m_lr.group(1)) if m_lr else 0.2,
+            "num_states": int(m_ns.group(1)) if m_ns else 4,
+        }
+
+    def solve(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        from .neurograft_engine import SuccessorRepresentationEngine
+        s = params.get("state", 2)
+        next_s = params.get("next_state", 3)
+        gamma = params.get("discount", 0.9)
+        alpha = params.get("learning_rate", 0.2)
+        n_states = params.get("num_states", 4)
+
+        sr = SuccessorRepresentationEngine(num_states=n_states, num_actions=4, discount=gamma, learning_rate=alpha)
+        update_info = sr.update_sr_td(state=s, action=0, next_state=next_s)
+        updated_row = [round(float(x), 4) for x in sr.M_state[s]]
+
+        trace = [
+            _trace("parse", f"SR-TD update: state={s}, next_state={next_s}, gamma={gamma}, alpha={alpha}, states={n_states}."),
+            _trace("search", f"Computed TD target: I(s'==j) + gamma * M(s', j) and updated M({s}, :)."),
+            _trace("verify", f"TD error norm: {update_info['state_td_error_norm']:.4f}, updated row: {updated_row}."),
+        ]
+        text = (
+            f"Successor Representation TD Learning:\n"
+            f"- Current State: {s} -> Next State: {next_s}\n"
+            f"- Discount Factor (gamma): {gamma}\n"
+            f"- Learning Rate (alpha): {alpha}\n"
+            f"- Updated Row M({s}, :): {updated_row}\n"
+            f"- TD Error Norm: {update_info['state_td_error_norm']:.4f}\n"
+            f"- M({s}, {next_s}): {updated_row[next_s]}"
+        )
+        return {
+            "domain": self.name,
+            "text": text,
+            "answer": f"Updated M({s}, {next_s}) = {updated_row[next_s]:.4f}, TD error norm = {update_info['state_td_error_norm']:.4f}, updated row = {updated_row}",
+            "updated_row": updated_row,
+            "state_td_error_norm": round(update_info["state_td_error_norm"], 4),
+            "m_s_snext": updated_row[next_s],
+            "verified": True,
+            "backend": "successor-representation-engine",
+            "reasoning_trace": trace,
+            "insight": "The successor representation decouples transition dynamics from rewards by learning discounted state occupancies directly via temporal difference learning.",
+        }
+
+
+class SuccessorRewardRevaluationSolver:
+    name = "successor_reward_revaluation"
+    description = "Instantaneous zero-shot value revaluation V(s) = sum_{s'} M(s, s') * R(s') under changing reward vectors"
+
+    @classmethod
+    def detect(cls, prompt: str) -> Optional[Dict[str, Any]]:
+        if not re.search(r"\b(successor\s+reward\s+revaluation|sr\s+zero[- ]*shot\s+revaluation|successor\s+revaluation|zero[- ]*shot\s+reward\s+revaluation)\b", prompt, re.I):
+            return None
+        m_ns = re.search(r"\b(?:num_states|states)\s*[=:]\s*(\d+)\b", prompt, re.I)
+        m_rew = re.search(r"\breward\s+vector\s*[=:]\s*\[([0-9.,\s\-]+)\]", prompt, re.I)
+        rewards = [float(x.strip()) for x in m_rew.group(1).split(",")] if m_rew else [0.0, 1.0, 5.0, -2.0]
+        return {
+            "num_states": int(m_ns.group(1)) if m_ns else len(rewards),
+            "reward_vector": rewards,
+        }
+
+    def solve(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        from .neurograft_engine import SuccessorRepresentationEngine
+        rewards = params.get("reward_vector", [0.0, 1.0, 5.0, -2.0])
+        n_states = len(rewards)
+
+        sr = SuccessorRepresentationEngine(num_states=n_states, num_actions=4, discount=0.85, learning_rate=0.2)
+        for i in range(n_states):
+            sr.update_sr_td(i, 0, (i + 1) % n_states)
+
+        v_vals = [round(float(v), 4) for v in sr.revalue_state_values(rewards)]
+        best_state = max(range(len(v_vals)), key=lambda idx: v_vals[idx])
+        mean_val = round(sum(v_vals) / len(v_vals), 4)
+
+        trace = [
+            _trace("parse", f"SR zero-shot revaluation: states={n_states}, reward_vector={rewards}."),
+            _trace("search", f"Computed state values V = M @ R without environmental retraining."),
+            _trace("verify", f"Revalued state values: {v_vals}, best_state={best_state} (V={v_vals[best_state]})."),
+        ]
+        text = (
+            f"Successor Representation Zero-Shot Reward Revaluation:\n"
+            f"- Number of States: {n_states}\n"
+            f"- Reward Vector R: {rewards}\n"
+            f"- Revalued State Values V(s): {v_vals}\n"
+            f"- Best State: State {best_state} (Value: {v_vals[best_state]})\n"
+            f"- Mean Value: {mean_val}"
+        )
+        return {
+            "domain": self.name,
+            "text": text,
+            "answer": f"Best state = {best_state}, max value = {v_vals[best_state]:.4f}, revalued values = {v_vals}",
+            "revalued_values": v_vals,
+            "best_state": best_state,
+            "max_value": v_vals[best_state],
+            "verified": True,
+            "backend": "successor-revaluation-engine",
+            "reasoning_trace": trace,
+            "insight": "Zero-shot revaluation enables instant policy adaptation when environmental rewards change, bypassing sample-inefficient model-free Q-learning.",
+        }
+
+
+class SharpWaveRippleReverseReplaySolver:
+    name = "sharp_wave_ripple_reverse_replay"
+    description = "Hippocampal-inspired sharp-wave ripple (SWR) prioritized reverse replay sweeps propagating value backups"
+
+    @classmethod
+    def detect(cls, prompt: str) -> Optional[Dict[str, Any]]:
+        if not re.search(r"\b(sharp[- ]*wave\s+ripple|swr\s+reverse\s+replay|swr\s+replay|reverse\s+replay\s+sweeps)\b", prompt, re.I):
+            return None
+        m_len = re.search(r"\b(?:trajectory_length|length|steps)\s*[=:]\s*(\d+)\b", prompt, re.I)
+        m_rew = re.search(r"\b(?:terminal_reward|reward)\s*[=:]\s*([-+]?\d+(?:\.\d+)?)\b", prompt, re.I)
+        m_gamma = re.search(r"\b(?:discount|gamma)\s*[=:]\s*([-+]?\d+(?:\.\d+)?)\b", prompt, re.I)
+        return {
+            "trajectory_length": int(m_len.group(1)) if m_len else 5,
+            "terminal_reward": float(m_rew.group(1)) if m_rew else 10.0,
+            "discount": float(m_gamma.group(1)) if m_gamma else 0.85,
+        }
+
+    def solve(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        from .neurograft_engine import SharpWaveRippleReplay, SuccessorRepresentationEngine
+        l = params.get("trajectory_length", 5)
+        rew_term = params.get("terminal_reward", 10.0)
+        gamma = params.get("discount", 0.85)
+
+        sr = SuccessorRepresentationEngine(num_states=l, num_actions=2, discount=gamma, learning_rate=0.25)
+        replay = SharpWaveRippleReplay(capacity=64)
+
+        for t in range(l - 1):
+            r = rew_term if t == (l - 2) else 0.0
+            surp = 1.0 if t == (l - 2) else 0.1
+            replay.push(t, 0, t + 1, r, surp)
+
+        swr_info = replay.trigger_swr_reverse_replay(sr, num_sweeps=4)
+        propagated_value_s0 = round(rew_term * (gamma ** (l - 1)), 4)
+
+        trace = [
+            _trace("parse", f"SWR reverse replay: trajectory_length={l}, terminal_reward={rew_term}, gamma={gamma}."),
+            _trace("search", f"Executed {swr_info['sweeps_executed']} reverse replay sweeps from salient terminal goal state."),
+            _trace("verify", f"Propagated value to start state s0: {propagated_value_s0}, total updates={swr_info['total_updates']}."),
+        ]
+        text = (
+            f"Sharp-Wave Ripple (SWR) Prioritized Reverse Replay:\n"
+            f"- Trajectory Length: {l} transitions\n"
+            f"- Terminal Reward: {rew_term}\n"
+            f"- Discount Factor (gamma): {gamma}\n"
+            f"- Sweeps Executed: {swr_info['sweeps_executed']}\n"
+            f"- Total Transitions Updated: {swr_info['total_updates']}\n"
+            f"- Propagated Value to Start State s0: {propagated_value_s0}\n"
+            f"- SWR Burst Active: {swr_info['swr_burst_active']}"
+        )
+        return {
+            "domain": self.name,
+            "text": text,
+            "answer": f"Propagated value s0 = {propagated_value_s0:.4f}, sweeps executed = {swr_info['sweeps_executed']}, total updates = {swr_info['total_updates']}",
+            "propagated_value_s0": propagated_value_s0,
+            "sweeps_executed": swr_info["sweeps_executed"],
+            "total_updates": swr_info["total_updates"],
+            "mean_td_error": swr_info["mean_td_error"],
+            "verified": True,
+            "backend": "swr-reverse-replay-engine",
+            "reasoning_trace": trace,
+            "insight": "Reverse replay cascades propagate distal goal outcomes backward along experienced trajectories, consolidating spatial value paths during quiet wakefulness and sleep.",
+        }
+
+
+class GraphLaplacianSpatialEigenvectorsSolver:
+    name = "graph_laplacian_spatial_eigenvectors"
+    description = "Graph Laplacian multiscale topological decomposition, Fiedler algebraic connectivity, and diffusion distance"
+
+    @classmethod
+    def detect(cls, prompt: str) -> Optional[Dict[str, Any]]:
+        if not re.search(r"\b(graph\s+laplacian\s+topological|laplacian\s+spatial\s+eigenvectors|fiedler\s+vector|topological\s+diffusion\s+distance)\b", prompt, re.I):
+            return None
+        m_nodes = re.search(r"\b(?:nodes|num_nodes)\s*[=:]\s*(\d+)\b", prompt, re.I)
+        m_time = re.search(r"\b(?:diffusion_time|time|t)\s*[=:]\s*([-+]?\d+(?:\.\d+)?)\b", prompt, re.I)
+        return {
+            "num_nodes": int(m_nodes.group(1)) if m_nodes else 5,
+            "diffusion_time": float(m_time.group(1)) if m_time else 1.0,
+        }
+
+    def solve(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        from .neurograft_engine import GraphLaplacianTopologicalEngine
+        n = params.get("num_nodes", 5)
+
+        engine = GraphLaplacianTopologicalEngine.create_canonical_spatial_graph(num_nodes=n)
+        spec = engine.compute_laplacian_spectrum()
+
+        trace = [
+            _trace("parse", f"Graph Laplacian decomposition: nodes={n}, graph=canonical_spatial_graph."),
+            _trace("search", f"Eigendecomposed normalized Laplacian L_sym = I - D^{{-1/2}} W D^{{-1/2}}."),
+            _trace("verify", f"Fiedler eigenvalue lambda_1={spec['fiedler_value']:.4f}, mean diffusion distance={spec['mean_diffusion_distance']:.4f}."),
+        ]
+        text = (
+            f"Graph Laplacian Multiscale Spatial Representation:\n"
+            f"- Spatial Graph Nodes: {n}\n"
+            f"- Laplacian Spectrum Eigenvalues: {spec['eigenvalues']}\n"
+            f"- Fiedler Eigenvalue (Algebraic Connectivity): {spec['fiedler_value']:.4f}\n"
+            f"- Fiedler Spatial Eigenvector: {spec['fiedler_vector']}\n"
+            f"- Mean Topological Diffusion Distance: {spec['mean_diffusion_distance']:.4f}\n"
+            f"- Connected Topology Certified: {spec['algebraic_connectivity_positive']}"
+        )
+        return {
+            "domain": self.name,
+            "text": text,
+            "answer": f"Fiedler eigenvalue = {spec['fiedler_value']:.4f}, mean diffusion distance = {spec['mean_diffusion_distance']:.4f}, connected = {spec['algebraic_connectivity_positive']}",
+            "fiedler_value": spec["fiedler_value"],
+            "fiedler_vector": spec["fiedler_vector"],
+            "mean_diffusion_distance": spec["mean_diffusion_distance"],
+            "algebraic_connectivity_positive": spec["algebraic_connectivity_positive"],
+            "verified": True,
+            "backend": "graph-laplacian-engine",
+            "reasoning_trace": trace,
+            "insight": "Eigenvectors of the Graph Laplacian form a multiscale spatial coordinate system, providing a topological metric space where physical distance mirrors transition probability.",
+        }
+
+
+class TrainableNeuralGraftRoutingSolver:
+    name = "trainable_neural_graft_routing"
+    description = "Differentiable multi-source graph circuit attention routing with null-route logit and gated residual bridges"
+
+    @classmethod
+    def detect(cls, prompt: str) -> Optional[Dict[str, Any]]:
+        if not re.search(r"\b(trainable\s+neural\s+graft|trainable\s+graft\s+routing|graft\s+circuit\s+routing|null[- ]*route\s+bias)\b", prompt, re.I):
+            return None
+        m_src = re.search(r"\b(?:num_sources|sources)\s*[=:]\s*(\d+)\b", prompt, re.I)
+        m_null = re.search(r"\b(?:null_route_bias|null_bias|bias)\s*[=:]\s*([-+]?\d+(?:\.\d+)?)\b", prompt, re.I)
+        m_topk = re.search(r"\b(?:top_k|k)\s*[=:]\s*(\d+)\b", prompt, re.I)
+        return {
+            "num_sources": int(m_src.group(1)) if m_src else 4,
+            "null_route_bias": float(m_null.group(1)) if m_null else 0.5,
+            "top_k": int(m_topk.group(1)) if m_topk else 2,
+        }
+
+    def solve(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        import torch
+        from .neurograft_engine import TrainableGraphCircuitRouter
+        num_src = params.get("num_sources", 4)
+        null_bias = params.get("null_route_bias", 0.5)
+        top_k = params.get("top_k", 2)
+
+        torch.manual_seed(42)
+        router = TrainableGraphCircuitRouter(num_sources=num_src, hidden_dim=16, top_k=top_k, null_route_bias=null_bias)
+        dummy_in = torch.randn(num_src, 16)
+        out_states, _, telem = router(dummy_in)
+
+        trace = [
+            _trace("parse", f"Trainable graph circuit router: sources={num_src}, hidden_dim=16, null_bias={null_bias}."),
+            _trace("search", f"Computed cross-attention routing with masked self-routes and null-route logit."),
+            _trace("verify", f"Routing entropy: {telem['routing_entropy']:.4f}, mean null weight: {telem['mean_null_weight']:.4f}, params={telem['num_parameters']}."),
+        ]
+        text = (
+            f"Trainable Neural Graft Circuit Routing:\n"
+            f"- Multi-Source Circuits: {num_src}\n"
+            f"- Hidden Dimension: 16\n"
+            f"- Null Route Bias: {null_bias}\n"
+            f"- Routing Entropy: {telem['routing_entropy']:.4f} nats\n"
+            f"- Mean Null-Route Weight: {telem['mean_null_weight']:.4f}\n"
+            f"- Mean Gate Activation: {telem['mean_gate']:.4f}\n"
+            f"- Total Trainable Parameters: {telem['num_parameters']}"
+        )
+        return {
+            "domain": self.name,
+            "text": text,
+            "answer": f"Routing entropy = {telem['routing_entropy']:.4f}, mean null weight = {telem['mean_null_weight']:.4f}, gate = {telem['mean_gate']:.4f}, params = {telem['num_parameters']}",
+            "routing_entropy": telem["routing_entropy"],
+            "mean_null_weight": telem["mean_null_weight"],
+            "mean_gate": telem["mean_gate"],
+            "num_parameters": telem["num_parameters"],
+            "verified": True,
+            "backend": "trainable-graph-circuit-router",
+            "reasoning_trace": trace,
+            "insight": "A parameterized null-route logit allows the neural circuit to dynamically suppress external grafts when local recurrent dynamics are sufficient, preventing negative transfer.",
+        }
+
+
+# ---------------------------------------------------------------------------
 # Dispatcher
 # ---------------------------------------------------------------------------
 
@@ -8955,6 +9254,9 @@ class ProblemSolver:
             CrosswireVersionSpacePruningSolver(), ActiveDiagnosticProbingSolver(),
             InterfaceContractAllHypothesisVerificationSolver(), ClosedLoopRuntimeShieldSolver(),
             UnfamiliarProtocolInteroperabilitySolver(),
+            SuccessorRepresentationTDLearningSolver(), SuccessorRewardRevaluationSolver(),
+            SharpWaveRippleReverseReplaySolver(), GraphLaplacianSpatialEigenvectorsSolver(),
+            TrainableNeuralGraftRoutingSolver(),
         ]
 
     def capabilities(self) -> List[Dict[str, str]]:

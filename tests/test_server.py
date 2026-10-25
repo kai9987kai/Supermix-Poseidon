@@ -857,3 +857,41 @@ def test_crosswire_server_endpoints(server):
     assert resp["verified"] is True
 
 
+def test_neurograft_server_endpoints(server):
+    url, _ = server
+
+    # 1. GET /api/neurograft/status
+    stat = json.load(urlopen(url + "/api/neurograft/status"))
+    assert stat["ready"] is True
+    assert stat["version"] == "v3.12.0-NEUROGRAFT-95"
+    assert stat["subsystems"]["successor_representation_td_learning"] is True
+    assert stat["subsystems"]["successor_reward_revaluation"] is True
+    assert stat["subsystems"]["sharp_wave_ripple_reverse_replay"] is True
+    assert stat["subsystems"]["graph_laplacian_spatial_decomposition"] is True
+    assert stat["subsystems"]["trainable_recurrent_graph_circuit"] is True
+    assert stat["subsystems"]["mnemosyne_successor_memory_adapter"] is True
+    assert stat["total_verified_domains"] == 95
+
+    # 2. POST /api/neurograft/synthesize
+    res_ng = json.load(post(url + "/api/neurograft/synthesize", {
+        "seed": 42,
+        "discount": 0.9,
+        "learning_rate": 0.1,
+    }))
+    assert res_ng["project"] == "NEUROGRAFT"
+    assert res_ng["verified"] is True
+    assert "receipt_sha256" in res_ng
+    assert "successor_representation" in res_ng
+    assert "sharp_wave_ripple_replay" in res_ng
+    assert "graph_laplacian_topological" in res_ng
+    assert "trainable_graph_circuit" in res_ng
+
+    # 3. POST /api/respond with mode="neurograft"
+    resp = json.load(post(url + "/api/respond", {
+        "prompt": "Synthesize Project NEUROGRAFT",
+        "mode": "neurograft",
+    }))
+    assert resp["project"] == "NEUROGRAFT"
+    assert resp["verified"] is True
+
+

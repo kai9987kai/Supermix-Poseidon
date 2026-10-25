@@ -149,7 +149,7 @@ class OmniReasoner:
             return "chronos_quantum_geometry"
         if any(k in q for k in ("aether", "gauge field", "wilson loop", "yang-mills", "jarzynski", "crooks fluctuation", "fisher-rao", "symplectic contact", "stormer-verlet", "open game", "categorical lens")):
             return "aether_gauge_thermo"
-        if any(k in q for k in ("neurograft", "connectome", "liquid time", "ltc", "monoamin", "graft route", "virtual lesion", "synaptic dyad")):
+        if any(k in q for k in ("neurograft", "connectome", "liquid time", "ltc", "monoamin", "graft route", "virtual lesion", "synaptic dyad", "successor representation", "sharp-wave ripple", "swr replay", "graph laplacian spatial", "topological diffusion")):
             return "neurograft_connectome"
         if any(k in q for k in ("hypothesis", "hypotheses", "falsif", "popper", "crucial experiment", "lakatos", "research programme", "paradigm synthesis")):
             return "scientific_hypothesis_falsification"
@@ -394,28 +394,33 @@ class OmniReasoner:
         }
 
     def _simulate_neurograft(self, seed: int = 42) -> Dict[str, Any]:
-        """Runs Project NEUROGRAFT heterogeneous connectome, LTC dynamics, and virtual lesion audit."""
-        from .neurograft import NeurograftEngine
-        engine = NeurograftEngine(seed=seed)
-        res = engine.synthesize(horizon=4)
+        """Runs Stage 31 Project NEUROGRAFT-II Successor Representation, SWR Replay, Graph Laplacian & Trainable Graph Circuit Synthesis."""
+        from .neurograft_engine import NeurograftEngine
+        engine = NeurograftEngine()
+        res = engine.synthesize(seed=seed)
+        sr = res["successor_representation"]
+        swr = res["sharp_wave_ripple_replay"]
+        lap = res["graph_laplacian_topological"]
+        cir = res["trainable_graph_circuit"]
         return {
-            "simulation_type": "Stage 23 Project NEUROGRAFT Bio-Connectome & LTC Dynamic Synthesis",
+            "simulation_type": "Stage 31 Project NEUROGRAFT Successor Representation, SWR Replay & Topological Graph Circuit Synthesis",
             "neurograft_receipt": res,
-            "neuromodulator_regime": res["tri_neuromodulation"]["behavioral_regime"],
-            "dopamine": res["tri_neuromodulation"]["dopamine_level"],
-            "serotonin": res["tri_neuromodulation"]["serotonin_level"],
-            "octopamine": res["tri_neuromodulation"]["octopamine_level"],
-            "cross_graft_entropy": res["cross_graft_routing"]["routing_entropy"],
-            "critical_lesion_target": res["virtual_lesion_audit"]["critical_lesion_target"],
-            "intact_policy_entropy": res["virtual_lesion_audit"]["intact_policy_entropy"],
             "receipt_sha256": res["receipt_sha256"],
+            "swr_sweeps_executed": swr["sweeps_executed"],
+            "swr_total_updates": swr["total_updates"],
+            "fiedler_value": lap["fiedler_value"],
+            "mean_diffusion_distance": lap["mean_diffusion_distance"],
+            "algebraic_connectivity_positive": lap["algebraic_connectivity_positive"],
+            "routing_entropy": cir["routing_entropy"],
+            "mean_null_weight": cir["mean_null_weight"],
+            "circuit_parameters": cir["num_parameters"],
+            "zero_shot_revalued": sr["adaptation"]["zero_shot_revalued"],
             "conclusion": (
-                f"Project NEUROGRAFT multi-species connectome synthesized across 4 graphs "
-                f"({res['connectomes']['worm']['nodes']} C. elegans + {res['connectomes']['fly_female']['nodes']} FlyF + "
-                f"{res['connectomes']['fly_male']['nodes']} FlyM + {res['connectomes']['human']['nodes']} Human nodes). "
-                f"LTC integration stable (contractive={res['ltc_trajectories']['worm']['contractive_stable']}). "
-                f"Neuromodulation regime: '{res['tri_neuromodulation']['behavioral_regime']}' (plasticity eta={res['tri_neuromodulation']['plasticity_multiplier']:.3f}). "
-                f"Critical lesion target '{res['virtual_lesion_audit']['critical_lesion_target']}' with max KL={res['virtual_lesion_audit']['max_kl_divergence']:.4f}."
+                f"Project NEUROGRAFT-II synthesized: Successor representation zero-shot revaluation certified "
+                f"(norm={sr['M_state_norm']:.4f}). SWR reverse replay executed {swr['sweeps_executed']} sweeps "
+                f"({swr['total_updates']} updates). Graph Laplacian Fiedler eigenvalue={lap['fiedler_value']:.4f} "
+                f"(diffusion distance={lap['mean_diffusion_distance']:.4f}). "
+                f"Trainable graph circuit routing entropy={cir['routing_entropy']:.4f} with null weight={cir['mean_null_weight']:.4f}."
             ),
         }
 
