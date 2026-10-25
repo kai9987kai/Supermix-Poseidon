@@ -1611,7 +1611,7 @@ class Poseidon:
             "atlas", "contrast", "horizon", "odyssey", "helm", "odysseus", "mco", "aura", "tessera",
             "mnemorph", "metamorph", "chimera", "hyperion", "titan", "trident", "hyper_agent",
             "ecosystem", "poseidon_x", "nexus_omega", "discovery_lab", "omni_reasoner", "pantheon",
-            "athenaeum", "hephaestus", "hyperborea", "neurograft", "aether", "chronos", "noether", "cartan", "tether")}
+            "athenaeum", "hephaestus", "hyperborea", "neurograft", "aether", "chronos", "noether", "cartan", "tether", "faultline")}
         components.update(external_adapter="external_adapter_status", noosphere="creative_status")
         for name, method in components.items():
             try:
@@ -1664,6 +1664,7 @@ class Poseidon:
                 "noether_invariant_symmetries",
                 "cartan_differential_systems",
                 "tether_reliability_gating",
+                "faultline_joint_failure",
                 "general_hyper_reasoning",
             ],
         }
@@ -2022,6 +2023,28 @@ class Poseidon:
             engine = CartanEngine()
             return engine.synthesize(seed=seed)
 
+    def faultline_status(self):
+        return {
+            "ready": True,
+            "version": "v3.10.0-FAULTLINE-85",
+            "stage": 29,
+            "subsystems": {
+                "discrete_joint_failure_selection": True,
+                "higher_order_hyperedge_proof": True,
+                "condition_stratified_risk_matrix": True,
+                "continuous_joint_error_covariance": True,
+                "minimax_continuous_panel_triage": True,
+                "oracle_active_panel_slicing": True,
+            },
+            "total_verified_domains": 85,
+        }
+
+    def faultline_synthesize(self, seed: int = 42, panel_size: int = 3):
+        with self.lock:
+            from .faultline_engine import FaultlineEngine
+            engine = FaultlineEngine()
+            return engine.synthesize(seed=seed, panel_size=panel_size)
+
     def tether_status(self):
         return {
             "ready": True,
@@ -2078,6 +2101,8 @@ class Poseidon:
         if type(seed) is not int or not 0 <= seed < 2**63:
             raise ValueError("Seed must be a nonnegative integer below 2^63.")
         with self.lock:
+            if mode == "faultline":
+                return self.faultline_synthesize(seed=seed)
             if mode == "tether":
                 return self.tether_synthesize(seed=seed)
             if mode == "cartan":

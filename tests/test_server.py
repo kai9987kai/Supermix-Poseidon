@@ -779,3 +779,42 @@ def test_tether_server_endpoints(server):
     }))
     assert resp["project"] == "TETHER"
     assert resp["verified"] is True
+
+
+def test_faultline_server_endpoints(server):
+    url, _ = server
+
+    # 1. GET /api/faultline/status
+    stat = json.load(urlopen(url + "/api/faultline/status"))
+    assert stat["ready"] is True
+    assert stat["version"] == "v3.10.0-FAULTLINE-85"
+    assert stat["subsystems"]["discrete_joint_failure_selection"] is True
+    assert stat["subsystems"]["higher_order_hyperedge_proof"] is True
+    assert stat["subsystems"]["condition_stratified_risk_matrix"] is True
+    assert stat["subsystems"]["continuous_joint_error_covariance"] is True
+    assert stat["subsystems"]["minimax_continuous_panel_triage"] is True
+    assert stat["subsystems"]["oracle_active_panel_slicing"] is True
+    assert stat["total_verified_domains"] == 85
+
+    # 2. POST /api/faultline/synthesize
+    res_fl = json.load(post(url + "/api/faultline/synthesize", {
+        "seed": 42,
+        "panel_size": 3,
+    }))
+    assert res_fl["project"] == "FAULTLINE"
+    assert res_fl["verified"] is True
+    assert res_fl["joint_advantage"] >= 0.0
+    assert "discrete_analysis" in res_fl
+    assert "continuous_error_covariance" in res_fl
+    assert "continuous_minimax_panel" in res_fl
+    assert "higher_order_parity_proof" in res_fl
+    assert len(res_fl["receipt_sha256"]) == 64
+
+    # 3. POST /api/respond with mode="faultline"
+    resp = json.load(post(url + "/api/respond", {
+        "prompt": "Synthesize Project FAULTLINE",
+        "mode": "faultline",
+    }))
+    assert resp["project"] == "FAULTLINE"
+    assert resp["verified"] is True
+

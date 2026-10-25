@@ -161,11 +161,16 @@ def test_problem_solver_unknown():
         solve_problem("What is the capital of France?")
 
 
-def test_problem_solver_80_capabilities():
+def test_problem_solver_85_capabilities():
     solver = ProblemSolver()
     caps = solver.capabilities()
-    assert len(caps) == 80
+    assert len(caps) == 85
     domains = [c["domain"] for c in caps]
+    assert "faultline_joint_failure_selection" in domains
+    assert "higher_order_failure_hyperedge" in domains
+    assert "condition_stratified_risk_matrix" in domains
+    assert "continuous_joint_error_covariance" in domains
+    assert "ensemble_panel_minimax_triage" in domains
     assert "tether_epistemic_reliability" in domains
     assert "counterfactual_covariation_invariance" in domains
     assert "causal_attribution_saliency" in domains
@@ -1092,5 +1097,50 @@ def test_evidence_calibrated_fallback_gate():
     assert res["domain"] == "evidence_calibrated_fallback_gate"
     assert res["verified"] is True
     assert res["admit_override"] is True
+
+
+def test_faultline_joint_failure_selection():
+    prompt = "Run faultline joint failure selection with panel size=3, policy=joint, and seed=42."
+    res = solve_problem(prompt)
+    assert res["domain"] == "faultline_joint_failure_selection"
+    assert res["verified"] is True
+    assert len(res["selected_panel"]) == 3
+    assert res["joint_advantage"] >= 0.0
+
+
+def test_higher_order_failure_hyperedge():
+    prompt = "Verify higher order failure hyperedge and 3-bit parity benchmark for even parity."
+    res = solve_problem(prompt)
+    assert res["domain"] == "higher_order_failure_hyperedge"
+    assert res["verified"] is True
+    assert res["actual_majority_error"] == 0.75
+    assert res["pairwise_second_moment_bound"] == 0.75
+
+
+def test_condition_stratified_risk_matrix():
+    prompt = "Compute condition stratified risk matrix and co-failure signature with seed=42."
+    res = solve_problem(prompt)
+    assert res["domain"] == "condition_stratified_risk_matrix"
+    assert res["verified"] is True
+    assert len(res["top_signatures"]) > 0
+
+
+def test_continuous_joint_error_covariance():
+    prompt = "Compute continuous joint error covariance matrix and ensemble diversity gain with models=5, samples=64, and seed=42."
+    res = solve_problem(prompt)
+    assert res["domain"] == "continuous_joint_error_covariance"
+    assert res["verified"] is True
+    assert res["ensemble_variance"] > 0.0
+    assert res["diversity_gain"] >= 0.0
+
+
+def test_ensemble_panel_minimax_triage():
+    prompt = "Perform ensemble panel minimax triage to find worst regime error minimization with panel size=3 and seed=42."
+    res = solve_problem(prompt)
+    assert res["domain"] == "ensemble_panel_minimax_triage"
+    assert res["verified"] is True
+    assert len(res["selected_panel"]) == 3
+    assert res["worst_condition_error"] > 0.0
+
 
 

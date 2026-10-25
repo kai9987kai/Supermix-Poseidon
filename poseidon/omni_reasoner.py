@@ -135,6 +135,8 @@ class OmniReasoner:
     def classify_intent(self, query: str) -> str:
         """Classifies the semantic intent of the query to select domain co-processors."""
         q = query.lower()
+        if any(k in q for k in ("faultline", "joint failure", "joint-failure", "co-failure", "cofailure", "hyperedge failure", "parity benchmark", "continuous joint error", "minimax panel", "ensemble triage")):
+            return "faultline_joint_failure"
         if any(k in q for k in ("tether", "epistemic reliability", "counterfactual covariation", "causal attribution", "pathway saliency", "corruption detection", "fallback gate", "specialist reliability", "tether gate")):
             return "tether_reliability_gating"
         if any(k in q for k in ("cartan", "moving frame", "exterior differential", "cartan-kahler", "non-hermitian", "pt-symmetry", "pt-symmetric", "exceptional point", "petermann", "albert algebra", "exceptional jordan", "fano plane", "ryu-takayanagi", "thermofield double", "turing pattern", "chemical morphogenesis", "reaction-diffusion instability")):
@@ -470,6 +472,30 @@ class OmniReasoner:
             ),
         }
 
+    def _simulate_faultline(self, seed: int = 42) -> Dict[str, Any]:
+        """Runs Stage 29 Project FAULTLINE Joint Failure Selection, Parity Proof & Continuous Covariance."""
+        from .faultline_engine import FaultlineEngine
+        engine = FaultlineEngine()
+        res = engine.synthesize(seed=seed, panel_size=3)
+        pol_map = {p["id"]: p for p in res["discrete_analysis"]["policies"]}
+        sel = pol_map["joint"]
+        acc = pol_map["accuracy"]
+        return {
+            "simulation_type": "Stage 29 Project FAULTLINE Joint-Failure Selection & Continuous Covariance",
+            "faultline_receipt": res,
+            "selected_panel": sel["panel"],
+            "joint_advantage": res["joint_advantage"],
+            "worst_condition_error": res["worst_condition_error"],
+            "continuous_minimax_panel": res["continuous_minimax_panel"]["selected_panel"],
+            "parity_divergence_proven": res["higher_order_parity_proof"]["pairwise_divergence_proven"],
+            "receipt_sha256": res["receipt_sha256"],
+            "conclusion": (
+                f"Project FAULTLINE synthesized: Selected joint panel={sel['panel']} achieving worst-condition error {res['worst_condition_error']:.4f} "
+                f"with joint advantage={res['joint_advantage']:.4f} ({res['joint_advantage']*100:.2f}% reduction vs accuracy policy). "
+                f"Continuous minimax panel={res['continuous_minimax_panel']['selected_panel']}, 3-bit parity hyperedge failure divergence verified."
+            ),
+        }
+
     def _simulate_tether(self, seed: int = 42) -> Dict[str, Any]:
         """Runs Stage 28 Project TETHER Continuous Reliability, Causal Co-Variation, Saliency & Fallback Gates."""
         from .tether_engine import TetherEngine
@@ -780,6 +806,12 @@ class OmniReasoner:
                 "will maintain strict gauge invariance, satisfy thermodynamic fluctuation theorems, "
                 "preserve phase-space differential 2-forms, and yield optic Nash equilibrium fixpoints."
             )
+        elif intent == "faultline_joint_failure":
+            hypo_text = (
+                "Hypothesis H1: Deterministic condition-stratified joint failure selection will outperform marginal "
+                "accuracy selection under environmental stress regimes, while continuous error covariance decomposition "
+                "and 3-bit parity hyperedge verification will isolate unanimous failure modes missed by pairwise bounds."
+            )
         elif intent == "tether_reliability_gating":
             hypo_text = (
                 "Hypothesis H1: Learned continuous forensic reliability weighting, four-view paired counterfactual "
@@ -871,6 +903,8 @@ class OmniReasoner:
             sim_result = self._simulate_neurograft(seed)
         elif intent == "aether_gauge_thermo":
             sim_result = self._simulate_aether(seed)
+        elif intent == "faultline_joint_failure":
+            sim_result = self._simulate_faultline(seed)
         elif intent == "tether_reliability_gating":
             sim_result = self._simulate_tether(seed)
         elif intent == "cartan_differential_systems":

@@ -114,6 +114,11 @@ CASES = [
     ("p65", "problem", "Compute causal attribution and pathway saliency with members=5 and sensitivity=1.0", ["pathway contributions", "gini ="]),
     ("p66", "problem", "Run zero-shot corruption detection and detect corrupted specialists with members=5 and corrupted_count=1", ["corrupted detected", "consensus preserved = true"]),
     ("p67", "problem", "Evaluate evidence-calibrated fallback gate with trust=0.85, margin=0.25, and risk=0.10", ["override admitted = true", "decision = qualified_override_admitted"]),
+    ("p68", "problem", "Run faultline joint failure selection with panel size=3, policy=joint, and seed=42", ["selected active panel", "joint failure advantage"]),
+    ("p69", "problem", "Verify higher order failure hyperedge and 3-bit parity benchmark for even parity", ["pairwise second-moment bound", "actual majority error rate"]),
+    ("p70", "problem", "Compute condition stratified risk matrix and co-failure signature with seed=42", ["condition-stratified risk matrix", "dominant joint failure patterns"]),
+    ("p71", "problem", "Compute continuous joint error covariance matrix and ensemble diversity gain with models=5, samples=64, and seed=42", ["continuous joint error covariance", "ensemble diversity gain"]),
+    ("p72", "problem", "Perform ensemble panel minimax triage to find worst regime error minimization with panel size=3 and seed=42", ["minimax continuous triage", "minimax optimal panel"]),
 ]
 
 

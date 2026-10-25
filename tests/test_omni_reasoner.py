@@ -255,6 +255,18 @@ def test_omni_reasoner_tether_synthesis():
     assert len(res.empirical_simulation["receipt_sha256"]) == 64
 
 
+def test_omni_reasoner_faultline_synthesis():
+    reasoner = OmniReasoner(seed=42)
+    res = reasoner.reason("Run Project FAULTLINE joint failure selection, condition-stratified risk matrix, and continuous covariance audit")
+    assert res.intent == "faultline_joint_failure"
+    assert res.verified is False
+    assert "FAULTLINE" in res.empirical_simulation["simulation_type"]
+    assert len(res.empirical_simulation["selected_panel"]) == 3
+    assert res.empirical_simulation["joint_advantage"] >= 0.0
+    assert len(res.empirical_simulation["receipt_sha256"]) == 64
+
+
+
 
 
 

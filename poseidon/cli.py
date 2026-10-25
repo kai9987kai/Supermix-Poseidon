@@ -47,6 +47,7 @@ def main():
         "noether",
         "cartan",
         "tether",
+        "faultline",
     ])
     p.add_argument("prompt", nargs="?", default="")
     p.add_argument("--root", default=".")

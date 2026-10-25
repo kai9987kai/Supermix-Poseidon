@@ -254,6 +254,12 @@ def make_handler(runtime, port):
                 except Exception as error:
                     self.send_json(500, {"error": str(error), "type": type(error).__name__})
                 return
+            if path == "/api/faultline/status":
+                try:
+                    self.send_json(200, runtime.faultline_status())
+                except Exception as error:
+                    self.send_json(500, {"error": str(error), "type": type(error).__name__})
+                return
             if path == "/api/tether/status":
                 try:
                     self.send_json(200, runtime.tether_status())
@@ -701,6 +707,15 @@ def make_handler(runtime, port):
                 try:
                     seed = int(payload.get("seed", 42))
                     res = runtime.cartan_synthesize(seed=seed)
+                    self.send_json(200, res)
+                except Exception as error:
+                    self.send_json(500, {"error": str(error), "type": type(error).__name__})
+                return
+            if path == "/api/faultline/synthesize":
+                try:
+                    seed = int(payload.get("seed", 42))
+                    panel_size = int(payload.get("panel_size", 3))
+                    res = runtime.faultline_synthesize(seed=seed, panel_size=panel_size)
                     self.send_json(200, res)
                 except Exception as error:
                     self.send_json(500, {"error": str(error), "type": type(error).__name__})
