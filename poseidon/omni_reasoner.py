@@ -135,6 +135,8 @@ class OmniReasoner:
     def classify_intent(self, query: str) -> str:
         """Classifies the semantic intent of the query to select domain co-processors."""
         q = query.lower()
+        if any(k in q for k in ("tether", "epistemic reliability", "counterfactual covariation", "causal attribution", "pathway saliency", "corruption detection", "fallback gate", "specialist reliability", "tether gate")):
+            return "tether_reliability_gating"
         if any(k in q for k in ("cartan", "moving frame", "exterior differential", "cartan-kahler", "non-hermitian", "pt-symmetry", "pt-symmetric", "exceptional point", "petermann", "albert algebra", "exceptional jordan", "fano plane", "ryu-takayanagi", "thermofield double", "turing pattern", "chemical morphogenesis", "reaction-diffusion instability")):
             return "cartan_differential_systems"
         if any(k in q for k in ("noether", "lie symmetry", "conserved charge", "poisson bracket", "modular tensor category", "mtc", "verlinde", "clifford sta", "spacetime algebra", "faraday bivector", "batalin-vilkovisky", "bv quantization", "active brownian particle", "active matter")):
@@ -468,6 +470,43 @@ class OmniReasoner:
             ),
         }
 
+    def _simulate_tether(self, seed: int = 42) -> Dict[str, Any]:
+        """Runs Stage 28 Project TETHER Continuous Reliability, Causal Co-Variation, Saliency & Fallback Gates."""
+        from .tether_engine import TetherEngine
+        engine = TetherEngine()
+        preds = [
+            [0.10, 0.20, -0.05, 0.15],
+            [0.11, 0.19, -0.04, 0.14],
+            [0.09, 0.21, -0.06, 0.16],
+            [0.10, 0.20, -0.05, 0.15],
+            [0.90, -0.50, 0.80, -0.70],  # Outlier
+        ]
+        rewards = [1.0, 1.1, 0.9, 1.05, -2.0]
+        res = engine.synthesize(
+            member_predictions=preds,
+            member_rewards=rewards,
+            base_action=0,
+            candidate_action=1,
+            candidate_margin=0.25,
+            corrupted_member_idx=4,
+        )
+        return {
+            "simulation_type": "Stage 28 Project TETHER Continuous Reliability, Causal Co-Variation, Saliency & Fallback Gates",
+            "tether_receipt": res,
+            "weights": res["weights"],
+            "epistemic_trust": res["epistemic_trust"],
+            "corruption_detected": res["corruption_detection"]["corrupted_indices"],
+            "dominant_member": res["attribution"]["dominant_member"],
+            "override_admitted": res["fallback_gate"]["admit_override"],
+            "receipt_sha256": res["receipt_sha256"],
+            "conclusion": (
+                f"Project TETHER synthesized: Epistemic trust tau={res['epistemic_trust']:.4f}, "
+                f"Isolated corrupted specialist={res['corruption_detection']['corrupted_indices']}, "
+                f"Pathway Gini concentration={res['attribution']['gini_concentration']:.4f}, "
+                f"Fallback gate decision={res['fallback_gate']['decision_type']} (selected={res['fallback_gate']['selected_action']})."
+            ),
+        }
+
     def _simulate_cartan(self, seed: int = 42) -> Dict[str, Any]:
         """Runs Stage 27 Project CARTAN Exterior Systems, PT Symmetry, Jordan Algebras, Holographic Entanglement & Turing Morphogenesis."""
         from .cartan import CartanEngine
@@ -741,6 +780,13 @@ class OmniReasoner:
                 "will maintain strict gauge invariance, satisfy thermodynamic fluctuation theorems, "
                 "preserve phase-space differential 2-forms, and yield optic Nash equilibrium fixpoints."
             )
+        elif intent == "tether_reliability_gating":
+            hypo_text = (
+                "Hypothesis H1: Learned continuous forensic reliability weighting, four-view paired counterfactual "
+                "co-variation and perturbation-localized invariance, mechanistic input x gradient causal attribution, "
+                "and evidence-calibrated fallback gating will reliably isolate corrupted or adversarial specialists, "
+                "preserve safe baseline decisions under total spoofing, and guarantee calibrated planning margins."
+            )
         elif intent == "cartan_differential_systems":
             hypo_text = (
                 "Hypothesis H1: Cartan's exterior differential systems on moving frames combined with "
@@ -825,6 +871,8 @@ class OmniReasoner:
             sim_result = self._simulate_neurograft(seed)
         elif intent == "aether_gauge_thermo":
             sim_result = self._simulate_aether(seed)
+        elif intent == "tether_reliability_gating":
+            sim_result = self._simulate_tether(seed)
         elif intent == "cartan_differential_systems":
             sim_result = self._simulate_cartan(seed)
         elif intent == "noether_invariant_symmetries":

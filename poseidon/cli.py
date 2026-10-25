@@ -46,6 +46,7 @@ def main():
         "chronos",
         "noether",
         "cartan",
+        "tether",
     ])
     p.add_argument("prompt", nargs="?", default="")
     p.add_argument("--root", default=".")

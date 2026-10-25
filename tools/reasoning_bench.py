@@ -109,6 +109,11 @@ CASES = [
     ("p60", "problem", "Compute exceptional Jordan algebra Albert algebra h3(O) with diagonal=[2.0, 3.0, 1.0]", ["albert algebra", "det(a) ="]),
     ("p61", "problem", "Compute holographic Ryu-Takayanagi entanglement entropy with central_charge=12.0, length=100.0, and subsystem=25.0", ["ryu-takayanagi", "nats"]),
     ("p62", "problem", "Analyze morphogenetic Turing reaction-diffusion instability with Du=0.01, Dv=0.50, fu=0.6, and gv=-1.1", ["turing active", "kc ="]),
+    ("p63", "problem", "Evaluate tether reliability and expert weighting with ensemble_size=5, temperature=1.0, and outlier_error=0.8", ["tether weights", "epistemic trust tau"]),
+    ("p64", "problem", "Evaluate counterfactual covariation and four-view causal objective for arm=tether, effect_weight=1.0, and invariance_weight=1.0", ["arm = tether", "total loss ="]),
+    ("p65", "problem", "Compute causal attribution and pathway saliency with members=5 and sensitivity=1.0", ["pathway contributions", "gini ="]),
+    ("p66", "problem", "Run zero-shot corruption detection and detect corrupted specialists with members=5 and corrupted_count=1", ["corrupted detected", "consensus preserved = true"]),
+    ("p67", "problem", "Evaluate evidence-calibrated fallback gate with trust=0.85, margin=0.25, and risk=0.10", ["override admitted = true", "decision = qualified_override_admitted"]),
 ]
 
 

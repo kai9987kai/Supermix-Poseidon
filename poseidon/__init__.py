@@ -1,5 +1,5 @@
 """Supermix Poseidon: explicitly bounded, locally trained research system."""
-__version__ = "3.8.0"
+__version__ = "3.9.0"
 
 from .provenance import capture_sources as _capture_sources
 from .cognitive_agent import CognitiveAgent, CognitiveDecision
@@ -151,6 +151,18 @@ from .cartan import (
     HolographicEntanglementEngine,
     MorphogeneticTuringEngine,
     CartanEngine,
+)
+from .tether_engine import (
+    TetherContinuousReliabilityEngine,
+    CounterfactualCovariationInvarianceEngine,
+    CausalAttributionSaliencyEngine,
+    ZeroShotCorruptionDetector,
+    EvidenceCalibratedFallbackGate,
+    TetherEngine,
+)
+from .research.tether_gate import (
+    TetherReliabilityGate,
+    TetherOracleAdapter,
 )
 
 _SOURCE_SNAPSHOT = _capture_sources()

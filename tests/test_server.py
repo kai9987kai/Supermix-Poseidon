@@ -742,3 +742,40 @@ def test_cartan_server_endpoints(server):
     }))
     assert resp["project"] == "CARTAN"
     assert resp["verified"] is True
+
+
+def test_tether_server_endpoints(server):
+    url, _ = server
+
+    # 1. GET /api/tether/status
+    stat = json.load(urlopen(url + "/api/tether/status"))
+    assert stat["ready"] is True
+    assert stat["version"] == "v3.9.0-TETHER-80"
+    assert stat["subsystems"]["continuous_reliability_weighting"] is True
+    assert stat["subsystems"]["counterfactual_covariation_invariance"] is True
+    assert stat["subsystems"]["causal_attribution_saliency"] is True
+    assert stat["subsystems"]["zero_shot_corruption_detection"] is True
+    assert stat["subsystems"]["evidence_calibrated_fallback_gate"] is True
+    assert stat["total_verified_domains"] == 80
+
+    # 2. POST /api/tether/synthesize
+    res_tet = json.load(post(url + "/api/tether/synthesize", {
+        "seed": 42,
+    }))
+    assert res_tet["project"] == "TETHER"
+    assert res_tet["verified"] is True
+    assert res_tet["epistemic_trust"] > 0.0
+    assert res_tet["four_view_causal_invariance"]["arm"] == "tether"
+    assert res_tet["attribution"]["dominant_member"] >= 0
+    assert res_tet["corruption_detection"]["clean_consensus_preserved"] is True
+    assert res_tet["fallback_gate"]["selected_action"] in (0, 1)
+    assert "decision_type" in res_tet["fallback_gate"]
+    assert len(res_tet["receipt_sha256"]) == 64
+
+    # 3. POST /api/respond with mode="tether"
+    resp = json.load(post(url + "/api/respond", {
+        "prompt": "Synthesize Project TETHER",
+        "mode": "tether",
+    }))
+    assert resp["project"] == "TETHER"
+    assert resp["verified"] is True

@@ -161,11 +161,16 @@ def test_problem_solver_unknown():
         solve_problem("What is the capital of France?")
 
 
-def test_problem_solver_75_capabilities():
+def test_problem_solver_80_capabilities():
     solver = ProblemSolver()
     caps = solver.capabilities()
-    assert len(caps) == 75
+    assert len(caps) == 80
     domains = [c["domain"] for c in caps]
+    assert "tether_epistemic_reliability" in domains
+    assert "counterfactual_covariation_invariance" in domains
+    assert "causal_attribution_saliency" in domains
+    assert "zero_shot_corruption_detection" in domains
+    assert "evidence_calibrated_fallback_gate" in domains
     assert "cartan_exterior_systems" in domains
     assert "non_hermitian_pt_symmetry" in domains
     assert "exceptional_jordan_algebra" in domains
@@ -1043,4 +1048,49 @@ def test_morphogenetic_turing_reaction():
     assert res["verified"] is True
     assert res["turing_active"] is True
     assert res["critical_wavenumber"] > 0
+
+
+def test_tether_epistemic_reliability():
+    prompt = "Evaluate tether reliability and expert weighting with ensemble_size=5, temperature=1.0, and outlier_error=0.8."
+    res = solve_problem(prompt)
+    assert res["domain"] == "tether_epistemic_reliability"
+    assert res["verified"] is True
+    assert len(res["weights"]) == 5
+    assert 0.0 <= res["epistemic_trust"] <= 1.0
+
+
+def test_counterfactual_covariation_invariance():
+    prompt = "Evaluate counterfactual covariation and four-view causal objective for arm=tether, effect_weight=1.0, and invariance_weight=1.0."
+    res = solve_problem(prompt)
+    assert res["domain"] == "counterfactual_covariation_invariance"
+    assert res["verified"] is True
+    assert res["arm"] == "tether"
+    assert res["loss"] >= 0.0
+
+
+def test_causal_attribution_saliency():
+    prompt = "Compute causal attribution and pathway saliency with members=5 and sensitivity=1.0."
+    res = solve_problem(prompt)
+    assert res["domain"] == "causal_attribution_saliency"
+    assert res["verified"] is True
+    assert len(res["member_percentages"]) == 5
+    assert 0 <= res["dominant_member"] < 5
+
+
+def test_zero_shot_corruption_detection():
+    prompt = "Run zero-shot corruption detection and detect corrupted specialists with members=5 and corrupted_count=1."
+    res = solve_problem(prompt)
+    assert res["domain"] == "zero_shot_corruption_detection"
+    assert res["verified"] is True
+    assert len(res["corrupted_indices"]) == 1
+    assert res["consensus_preserved"] is True
+
+
+def test_evidence_calibrated_fallback_gate():
+    prompt = "Evaluate evidence-calibrated fallback gate with trust=0.85, margin=0.25, and risk=0.10."
+    res = solve_problem(prompt)
+    assert res["domain"] == "evidence_calibrated_fallback_gate"
+    assert res["verified"] is True
+    assert res["admit_override"] is True
+
 

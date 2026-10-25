@@ -244,5 +244,17 @@ def test_omni_reasoner_cartan_synthesis():
     assert len(res.empirical_simulation["receipt_sha256"]) == 64
 
 
+def test_omni_reasoner_tether_synthesis():
+    reasoner = OmniReasoner(seed=42)
+    res = reasoner.reason("Execute Project TETHER continuous epistemic reliability gating, counterfactual covariation, causal attribution, and fallback gate")
+    assert res.intent == "tether_reliability_gating"
+    assert res.verified is False
+    assert "TETHER" in res.empirical_simulation["simulation_type"]
+    assert 0.0 <= res.empirical_simulation["epistemic_trust"] <= 1.0
+    assert 4 in res.empirical_simulation["corruption_detected"]
+    assert len(res.empirical_simulation["receipt_sha256"]) == 64
+
+
+
 
 

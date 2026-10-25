@@ -2191,6 +2191,8 @@ class CausalDoCalculusSolver:
 
     @classmethod
     def detect(cls, prompt: str) -> Optional[Dict[str, Any]]:
+        if re.search(r"\b(counterfactual\s+covariation|four[- ]view\s+causal|tether\s+invariance|tether)\b", prompt, re.I):
+            return None
         if not re.search(
             r"\b(do-calculus|do\s*\(|backdoor adjustment|average treatment effect|causal effect|simpson'?s paradox|structural causal model|counterfactual abduction|counterfactual|confounder)\b",
             prompt,
@@ -3332,7 +3334,7 @@ class BayesianInferenceSolver:
     @classmethod
     def detect(cls, prompt: str) -> Optional[Dict[str, Any]]:
         if re.search(
-            r"\b(differential privacy|gaussian mechanism|laplace mechanism|advanced composition|privacy budget|solomonoff|kolmogorov complexity|levin search|universal prior|minimum description length|\bmdl\b)\b",
+            r"\b(differential privacy|gaussian mechanism|laplace mechanism|advanced composition|privacy budget|solomonoff|kolmogorov complexity|levin search|universal prior|minimum description length|\bmdl\b|pathway\s+saliency|causal\s+attribution|tether)\b",
             prompt,
             re.I,
         ):
@@ -7968,6 +7970,323 @@ class MorphogeneticTuringSolver:
 
 
 # ---------------------------------------------------------------------------
+# 76. Tether Epistemic Reliability and Expert Weighting
+# ---------------------------------------------------------------------------
+
+class TetherEpistemicReliabilitySolver:
+    name = "tether_epistemic_reliability"
+    description = "Tether continuous reliability weighting, ensemble centroid deviations, aleatoric vs epistemic variance decomposition, and epistemic trust metric tau"
+
+    @classmethod
+    def detect(cls, prompt: str) -> Optional[Dict[str, Any]]:
+        if not re.search(r"\b(tether\s+reliability|tether\s+weighting|epistemic\s+trust|tether\s+expert|reliability\s+weights?|continuous\s+reliability|tether\s+tau)\b", prompt, re.I):
+            return None
+        m_temp = re.search(r"\b(?:temperature|temp)\s*[:=]\s*([-+]?\d+(?:\.\d+)?)", prompt, re.I)
+        m_k = re.search(r"\b(?:ensemble_size|members?|k)\s*[:=]\s*(\d+)", prompt, re.I)
+        m_err = re.search(r"\b(?:outlier_error|error|outlier)\s*[:=]\s*([-+]?\d+(?:\.\d+)?)", prompt, re.I)
+        return {
+            "temperature": float(m_temp.group(1)) if m_temp else 1.0,
+            "ensemble_size": int(m_k.group(1)) if m_k else 5,
+            "outlier_error": float(m_err.group(1)) if m_err else 0.8,
+        }
+
+    def solve(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        from .tether_engine import TetherContinuousReliabilityEngine
+        temp = params.get("temperature", 1.0)
+        K = params.get("ensemble_size", 5)
+        outlier = params.get("outlier_error", 0.8)
+
+        engine = TetherContinuousReliabilityEngine(temperature=temp)
+        preds = [[0.1, 0.2, -0.05, 0.15] for _ in range(K - 1)]
+        preds.append([0.1 + outlier, 0.2 - outlier, -0.05 + outlier, 0.15 - outlier])
+        rewards = [1.0] * (K - 1) + [1.0 - outlier]
+
+        res = engine.evaluate_reliability(preds, rewards=rewards)
+        weights_str = ", ".join(f"m{i}={w:.4f}" for i, w in enumerate(res["weights"]))
+        trace = [
+            _trace("parse", f"Tether continuous reliability model for K={K} members, temperature={temp}, outlier={outlier}."),
+            _trace("search", f"Centroid={res['centroid']}, outlier weight m{K-1}={res['weights'][-1]:.4f} vs consensus m0={res['weights'][0]:.4f}."),
+            _trace("verify", f"Weights partition of unity: sum={sum(res['weights']):.6f}, epistemic trust tau={res['epistemic_trust']:.4f}."),
+        ]
+        text = (
+            f"Tether Continuous Reliability & Expert Weighting:\n"
+            f"- Ensemble Size K: {K} | Temperature: {temp}\n"
+            f"- Specialist Weights: [{weights_str}]\n"
+            f"- Gated Synthesized Delta: {[round(x, 4) for x in res['gated_prediction']]}\n"
+            f"- Gated Reward: {res['gated_reward']:.4f}\n"
+            f"- Epistemic Variance Sum: {sum(res['epistemic_variance']):.6f}\n"
+            f"- Epistemic Trust Metric tau: {res['epistemic_trust']:.4f} (Verified in [0, 1])"
+        )
+        return {
+            "domain": self.name,
+            "text": text,
+            "answer": f"Tether weights = [{weights_str}], epistemic trust tau = {res['epistemic_trust']:.4f}, verified = {res['verified']}",
+            "weights": res["weights"],
+            "epistemic_trust": res["epistemic_trust"],
+            "verified": res["verified"],
+            "backend": "tether-continuous-reliability-engine",
+            "reasoning_trace": trace,
+            "insight": "Tether replaces unweighted averaging with learned forensic trust weights, effectively dampening unreliable and corrupted specialists.",
+        }
+
+
+# ---------------------------------------------------------------------------
+# 77. Counterfactual Co-Variation & Invariance Causal Objectives
+# ---------------------------------------------------------------------------
+
+class CounterfactualCovariationSolver:
+    name = "counterfactual_covariation_invariance"
+    description = "Tether four-view causal training (factual, relevant, irrelevant, damaged), effect co-variation, and perturbation-localized invariance"
+    ARMS = ("passive", "dropout", "iit", "effect_only", "invariance_only", "tether", "unpaired")
+
+    @classmethod
+    def detect(cls, prompt: str) -> Optional[Dict[str, Any]]:
+        if not re.search(r"\b(counterfactual\s+covariation|four[- ]view\s+causal|tether\s+invariance|perturbation[- ]localized|tether\s+arms?|paired\s+causal\s+objective)\b", prompt, re.I):
+            return None
+        m_arm = re.search(r"\b(?:arm|protocol)\s*[:=]\s*(\w+)", prompt, re.I)
+        m_ew = re.search(r"\b(?:effect_weight|ew)\s*[:=]\s*([-+]?\d+(?:\.\d+)?)", prompt, re.I)
+        m_iw = re.search(r"\b(?:invariance_weight|iw)\s*[:=]\s*([-+]?\d+(?:\.\d+)?)", prompt, re.I)
+        return {
+            "arm": m_arm.group(1).lower() if m_arm and m_arm.group(1).lower() in cls.ARMS else "tether",
+            "effect_weight": float(m_ew.group(1)) if m_ew else 1.0,
+            "invariance_weight": float(m_iw.group(1)) if m_iw else 1.0,
+        }
+
+    def solve(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        from .tether_engine import CounterfactualCovariationInvarianceEngine
+        arm = params.get("arm", "tether")
+        ew = params.get("effect_weight", 1.0)
+        iw = params.get("invariance_weight", 1.0)
+
+        engine = CounterfactualCovariationInvarianceEngine(effect_weight=ew, invariance_weight=iw)
+        res = engine.evaluate_four_views(
+            factual_pred=[0.1, 0.2, 0.3],
+            factual_target=[0.1, 0.2, 0.3],
+            relevant_pred=[0.6, 0.7, 0.8],
+            relevant_target=[0.6, 0.7, 0.8],
+            irrelevant_pred=[0.101, 0.201, 0.301],
+            damaged_pred=[0.102, 0.202, 0.302],
+            corrupted_weights=[0.02],
+            arm=arm,
+        )
+        trace = [
+            _trace("parse", f"Four-view counterfactual causal evaluation for arm='{arm}', ew={ew}, iw={iw}."),
+            _trace("search", f"Factual MSE={res['factual_mse']:.6f}, Effect={res['effect_loss']:.6f}, Invariance={res['invariance_loss']:.6f}."),
+            _trace("verify", f"Arm '{arm}' total composite loss={res['loss']:.6f}."),
+        ]
+        text = (
+            f"Counterfactual Co-Variation & Perturbation Invariance:\n"
+            f"- Arm: {arm} | Effect Weight: {ew} | Invariance Weight: {iw}\n"
+            f"- Factual MSE: {res['factual_mse']:.6f}\n"
+            f"- Relevant Effect Loss: {res['effect_loss']:.6f} (repel penalty: {res['repel_penalty']:.6f})\n"
+            f"- Invariance Loss: {res['invariance_loss']:.6f} (damage invariance: {res['damage_invariance']:.6f})\n"
+            f"- Corrupted Weight Penalty: {res['corrupted_weight_penalty']:.6f}\n"
+            f"- Total Differentiable Objective: {res['loss']:.6f}"
+        )
+        return {
+            "domain": self.name,
+            "text": text,
+            "answer": f"Arm = {arm}, total loss = {res['loss']:.6f}, effect = {res['effect_loss']:.6f}, invariance = {res['invariance_loss']:.6f}",
+            "arm": arm,
+            "loss": res["loss"],
+            "effect_loss": res["effect_loss"],
+            "invariance_loss": res["invariance_loss"],
+            "verified": res["verified"],
+            "backend": "counterfactual-covariation-invariance-engine",
+            "reasoning_trace": trace,
+            "insight": "By supervising both co-variation with relevant interventions and invariance under irrelevant/damaged interventions, Tether enforces causal fidelity.",
+        }
+
+
+# ---------------------------------------------------------------------------
+# 78. Causal Attribution and Mechanistic Pathway Saliency
+# ---------------------------------------------------------------------------
+
+class CausalAttributionSaliencySolver:
+    name = "causal_attribution_saliency"
+    description = "Input x Gradient causal attribution, specialist pathway contribution percentages, and Gini concentration index"
+
+    @classmethod
+    def detect(cls, prompt: str) -> Optional[Dict[str, Any]]:
+        if not re.search(r"\b(causal\s+attribution|pathway\s+saliency|input\s+times\s+gradient|gradient\s+attribution|tether\s+saliency|pathway\s+gini)\b", prompt, re.I):
+            return None
+        m_k = re.search(r"\b(?:members?|specialists?|k)\s*[:=]\s*(\d+)", prompt, re.I)
+        m_sens = re.search(r"\b(?:sensitivity|sens)\s*[:=]\s*([-+]?\d+(?:\.\d+)?)", prompt, re.I)
+        return {
+            "members": int(m_k.group(1)) if m_k else 5,
+            "sensitivity": float(m_sens.group(1)) if m_sens else 1.0,
+        }
+
+    def solve(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        from .tether_engine import CausalAttributionSaliencyEngine
+        K = params.get("members", 5)
+        sens = params.get("sensitivity", 1.0)
+
+        engine = CausalAttributionSaliencyEngine()
+        preds = [[0.1 * (k + 1), 0.2 * (k + 1)] for k in range(K)]
+        weights = [1.0 / K] * K
+        weights[0] *= 2.0
+        s_w = sum(weights)
+        weights = [w / s_w for w in weights]
+
+        res = engine.compute_member_saliency(preds, weights, output_sensitivities=[sens, sens])
+        sal_str = ", ".join(f"m{i}: {p:.1f}%" for i, p in enumerate(res["member_percentages"]))
+        trace = [
+            _trace("parse", f"Causal pathway attribution for K={K} specialists, sensitivity={sens}."),
+            _trace("search", f"Member saliencies: {res['member_saliencies']}, dominant member={res['dominant_member']}."),
+            _trace("verify", f"Pathway percentages sum to 100%: Gini={res['pathway_gini_concentration']:.4f}."),
+        ]
+        text = (
+            f"Causal Attribution & Mechanistic Pathway Saliency:\n"
+            f"- Specialists K: {K} | Sensitivity: {sens}\n"
+            f"- Pathway Saliency Contribution: [{sal_str}]\n"
+            f"- Dominant Pathway: Member {res['dominant_member']} ({res['member_percentages'][res['dominant_member']]:.2f}%)\n"
+            f"- Pathway Gini Concentration Index: {res['pathway_gini_concentration']:.4f}"
+        )
+        return {
+            "domain": self.name,
+            "text": text,
+            "answer": f"Pathway contributions = [{sal_str}], dominant = m{res['dominant_member']}, Gini = {res['pathway_gini_concentration']:.4f}",
+            "member_percentages": res["member_percentages"],
+            "dominant_member": res["dominant_member"],
+            "gini_concentration": res["pathway_gini_concentration"],
+            "verified": res["verified"],
+            "backend": "causal-attribution-saliency-engine",
+            "reasoning_trace": trace,
+            "insight": "Input x Gradient attribution reveals exactly which specialist pathways causally determine the receiver's synthesized decisions.",
+        }
+
+
+# ---------------------------------------------------------------------------
+# 79. Zero-Shot Specialist Corruption Detection
+# ---------------------------------------------------------------------------
+
+class ZeroShotCorruptionDetectionSolver:
+    name = "zero_shot_corruption_detection"
+    description = "Dark-knowledge and continuous forensic anomaly detection, pairwise divergence matrix, and zero-shot corrupted specialist isolation"
+
+    @classmethod
+    def detect(cls, prompt: str) -> Optional[Dict[str, Any]]:
+        if not re.search(r"\b(corruption\s+detection|zero[- ]shot\s+corruption|spoofed\s+specialist|damaged\s+specialist|detect\s+corrupted|specialist\s+anomaly)\b", prompt, re.I):
+            return None
+        m_k = re.search(r"\b(?:members?|k)\s*[:=]\s*(\d+)", prompt, re.I)
+        m_corrupt = re.search(r"\b(?:corrupted|corrupted_count|n_corrupt)\s*[:=]\s*(\d+)", prompt, re.I)
+        m_thresh = re.search(r"\b(?:threshold|z_thresh)\s*[:=]\s*([-+]?\d+(?:\.\d+)?)", prompt, re.I)
+        return {
+            "members": int(m_k.group(1)) if m_k else 5,
+            "corrupted_count": int(m_corrupt.group(1)) if m_corrupt else 1,
+            "threshold": float(m_thresh.group(1)) if m_thresh else 1.5,
+        }
+
+    def solve(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        from .tether_engine import ZeroShotCorruptionDetector
+        K = params.get("members", 5)
+        n_corrupt = min(K - 1, params.get("corrupted_count", 1))
+        thresh = params.get("threshold", 1.5)
+
+        detector = ZeroShotCorruptionDetector(z_score_threshold=thresh)
+        preds = [[0.10, 0.20, -0.05] for _ in range(K)]
+        for c in range(n_corrupt):
+            preds[c] = [0.10 + 3.0 * (c + 1), 0.20 + 3.0 * (c + 1), -0.05 + 3.0 * (c + 1)]
+
+        res = detector.detect_corrupted_members(preds)
+        trace = [
+            _trace("parse", f"Specialist corruption detection for K={K} members with {n_corrupt} corrupted, threshold={thresh}."),
+            _trace("search", f"Pairwise disagreements={res['disagreements']}, Z-scores={res['z_scores']}."),
+            _trace("verify", f"Detected corrupted indices={res['corrupted_indices']}, clean consensus preserved={res['clean_consensus_preserved']}."),
+        ]
+        text = (
+            f"Zero-Shot Specialist Corruption Detection:\n"
+            f"- Total Specialists K: {K} | Injected Corrupted: {n_corrupt} | Z-Threshold: {thresh}\n"
+            f"- Detected Corrupted Specialists: {res['corrupted_indices']}\n"
+            f"- Verified Intact Specialists: {res['intact_indices']}\n"
+            f"- Clean Majority Consensus Preserved: {'YES' if res['clean_consensus_preserved'] else 'NO'}\n"
+            f"- Isolation Confidence: {res['isolation_confidence']:.4f}"
+        )
+        return {
+            "domain": self.name,
+            "text": text,
+            "answer": f"Corrupted detected = {res['corrupted_indices']}, intact = {res['intact_indices']}, consensus preserved = {res['clean_consensus_preserved']}",
+            "corrupted_indices": res["corrupted_indices"],
+            "intact_indices": res["intact_indices"],
+            "consensus_preserved": res["clean_consensus_preserved"],
+            "verified": res["verified"],
+            "backend": "zero-shot-corruption-detector",
+            "reasoning_trace": trace,
+            "insight": "By evaluating pairwise divergence and tail dispersion, Tether isolates corrupted or adversarial specialists before they pollute predictions.",
+        }
+
+
+# ---------------------------------------------------------------------------
+# 80. Evidence-Calibrated Fallback Gate
+# ---------------------------------------------------------------------------
+
+class EvidenceCalibratedFallbackSolver:
+    name = "evidence_calibrated_fallback_gate"
+    description = "Epistemic trust evaluation, conformal risk calibration, and safe fallback gate protecting baseline policies against uncalibrated overrides"
+
+    @classmethod
+    def detect(cls, prompt: str) -> Optional[Dict[str, Any]]:
+        if not re.search(r"\b(fallback\s+gate|evidence[- ]calibrated\s+fallback|epistemic\s+fallback|admit\s+override|planning\s+support\s+gate|safe\s+fallback)\b", prompt, re.I):
+            return None
+        m_trust = re.search(r"\b(?:trust|epistemic_trust|tau)\s*[:=]\s*([-+]?\d+(?:\.\d+)?)", prompt, re.I)
+        m_margin = re.search(r"\b(?:margin|cand_margin)\s*[:=]\s*([-+]?\d+(?:\.\d+)?)", prompt, re.I)
+        m_risk = re.search(r"\b(?:risk|calibrated_risk)\s*[:=]\s*([-+]?\d+(?:\.\d+)?)", prompt, re.I)
+        m_base = re.search(r"\b(?:base_action|base)\s*[:=]\s*(\d+)", prompt, re.I)
+        m_cand = re.search(r"\b(?:candidate_action|cand)\s*[:=]\s*(\d+)", prompt, re.I)
+        return {
+            "epistemic_trust": float(m_trust.group(1)) if m_trust else 0.8,
+            "candidate_margin": float(m_margin.group(1)) if m_margin else 0.25,
+            "calibrated_risk": float(m_risk.group(1)) if m_risk else 0.10,
+            "base_action": int(m_base.group(1)) if m_base else 0,
+            "candidate_action": int(m_cand.group(1)) if m_cand else 1,
+        }
+
+    def solve(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        from .tether_engine import EvidenceCalibratedFallbackGate
+        trust = params.get("epistemic_trust", 0.8)
+        margin = params.get("candidate_margin", 0.25)
+        risk = params.get("calibrated_risk", 0.10)
+        base = params.get("base_action", 0)
+        cand = params.get("candidate_action", 1)
+
+        gate = EvidenceCalibratedFallbackGate()
+        res = gate.evaluate_override(
+            base_action=base,
+            candidate_action=cand,
+            candidate_margin=margin,
+            epistemic_trust=trust,
+            calibrated_risk=risk,
+        )
+        trace = [
+            _trace("parse", f"Fallback gate check: trust={trust}, margin={margin}, risk={risk}, base={base}, cand={cand}."),
+            _trace("search", f"Gates: trust_passed={res['trust_passed']}, margin_passed={res['margin_passed']}, risk_passed={res['risk_passed']}."),
+            _trace("verify", f"Decision={res['decision_type']}, selected_action={res['selected_action']}."),
+        ]
+        text = (
+            f"Evidence-Calibrated Fallback Gate Evaluation:\n"
+            f"- Epistemic Trust tau: {trust:.4f} (Threshold: {gate.epistemic_threshold:.2f} -> {'PASS' if res['trust_passed'] else 'FAIL'})\n"
+            f"- Candidate Margin: {margin:.4f} (Threshold: {gate.margin_threshold:.2f} -> {'PASS' if res['margin_passed'] else 'FAIL'})\n"
+            f"- Calibrated Risk: {risk:.4f} (Max: {gate.max_admissible_risk:.2f} -> {'PASS' if res['risk_passed'] else 'FAIL'})\n"
+            f"- Override Admitted: {'YES' if res['admit_override'] else 'NO'}\n"
+            f"- Decision Type: {res['decision_type']}\n"
+            f"- Final Executed Action: Action {res['selected_action']} ({res['reason']})"
+        )
+        return {
+            "domain": self.name,
+            "text": text,
+            "answer": f"Override admitted = {res['admit_override']}, selected action = {res['selected_action']}, decision = {res['decision_type']}",
+            "admit_override": res["admit_override"],
+            "selected_action": res["selected_action"],
+            "decision_type": res["decision_type"],
+            "verified": res["verified"],
+            "backend": "evidence-calibrated-fallback-gate",
+            "reasoning_trace": trace,
+            "insight": "By guaranteeing safe fallback when epistemic trust is insufficient, Tether prevents uncalibrated world models from degrading baseline survival.",
+        }
+
+
+# ---------------------------------------------------------------------------
 # Dispatcher
 # ---------------------------------------------------------------------------
 
@@ -8005,6 +8324,9 @@ class ProblemSolver:
             CartanExteriorSystemSolver(), NonHermitianPTSolver(),
             ExceptionalJordanAlgebraSolver(), HolographicEntanglementSolver(),
             MorphogeneticTuringSolver(),
+            TetherEpistemicReliabilitySolver(), CounterfactualCovariationSolver(),
+            CausalAttributionSaliencySolver(), ZeroShotCorruptionDetectionSolver(),
+            EvidenceCalibratedFallbackSolver(),
         ]
 
     def capabilities(self) -> List[Dict[str, str]]:
