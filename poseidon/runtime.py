@@ -1611,7 +1611,7 @@ class Poseidon:
             "atlas", "contrast", "horizon", "odyssey", "helm", "odysseus", "mco", "aura", "tessera",
             "mnemorph", "metamorph", "chimera", "hyperion", "titan", "trident", "hyper_agent",
             "ecosystem", "poseidon_x", "nexus_omega", "discovery_lab", "omni_reasoner", "pantheon",
-            "athenaeum", "hephaestus", "hyperborea", "neurograft", "aether", "chronos", "noether", "cartan", "tether", "faultline")}
+            "athenaeum", "hephaestus", "hyperborea", "neurograft", "aether", "chronos", "noether", "cartan", "tether", "faultline", "crosswire")}
         components.update(external_adapter="external_adapter_status", noosphere="creative_status")
         for name, method in components.items():
             try:
@@ -1665,6 +1665,7 @@ class Poseidon:
                 "cartan_differential_systems",
                 "tether_reliability_gating",
                 "faultline_joint_failure",
+                "crosswire_interoperability",
                 "general_hyper_reasoning",
             ],
         }
@@ -2023,6 +2024,28 @@ class Poseidon:
             engine = CartanEngine()
             return engine.synthesize(seed=seed)
 
+    def crosswire_status(self):
+        return {
+            "ready": True,
+            "version": "v3.11.0-CROSSWIRE-90",
+            "stage": 30,
+            "subsystems": {
+                "candidate_permutation_space": True,
+                "version_space_tracking": True,
+                "active_diagnostic_probing": True,
+                "all_hypothesis_contract_verification": True,
+                "closed_loop_runtime_shield": True,
+                "external_adapter_interoperability": True,
+            },
+            "total_verified_domains": 90,
+        }
+
+    def crosswire_synthesize(self, seed: int = 42, budget: int = 16, num_actions: int = 4):
+        with self.lock:
+            from .crosswire_engine import CrosswireEngine
+            engine = CrosswireEngine(num_actions=num_actions)
+            return engine.synthesize(seed=seed, budget=budget, num_actions=num_actions)
+
     def faultline_status(self):
         return {
             "ready": True,
@@ -2101,6 +2124,8 @@ class Poseidon:
         if type(seed) is not int or not 0 <= seed < 2**63:
             raise ValueError("Seed must be a nonnegative integer below 2^63.")
         with self.lock:
+            if mode == "crosswire":
+                return self.crosswire_synthesize(seed=seed)
             if mode == "faultline":
                 return self.faultline_synthesize(seed=seed)
             if mode == "tether":

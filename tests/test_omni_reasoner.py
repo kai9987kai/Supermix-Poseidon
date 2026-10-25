@@ -266,6 +266,19 @@ def test_omni_reasoner_faultline_synthesis():
     assert len(res.empirical_simulation["receipt_sha256"]) == 64
 
 
+def test_omni_reasoner_crosswire_synthesis():
+    reasoner = OmniReasoner(seed=42)
+    res = reasoner.reason("Synthesize Project CROSSWIRE unfamiliar protocol interoperability, active diagnostic probing, and closed-loop runtime shielding")
+    assert res.intent == "crosswire_interoperability"
+    assert res.verified is False
+    assert "CROSSWIRE" in res.empirical_simulation["simulation_type"]
+    assert res.empirical_simulation["interoperability_certified"] is True
+    assert res.empirical_simulation["probing_steps"] > 0
+    assert res.empirical_simulation["zero_hazard_violations"] is True
+    assert len(res.empirical_simulation["receipt_sha256"]) == 64
+
+
+
 
 
 

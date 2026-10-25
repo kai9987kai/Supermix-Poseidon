@@ -48,6 +48,7 @@ def main():
         "cartan",
         "tether",
         "faultline",
+        "crosswire",
     ])
     p.add_argument("prompt", nargs="?", default="")
     p.add_argument("--root", default=".")

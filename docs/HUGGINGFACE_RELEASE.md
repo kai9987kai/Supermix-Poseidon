@@ -1,8 +1,8 @@
 # Hugging Face release procedure
 
-Poseidon is a custom PyTorch runtime package hosted at [Kai9987kai/Supermix-Poseidon](https://huggingface.co/Kai9987kai/Supermix-Poseidon). The repository root is not a Transformers `AutoModel` checkpoint. The current source identifies itself as **3.10.0**, with Project FAULTLINE condition-stratified joint failure ensemble selection, Project TETHER continuous reliability gating, and 85-domain Problem Forge alongside experimental mathematical and synthetic research modules around the unchanged selected Tidal core. This guide describes release preparation; it does not assert that a v3.10.0 Hub tag has been published.
+Poseidon is a custom PyTorch runtime package hosted at [Kai9987kai/Supermix-Poseidon](https://huggingface.co/Kai9987kai/Supermix-Poseidon). The repository root is not a Transformers `AutoModel` checkpoint. The current source identifies itself as **3.11.0**, with Project CROSSWIRE unfamiliar interface version space tracking, active diagnostic probing, all-hypothesis contract verification, closed-loop runtime shielding, Project FAULTLINE condition-stratified joint failure ensemble selection, Project TETHER continuous reliability gating, and 90-domain Problem Forge alongside experimental mathematical and synthetic research modules around the unchanged selected Tidal core. This guide describes release preparation; it does not assert that a v3.11.0 Hub tag has been published.
 
-`poseidon.__version__` is the version source for both runtime and distribution metadata. The release builder and verifier share the supported version list, including historical v3.0.0 through v3.10.0 profiles. New v3 profiles retain the required artifact digests and replay evidence from v2.0.0.
+`poseidon.__version__` is the version source for both runtime and distribution metadata. The release builder and verifier share the supported version list, including historical v3.0.0 through v3.11.0 profiles. New v3 profiles retain the required artifact digests and replay evidence from v2.0.0.
 
 ## Download and run
 
@@ -34,9 +34,9 @@ The receipt is bound to the active Tidal checkpoint and TidePool source bytes. I
 Start with a clean Git checkout and a completed `outputs/trident_experiments/RECEIPT.json`. The packager checks the active checkpoints, pinned upstream language files, existing experiment evidence, and the TRIDENT receipt. It rejects dirty source so the manifest can bind a commit. A source checkout, wheel build, or passing unit suite alone does not satisfy these model-release requirements. The build may download pinned historical release assets when they are absent from the local Hub cache.
 
 ```powershell
-python tools/package_huggingface.py --output outputs/releases/poseidon-v3.10.0
-python tools/verify_huggingface_release.py outputs/releases/poseidon-v3.10.0 --smoke
-hf upload Kai9987kai/Supermix-Poseidon outputs/releases/poseidon-v3.10.0 . --commit-message "Release Poseidon v3.10.0"
+python tools/package_huggingface.py --output outputs/releases/poseidon-v3.11.0
+python tools/verify_huggingface_release.py outputs/releases/poseidon-v3.11.0 --smoke
+hf upload Kai9987kai/Supermix-Poseidon outputs/releases/poseidon-v3.11.0 . --commit-message "Release Poseidon v3.11.0"
 ```
 
 After upload, verify the Hub's new commit SHA, intended version tag, model card, manifest, file inventory, and remote file hashes against the local release package. Upload does not itself create a version tag. A local package or successful CLI upload alone is not proof that publication completed. Preserve the existing Hub history and release assets; do not force-push.

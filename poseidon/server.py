@@ -254,6 +254,12 @@ def make_handler(runtime, port):
                 except Exception as error:
                     self.send_json(500, {"error": str(error), "type": type(error).__name__})
                 return
+            if path == "/api/crosswire/status":
+                try:
+                    self.send_json(200, runtime.crosswire_status())
+                except Exception as error:
+                    self.send_json(500, {"error": str(error), "type": type(error).__name__})
+                return
             if path == "/api/faultline/status":
                 try:
                     self.send_json(200, runtime.faultline_status())
@@ -707,6 +713,16 @@ def make_handler(runtime, port):
                 try:
                     seed = int(payload.get("seed", 42))
                     res = runtime.cartan_synthesize(seed=seed)
+                    self.send_json(200, res)
+                except Exception as error:
+                    self.send_json(500, {"error": str(error), "type": type(error).__name__})
+                return
+            if path == "/api/crosswire/synthesize":
+                try:
+                    seed = int(payload.get("seed", 42))
+                    budget = int(payload.get("budget", 16))
+                    num_actions = int(payload.get("num_actions", 4))
+                    res = runtime.crosswire_synthesize(seed=seed, budget=budget, num_actions=num_actions)
                     self.send_json(200, res)
                 except Exception as error:
                     self.send_json(500, {"error": str(error), "type": type(error).__name__})

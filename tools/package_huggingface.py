@@ -117,7 +117,8 @@ Additional modules are software simulations or heuristics: Archimedes computes s
 | SmolLM2: 134,515,008 stored parameters | `models/language/model.safetensors` | Separate unchanged pretrained conversation backend |
 | LoRA: 61,440 parameters | `runs/language/adapter/` | Experimental candidate, inactive by default |
 | Poseidon-X | `poseidon/poseidon_x.py` | Experimental geometric and homeostatic controller; opt-in |
-| Problem Forge | `poseidon/problem_solver.py` | Bounded exact and numerical tools; 85 verified domains |
+| Problem Forge | `poseidon/problem_solver.py` | Bounded exact and numerical tools; 90 verified domains |
+| Project CROSSWIRE | `poseidon/crosswire_engine.py`, `poseidon/research/crosswire_adapter.py` | Version space tracking, active diagnostic probing, all-hypothesis contract verification & closed-loop runtime shielding |
 | Project FAULTLINE | `poseidon/faultline_engine.py`, `poseidon/research/faultline_adapter.py` | Condition-stratified joint failure selection, 3-bit parity hyperedge audit, continuous error covariance & minimax panel triage |
 | Project TETHER | `poseidon/tether_engine.py`, `poseidon/research/tether_gate.py` | Continuous reliability weighting, 4-view causal invariance, input x gradient saliency, consensus isolation & fallback gate |
 | CHRONOS, NOETHER, and CARTAN | `poseidon/chronos.py`, `poseidon/noether.py`, `poseidon/cartan.py` | Experimental mathematical constructions and synthetic telemetry |
@@ -628,7 +629,8 @@ See runs/language/report.json, data/language/SOURCE_CARD.md and the root model c
                        "nexus_search": "federated-associative-vector-lattice-indexing",
                        "external_adapter": "typed-3d-simulation-telemetry-protocol",
                        "nexus_omega": "causal-epigenetic-self-experimenting-discovery-agent",
-                       "problem_forge_85": "verified-85-domain-zero-eval-symbolic-problem-solver",
+                       "problem_forge_90": "verified-90-domain-zero-eval-symbolic-problem-solver",
+                       "crosswire": "crosswire-version-space-active-diagnostic-probing-runtime-shield",
                        "faultline": "faultline-joint-failure-condition-stratified-panel-selection-continuous-covariance",
                        "tether": "tether-continuous-reliability-causal-invariance-fallback-gate",
                        "cartan": "cartan-moving-frames-pt-symmetry-albert-algebra-holographic-turing-engine",

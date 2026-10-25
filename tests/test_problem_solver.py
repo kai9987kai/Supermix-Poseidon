@@ -161,11 +161,16 @@ def test_problem_solver_unknown():
         solve_problem("What is the capital of France?")
 
 
-def test_problem_solver_85_capabilities():
+def test_problem_solver_90_capabilities():
     solver = ProblemSolver()
     caps = solver.capabilities()
-    assert len(caps) == 85
+    assert len(caps) == 90
     domains = [c["domain"] for c in caps]
+    assert "crosswire_version_space_pruning" in domains
+    assert "active_diagnostic_probing" in domains
+    assert "interface_contract_all_hypothesis_verification" in domains
+    assert "closed_loop_runtime_shield" in domains
+    assert "unfamiliar_protocol_interoperability" in domains
     assert "faultline_joint_failure_selection" in domains
     assert "higher_order_failure_hyperedge" in domains
     assert "condition_stratified_risk_matrix" in domains
@@ -1141,6 +1146,51 @@ def test_ensemble_panel_minimax_triage():
     assert res["verified"] is True
     assert len(res["selected_panel"]) == 3
     assert res["worst_condition_error"] > 0.0
+
+
+def test_crosswire_version_space_pruning():
+    prompt = "Prune Crosswire version space with actions=4 and traces=3."
+    res = solve_problem(prompt)
+    assert res["domain"] == "crosswire_version_space_pruning"
+    assert res["verified"] is True
+    assert res["initial_hypotheses"] == 24
+    assert res["surviving_hypotheses"] < 24
+    assert res["entropy_reduction_bits"] > 0.0
+
+
+def test_active_diagnostic_probing():
+    prompt = "Run active diagnostic probing with actions=4 and budget=8."
+    res = solve_problem(prompt)
+    assert res["domain"] == "active_diagnostic_probing"
+    assert res["verified"] is True
+    assert res["steps_executed"] > 0
+    assert res["is_correct"] is True
+
+
+def test_interface_contract_all_hypothesis_verification():
+    prompt = "Verify interface contract all-hypothesis verification for plan=[1, 1] with surviving hypotheses=6 and hazard=4."
+    res = solve_problem(prompt)
+    assert res["domain"] == "interface_contract_all_hypothesis_verification"
+    assert res["verified"] is True
+    assert "admitted" in res
+
+
+def test_closed_loop_runtime_shield():
+    prompt = "Execute closed-loop runtime shield with intended action=2, surviving count=4, and safe fallback=0."
+    res = solve_problem(prompt)
+    assert res["domain"] == "closed_loop_runtime_shield"
+    assert res["verified"] is True
+    assert res["decision"] in ("certified_admit", "shield_intercept_fallback")
+
+
+def test_unfamiliar_protocol_interoperability():
+    prompt = "Synthesize unfamiliar protocol interoperability with actions=4, probing_budget=12, and seed=42."
+    res = solve_problem(prompt)
+    assert res["domain"] == "unfamiliar_protocol_interoperability"
+    assert res["verified"] is True
+    assert res["interoperability_certified"] is True
+    assert res["zero_hazard_violations"] is True
+
 
 
 

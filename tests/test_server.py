@@ -818,3 +818,42 @@ def test_faultline_server_endpoints(server):
     assert resp["project"] == "FAULTLINE"
     assert resp["verified"] is True
 
+
+def test_crosswire_server_endpoints(server):
+    url, _ = server
+
+    # 1. GET /api/crosswire/status
+    stat = json.load(urlopen(url + "/api/crosswire/status"))
+    assert stat["ready"] is True
+    assert stat["version"] == "v3.11.0-CROSSWIRE-90"
+    assert stat["subsystems"]["candidate_permutation_space"] is True
+    assert stat["subsystems"]["version_space_tracking"] is True
+    assert stat["subsystems"]["active_diagnostic_probing"] is True
+    assert stat["subsystems"]["all_hypothesis_contract_verification"] is True
+    assert stat["subsystems"]["closed_loop_runtime_shield"] is True
+    assert stat["subsystems"]["external_adapter_interoperability"] is True
+    assert stat["total_verified_domains"] == 90
+
+    # 2. POST /api/crosswire/synthesize
+    res_cw = json.load(post(url + "/api/crosswire/synthesize", {
+        "seed": 42,
+        "budget": 16,
+        "num_actions": 4,
+    }))
+    assert res_cw["project"] == "CROSSWIRE"
+    assert res_cw["verified"] is True
+    assert "receipt_sha256" in res_cw
+    assert "probing_results" in res_cw
+    assert "contract_verification" in res_cw
+    assert "runtime_shield" in res_cw
+    assert res_cw["telemetry_summary"]["interoperability_certified"] is True
+
+    # 3. POST /api/respond with mode="crosswire"
+    resp = json.load(post(url + "/api/respond", {
+        "prompt": "Synthesize Project CROSSWIRE",
+        "mode": "crosswire",
+    }))
+    assert resp["project"] == "CROSSWIRE"
+    assert resp["verified"] is True
+
+

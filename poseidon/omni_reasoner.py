@@ -135,6 +135,8 @@ class OmniReasoner:
     def classify_intent(self, query: str) -> str:
         """Classifies the semantic intent of the query to select domain co-processors."""
         q = query.lower()
+        if any(k in q for k in ("crosswire", "version space", "diagnostic prob", "runtime shield", "unfamiliar protocol", "interface contract", "hypothesis pruning", "interoperability verification")):
+            return "crosswire_interoperability"
         if any(k in q for k in ("faultline", "joint failure", "joint-failure", "co-failure", "cofailure", "hyperedge failure", "parity benchmark", "continuous joint error", "minimax panel", "ensemble triage")):
             return "faultline_joint_failure"
         if any(k in q for k in ("tether", "epistemic reliability", "counterfactual covariation", "causal attribution", "pathway saliency", "corruption detection", "fallback gate", "specialist reliability", "tether gate")):
@@ -472,6 +474,29 @@ class OmniReasoner:
             ),
         }
 
+    def _simulate_crosswire(self, seed: int = 42) -> Dict[str, Any]:
+        """Runs Stage 30 Project CROSSWIRE Interoperability, Active Probing & Runtime Shielding."""
+        from .crosswire_engine import CrosswireEngine
+        engine = CrosswireEngine(num_actions=4)
+        res = engine.synthesize(seed=seed, budget=16, num_actions=4)
+        return {
+            "simulation_type": "Stage 30 Project CROSSWIRE Interoperability & Runtime Shielding",
+            "crosswire_receipt": res,
+            "receipt_sha256": res["receipt_sha256"],
+            "interoperability_certified": res["telemetry_summary"]["interoperability_certified"],
+            "entropy_reduction_bits": res["telemetry_summary"]["entropy_reduction_bits"],
+            "probing_steps": res["probing_results"]["steps_executed"],
+            "shield_total_intercepts": res["runtime_shield"]["total_intercepts"],
+            "shield_total_admitted": res["runtime_shield"]["total_admitted"],
+            "zero_hazard_violations": res["telemetry_summary"]["zero_hazard_violations"],
+            "conclusion": (
+                f"Project CROSSWIRE synthesized: Interface permutation recovered in {res['probing_results']['steps_executed']} active probes "
+                f"with entropy reduction of {res['telemetry_summary']['entropy_reduction_bits']} bits. "
+                f"Closed-loop runtime shield intercepted ambiguous actions ({res['runtime_shield']['total_intercepts']} intercepts) "
+                f"and enforced safe fallback actions with zero hazard violations (receipt: {res['receipt_sha256'][:16]}...)."
+            ),
+        }
+
     def _simulate_faultline(self, seed: int = 42) -> Dict[str, Any]:
         """Runs Stage 29 Project FAULTLINE Joint Failure Selection, Parity Proof & Continuous Covariance."""
         from .faultline_engine import FaultlineEngine
@@ -806,6 +831,12 @@ class OmniReasoner:
                 "will maintain strict gauge invariance, satisfy thermodynamic fluctuation theorems, "
                 "preserve phase-space differential 2-forms, and yield optic Nash equilibrium fixpoints."
             )
+        elif intent == "crosswire_interoperability":
+            hypo_text = (
+                "Hypothesis H1: Active information-theoretic diagnostic probing will contract the candidate interface "
+                "permutation version space in bounded steps, while closed-loop runtime shielding will enforce the all-hypothesis "
+                "safety invariant Admit(pi) <=> forall h in V(D), h |= Contract(pi) to prevent hazard transitions during adaptation."
+            )
         elif intent == "faultline_joint_failure":
             hypo_text = (
                 "Hypothesis H1: Deterministic condition-stratified joint failure selection will outperform marginal "
@@ -903,6 +934,8 @@ class OmniReasoner:
             sim_result = self._simulate_neurograft(seed)
         elif intent == "aether_gauge_thermo":
             sim_result = self._simulate_aether(seed)
+        elif intent == "crosswire_interoperability":
+            sim_result = self._simulate_crosswire(seed)
         elif intent == "faultline_joint_failure":
             sim_result = self._simulate_faultline(seed)
         elif intent == "tether_reliability_gating":

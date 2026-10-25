@@ -119,6 +119,11 @@ CASES = [
     ("p70", "problem", "Compute condition stratified risk matrix and co-failure signature with seed=42", ["condition-stratified risk matrix", "dominant joint failure patterns"]),
     ("p71", "problem", "Compute continuous joint error covariance matrix and ensemble diversity gain with models=5, samples=64, and seed=42", ["continuous joint error covariance", "ensemble diversity gain"]),
     ("p72", "problem", "Perform ensemble panel minimax triage to find worst regime error minimization with panel size=3 and seed=42", ["minimax continuous triage", "minimax optimal panel"]),
+    ("p73", "problem", "Prune Crosswire version space with actions=4 and traces=3", ["surviving version space", "final entropy"]),
+    ("p74", "problem", "Run active diagnostic probing with actions=4 and budget=8", ["probing steps executed", "final surviving"]),
+    ("p75", "problem", "Verify interface contract all-hypothesis verification for plan=[1, 1] with surviving hypotheses=6 and hazard=4", ["plan admitted", "satisfying"]),
+    ("p76", "problem", "Execute closed-loop runtime shield with intended action=2, surviving count=4, and safe fallback=0", ["decision", "dispatched action"]),
+    ("p77", "problem", "Synthesize unfamiliar protocol interoperability with actions=4, probing_budget=12, and seed=42", ["interoperability certified", "probing steps"]),
 ]
 
 
