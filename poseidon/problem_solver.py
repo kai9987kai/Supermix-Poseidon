@@ -9208,6 +9208,332 @@ class TrainableNeuralGraftRoutingSolver:
 
 
 # ---------------------------------------------------------------------------
+# 96. Poincaré Surface of Section & Hamiltonian Chaos
+# ---------------------------------------------------------------------------
+
+class PoincareReturnMapChaosSolver:
+    name = "poincare_return_map_chaos"
+    description = "Poincaré surface of section, Chirikov standard map, Lyapunov exponent pairing, and KAM invariant torus stability"
+
+    @classmethod
+    def detect(cls, prompt: str) -> Optional[Dict[str, Any]]:
+        if not re.search(r"\b(poincare\s+return\s+map|poincare\s+surface\s+of\s+section|chirikov\s+standard\s+map|chirikov\s+map|standard\s+map\s+chaos|kam\s+invariant\s+torus|kam\s+torus|lyapunov\s+spectrum\s+pairing)\b", prompt, re.I):
+            return None
+        m_k = re.search(r"\b(?:stochastic_k|k|parameter_k)\s*[=:]\s*([-+]?\d+(?:\.\d+)?)\b", prompt, re.I)
+        m_iter = re.search(r"\b(?:iterations|steps)\s*[=:]\s*(\d+)\b", prompt, re.I)
+        return {
+            "stochastic_k": float(m_k.group(1)) if m_k else 0.85,
+            "iterations": int(m_iter.group(1)) if m_iter else 500,
+        }
+
+    def solve(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        from .poincare_engine import PoincareReturnMapEngine
+        k = params.get("stochastic_k", 0.85)
+        iters = params.get("iterations", 500)
+
+        engine = PoincareReturnMapEngine(stochastic_parameter_k=k, seed=42)
+        res = engine.compute_lyapunov_spectrum(iterations=iters)
+
+        trace = [
+            _trace("parse", f"Chirikov standard map: stochastic_k={k}, iterations={iters}."),
+            _trace("search", f"Evolved tangent space via Gram-Schmidt reorthonormalization, verifying symplectic pairing sum."),
+            _trace("verify", f"Lyapunov exponents: lambda_1={res['lambda_1']}, lambda_2={res['lambda_2']}, pairing_residual={res['pairing_residual']:.6f}, regime={res['regime']}."),
+        ]
+        text = (
+            f"Poincaré Return Map & Hamiltonian Chaos (Chirikov Standard Map):\n"
+            f"- Stochastic Perturbation Parameter K: {k}\n"
+            f"- Phase Space Iterations: {iters}\n"
+            f"- Largest Lyapunov Exponent (lambda_1): {res['lambda_1']:.4f}\n"
+            f"- Second Lyapunov Exponent (lambda_2): {res['lambda_2']:.4f}\n"
+            f"- Symplectic Pairing Sum (lambda_1 + lambda_2): {res['pairing_sum']:.6f}\n"
+            f"- Area Preserving Verified: {res['area_preserving_verified']}\n"
+            f"- Finite-Orbit Regime Heuristic: {res['regime']}\n"
+            f"- Reference KAM Threshold K_c: {res['kam_critical_threshold']:.6f}\n"
+            f"Finite-time diagnostics do not establish an invariant torus or a chaos theorem."
+        )
+        return {
+            "domain": self.name,
+            "text": text,
+            "answer": f"lambda_1 = {res['lambda_1']:.4f}, lambda_2 = {res['lambda_2']:.4f}, pairing sum = {res['pairing_sum']:.6f}, regime = {res['regime']}",
+            "lambda_1": res["lambda_1"],
+            "lambda_2": res["lambda_2"],
+            "pairing_sum": res["pairing_sum"],
+            "area_preserving_verified": res["area_preserving_verified"],
+            "regime": res["regime"],
+            "verified": True,
+            "backend": "poincare-standard-map-engine",
+            "reasoning_trace": trace,
+            "evidence_scope": "finite_orbit_numerical_diagnostics",
+            "insight": "Area preservation provides a consistency check on numerical exponent pairing. This finite orbit and its regime heuristic do not prove KAM stability or global chaos.",
+        }
+
+
+# ---------------------------------------------------------------------------
+# 97. Hyperbolic Poincaré Disk & Möbius Gyrovector Geometry
+# ---------------------------------------------------------------------------
+
+class HyperbolicPoincareDiskGeodesicSolver:
+    name = "hyperbolic_poincare_disk_geodesic"
+    description = "Hyperbolic Poincaré disk metric, exact geodesic distance, Möbius gyrovector addition, and Gromov delta-hyperbolicity"
+
+    @classmethod
+    def detect(cls, prompt: str) -> Optional[Dict[str, Any]]:
+        if not re.search(r"\b(hyperbolic\s+poincare\s+disk|poincare\s+disk\s+geodesic|mobius\s+gyrovector|mobius\s+addition|gromov\s+delta[- ]*hyperbolic|poincare\s+ball\s+metric)\b", prompt, re.I):
+            return None
+        m_c = re.search(r"\b(?:curvature|c)\s*[=:]\s*([-+]?\d+(?:\.\d+)?)\b", prompt, re.I)
+        m_u = re.search(r"\bu\s*[=:]\s*\[\s*([-+]?\d+(?:\.\d+)?)\s*,\s*([-+]?\d+(?:\.\d+)?)\s*\]", prompt, re.I)
+        m_v = re.search(r"\bv\s*[=:]\s*\[\s*([-+]?\d+(?:\.\d+)?)\s*,\s*([-+]?\d+(?:\.\d+)?)\s*\]", prompt, re.I)
+        u = [float(m_u.group(1)), float(m_u.group(2))] if m_u else [0.2, 0.3]
+        v = [float(m_v.group(1)), float(m_v.group(2))] if m_v else [-0.4, 0.1]
+        return {
+            "curvature_c": float(m_c.group(1)) if m_c else 1.0,
+            "point_u": u,
+            "point_v": v,
+        }
+
+    def solve(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        from .poincare_engine import HyperbolicPoincareDiskEngine
+        c = params.get("curvature_c", 1.0)
+        u = params.get("point_u", [0.2, 0.3])
+        v = params.get("point_v", [-0.4, 0.1])
+
+        engine = HyperbolicPoincareDiskEngine(curvature_c=c)
+        dist_uv = engine.poincare_distance(u, v)
+        mobius_sum = engine.mobius_addition(u, v)
+
+        # Check Gromov 4-point condition on canonical quad
+        quad = [u, v, [0.0, 0.0], [0.1, -0.2]]
+        gromov = engine.check_gromov_four_point_condition(quad)
+
+        trace = [
+            _trace("parse", f"Poincaré disk geometry: curvature={c}, u={u}, v={v}."),
+            _trace("search", f"Computed exact Riemannian geodesic distance d_B(u, v) and Möbius gyrovector addition u (+) v."),
+            _trace("verify", f"Distance={dist_uv:.4f}, Möbius sum={[round(x, 4) for x in mobius_sum]}, Gromov delta={gromov['delta_hyperbolicity']:.4f}."),
+        ]
+        text = (
+            f"Hyperbolic Poincaré Disk & Möbius Gyrovector Geometry:\n"
+            f"- Curvature Parameter c: {c}\n"
+            f"- Point u: {u}\n"
+            f"- Point v: {v}\n"
+            f"- Geodesic Distance d_B(u, v): {dist_uv:.4f}\n"
+            f"- Möbius Gyrovector Sum u (+) v: {[round(x, 4) for x in mobius_sum]}\n"
+            f"- Gromov delta-Hyperbolicity: {gromov['delta_hyperbolicity']:.4f}\n"
+            f"- Hyperbolic Bound Satisfied: {gromov['is_delta_hyperbolic']}"
+        )
+        return {
+            "domain": self.name,
+            "text": text,
+            "answer": f"Geodesic distance = {dist_uv:.4f}, Mobius sum = {[round(x, 4) for x in mobius_sum]}, Gromov delta = {gromov['delta_hyperbolicity']:.4f}",
+            "geodesic_distance": round(dist_uv, 4),
+            "mobius_addition": [round(x, 4) for x in mobius_sum],
+            "delta_hyperbolicity": gromov["delta_hyperbolicity"],
+            "is_delta_hyperbolic": gromov["is_delta_hyperbolic"],
+            "verified": True,
+            "backend": "hyperbolic-poincare-disk-engine",
+            "reasoning_trace": trace,
+            "insight": "Negative sectional curvature in the Poincaré disk model produces exponential volume expansion, allowing hierarchical tree-like structures to embed with minimal distortion via Möbius gyrovector operations.",
+        }
+
+
+# ---------------------------------------------------------------------------
+# 98. Algebraic Topology Poincaré Duality & Morse Complex
+# ---------------------------------------------------------------------------
+
+class PoincareDualityMorseComplexSolver:
+    name = "poincare_duality_morse_complex"
+    description = "Algebraic topology Poincaré duality, chain complexes, boundary nilpotency (d^2 = 0), and Euler-Poincaré characteristic"
+
+    @classmethod
+    def detect(cls, prompt: str) -> Optional[Dict[str, Any]]:
+        if not re.search(r"\b(poincare\s+duality|morse\s+chain\s+complex|boundary\s+nilpotency|morse\s+smale\s+complex|euler[- ]*poincare\s+characteristic|poincare\s+betti\s+duality)\b", prompt, re.I):
+            return None
+        m_surf = re.search(r"\b(?:surface|manifold|type)\s*[=:]\s*([a-zA-Z0-9_\-]+)\b", prompt, re.I)
+        surface_type = m_surf.group(1).lower() if m_surf else "torus"
+        return {
+            "surface_type": surface_type,
+        }
+
+    def solve(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        from .poincare_engine import PoincareDualityMorseEngine
+        surface = params.get("surface_type", "torus")
+
+        engine = PoincareDualityMorseEngine()
+        res = engine.verify_poincare_duality(surface_type=surface)
+
+        trace = [
+            _trace("parse", f"Poincaré duality analysis for manifold: {surface}."),
+            _trace("search", f"Formulated cellular chain complex, evaluated boundary operators d_k, and computed homology ranks."),
+            _trace("verify", f"Betti numbers: {res['betti_numbers']}, Euler chi: {res['euler_characteristic']}, Poincaré duality pairs: {res['poincare_duality_pairs']}."),
+        ]
+        text = (
+            f"Algebraic Topology Poincaré Duality & Morse Complex:\n"
+            f"- Manifold Type: {surface.title()}\n"
+            f"- Manifold Dimension n: {res['manifold_dimension']}\n"
+            f"- Betti Numbers: {res['betti_numbers']}\n"
+            f"- Euler-Poincaré Characteristic (chi): {res['euler_characteristic']}\n"
+            f"- Boundary Operator Nilpotency (d^2 = 0): {res['boundary_nilpotency_verified']}\n"
+            f"- Poincaré Duality Pairs (beta_k == beta_{{n-k}}): {res['poincare_duality_pairs']}\n"
+            f"- Poincaré Duality Holds: {res['poincare_duality_verified']}"
+        )
+        return {
+            "domain": self.name,
+            "text": text,
+            "answer": f"Betti numbers = {res['betti_numbers']}, Euler chi = {res['euler_characteristic']}, Poincare duality = {res['poincare_duality_verified']}",
+            "betti_numbers": res["betti_numbers"],
+            "euler_characteristic": res["euler_characteristic"],
+            "poincare_duality_verified": res["poincare_duality_verified"],
+            "boundary_nilpotency_verified": res["boundary_nilpotency_verified"],
+            "verified": True,
+            "backend": "poincare-duality-morse-engine",
+            "reasoning_trace": trace,
+            "insight": "On closed orientable n-manifolds, Poincaré Duality establishes an isomorphism between the k-th homology and (n-k)-th cohomology groups, guaranteeing beta_k = beta_{n-k} and linking local cell geometry to global topological invariants.",
+        }
+
+
+# ---------------------------------------------------------------------------
+# 99. Hamilton-Perelman Normalized Ricci Flow & W-Entropy
+# ---------------------------------------------------------------------------
+
+class RicciFlowPerelmanEntropySolver:
+    name = "ricci_flow_perelman_entropy"
+    description = "Hamilton-Perelman normalized surface Ricci flow, Gauss-Bonnet conservation, and monotonic Perelman W-entropy"
+
+    @classmethod
+    def detect(cls, prompt: str) -> Optional[Dict[str, Any]]:
+        if not re.search(r"\b(ricci\s+flow|perelman\s+entropy|normalized\s+ricci\s+flow|perelman\s+f[- ]*functional|perelman\s+w[- ]*entropy|hamilton\s+perelman\s+ricci)\b", prompt, re.I):
+            return None
+        m_v = re.search(r"\b(?:vertices|num_vertices|nodes)\s*[=:]\s*(\d+)\b", prompt, re.I)
+        m_s = re.search(r"\b(?:steps|iterations)\s*[=:]\s*(\d+)\b", prompt, re.I)
+        m_chi = re.search(r"\b(?:euler|chi)\s*[=:]\s*([-+]?\d+)\b", prompt, re.I)
+        return {
+            "num_vertices": int(m_v.group(1)) if m_v else 6,
+            "steps": int(m_s.group(1)) if m_s else 30,
+            "euler_characteristic": int(m_chi.group(1)) if m_chi else 2,
+        }
+
+    def solve(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        from .poincare_engine import RicciFlowPerelmanEngine
+        n_v = params.get("num_vertices", 6)
+        steps = params.get("steps", 30)
+        chi = params.get("euler_characteristic", 2)
+
+        engine = RicciFlowPerelmanEngine(num_vertices=n_v, seed=42)
+        res = engine.run_discrete_ricci_flow(euler_characteristic=chi, steps=steps)
+
+        trace = [
+            _trace("parse", f"Mean-curvature relaxation surrogate: vertices={n_v}, steps={steps}, chi={chi}."),
+            _trace("search", "Relaxed curvature values toward their mean with an imposed total; no geometric metric evolution."),
+            _trace("verify", f"Imposed total conserved: {res['gauss_bonnet_conserved']}, variance ratio: {res['curvature_variance_reduction_ratio']}, entropy proxy monotonic: {res['perelman_entropy_monotonic']}."),
+        ]
+        text = (
+            f"Mean-Curvature Relaxation Surrogate:\n"
+            f"- Vertices: {n_v}\n"
+            f"- Euler Characteristic (chi): {chi}\n"
+            f"- Target Constant Curvature K_bar: {res['target_constant_curvature_k_bar']:.4f}\n"
+            f"- Initial Curvature Variance: {res['initial_curvature_variance']:.6f}\n"
+            f"- Final Curvature Variance: {res['final_curvature_variance']:.6f}\n"
+            f"- Curvature Variance Reduction Ratio: {res['curvature_variance_reduction_ratio']:.4f}\n"
+            f"- Gauss-Bonnet Conservation: {res['gauss_bonnet_conserved']}\n"
+            f"- Entropy Proxy Monotonic: {res['perelman_entropy_monotonic']}\n"
+            f"This calculation does not implement geometric Ricci flow or verify Perelman entropy."
+        )
+        return {
+            "domain": self.name,
+            "text": text,
+            "answer": f"K_bar = {res['target_constant_curvature_k_bar']:.4f}, variance reduction = {res['curvature_variance_reduction_ratio']:.4f}, Gauss-Bonnet conserved = {res['gauss_bonnet_conserved']}, entropy monotonic = {res['perelman_entropy_monotonic']}",
+            "target_constant_curvature_k_bar": res["target_constant_curvature_k_bar"],
+            "curvature_variance_reduction_ratio": res["curvature_variance_reduction_ratio"],
+            "variance_reduction": res["variance_reduction"],
+            "gauss_bonnet_conserved": res["gauss_bonnet_conserved"],
+            "perelman_entropy_monotonic": res["perelman_entropy_monotonic"],
+            "perelman_entropy_verified": False,
+            "evidence_scope": res["evidence_scope"],
+            "verified": res["verified"],
+            "backend": "ricci-flow-perelman-engine",
+            "reasoning_trace": trace,
+            "insight": "This finite mean-relaxation model tests variance reduction and conservation of its imposed total. Its entropy proxy is separate from Perelman's geometric entropy.",
+        }
+
+
+# ---------------------------------------------------------------------------
+# 100. Unified Quartet Cognitive Synthesis (The Centurion Domain!)
+# ---------------------------------------------------------------------------
+
+class UnifiedQuartetCognitiveSynthesisSolver:
+    name = "unified_quartet_cognitive_synthesis"
+    description = "Unified quartet cognitive synthesis chaining TETHER, FAULTLINE, CROSSWIRE, and NEUROGRAFT-II with Poincaré recurrence"
+
+    @classmethod
+    def detect(cls, prompt: str) -> Optional[Dict[str, Any]]:
+        if not re.search(r"\b(unified\s+quartet|quartet\s+cognitive\s+synthesis|tether\s+faultline\s+crosswire\s+neurograft|centurion\s+cognitive\s+synthesis|poincare\s+quartet\s+coordinator)\b", prompt, re.I):
+            return None
+        m_base = re.search(r"\b(?:base_action|base)\s*[=:]\s*(\d+)\b", prompt, re.I)
+        m_cand = re.search(r"\b(?:intended_action|intended|cand)\s*[=:]\s*(\d+)\b", prompt, re.I)
+        m_haz = re.search(r"\b(?:hazard_action|hazard)\s*[=:]\s*(\d+)\b", prompt, re.I)
+        return {
+            "base_action": int(m_base.group(1)) if m_base else 0,
+            "intended_action": int(m_cand.group(1)) if m_cand else 1,
+            "hazard_action": int(m_haz.group(1)) if m_haz else 5,
+        }
+
+    def solve(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        from .poincare_engine import UnifiedQuartetCognitiveEngine
+        base = params.get("base_action", 0)
+        cand = params.get("intended_action", 1)
+        haz = params.get("hazard_action", 5)
+
+        engine = UnifiedQuartetCognitiveEngine(seed=42)
+        res = engine.synthesize_quartet_decision(
+            observation_16d=[0.9, 0.85, 0.8, 0.75] + [0.1] * 12,
+            base_policy_action=base,
+            intended_action=cand,
+            hazard_action=haz,
+        )
+
+        trace = [
+            _trace("parse", f"Unified Quartet synthesis: base={base}, intended={cand}, hazard={haz}."),
+            _trace("search", f"Chained CROSSWIRE shield -> FAULTLINE minimax panel -> TETHER epistemic reliability -> NEUROGRAFT value alignment -> POINCARÉ stability."),
+            _trace("verify", f"Final action: {res['final_dispatched_action']}, override: {res['override_admitted']}, shield: {res['crosswire_shield_decision']}, trust: {res['tether_epistemic_trust']:.3f}, panel: {res['faultline_active_panel']}."),
+        ]
+        text = (
+            f"Unified Quartet Synthetic Integration Diagnostic:\n"
+            f"- Base Policy Action: {base}\n"
+            f"- Intended Action: {cand}\n"
+            f"- Final Dispatched Action: {res['final_dispatched_action']}\n"
+            f"- Override Admitted: {res['override_admitted']}\n"
+            f"- CROSSWIRE Shield Decision: {res['crosswire_shield_decision']}\n"
+            f"- FAULTLINE Active Panel: {res['faultline_active_panel']} (Diversity Gain: +{res['faultline_diversity_gain']*100:.1f}%)\n"
+            f"- TETHER Epistemic Trust (tau): {res['tether_epistemic_trust']:.4f}\n"
+            f"- TETHER Gate Decision: {res['tether_gate_decision']}\n"
+            f"- NEUROGRAFT Successor Value Aligned: {res['successor_value_aligned']}\n"
+            f"- Observation Reserve Heuristic: {res['lyapunov_homeostatic_stable']}\n"
+            f"- Tamper-Evident Receipt SHA-256: {res['receipt_sha256']}"
+        )
+        return {
+            "domain": self.name,
+            "text": text,
+            "answer": f"Final action = {res['final_dispatched_action']}, override admitted = {res['override_admitted']}, shield = {res['crosswire_shield_decision']}, trust = {res['tether_epistemic_trust']:.4f}, panel = {res['faultline_active_panel']}",
+            "final_dispatched_action": res["final_dispatched_action"],
+            "final_action": res["final_dispatched_action"],
+            "panel": res["faultline_active_panel"],
+            "override_admitted": res["override_admitted"],
+            "crosswire_shield_decision": res["crosswire_shield_decision"],
+            "faultline_active_panel": res["faultline_active_panel"],
+            "faultline_diversity_gain": res["faultline_diversity_gain"],
+            "tether_epistemic_trust": res["tether_epistemic_trust"],
+            "successor_value_aligned": res["successor_value_aligned"],
+            "lyapunov_homeostatic_stable": res["lyapunov_homeostatic_stable"],
+            "receipt_sha256": res["receipt_sha256"],
+            "verified": res["verified"],
+            "evidence_scope": res["evidence_scope"],
+            "safety_certified": False,
+            "backend": "unified-quartet-cognitive-engine",
+            "reasoning_trace": trace,
+            "insight": "This diagnostic uses synthetic fixtures and a fixed observation. It establishes no learned reliability, optimality, or live policy safety; the separate opt-in coordinator requires caller-supplied evidence.",
+        }
+
+
+# ---------------------------------------------------------------------------
 # Dispatcher
 # ---------------------------------------------------------------------------
 
@@ -9257,6 +9583,9 @@ class ProblemSolver:
             SuccessorRepresentationTDLearningSolver(), SuccessorRewardRevaluationSolver(),
             SharpWaveRippleReverseReplaySolver(), GraphLaplacianSpatialEigenvectorsSolver(),
             TrainableNeuralGraftRoutingSolver(),
+            PoincareReturnMapChaosSolver(), HyperbolicPoincareDiskGeodesicSolver(),
+            PoincareDualityMorseComplexSolver(), RicciFlowPerelmanEntropySolver(),
+            UnifiedQuartetCognitiveSynthesisSolver(),
         ]
 
     def capabilities(self) -> List[Dict[str, str]]:

@@ -4,15 +4,10 @@ Integrates FAULTLINE's condition-stratified joint-failure ensemble selection,
 higher-order co-failure auditing, and continuous joint error covariance
 minimization with Poseidon's ORACLE world model ensemble and TETHER reliability gate.
 
-Responsibilities:
-1. Condition-stratified audit: Collects ORACLE forecasts under stress conditions
-   (normal, scarce, storm, depleted) into 'faultline-dataset-v1' format.
-2. Multi-policy panel selection: Evaluates all (M choose K) panels across
-   accuracy, pairwise, pooled, and joint policies.
-3. Continuous covariance optimization: Evaluates Sigma_joint and selects minimax
-   variance-minimizing panels across environmental regimes.
-4. Active panel slicing: Routes only certified low-joint-risk specialists to
-   Tether's continuous reliability weighting and fallback gate.
+The default audit uses canonical synthetic predictions and simulated errors,
+not forecasts collected from the selected ORACLE artifact. Panel slicing is
+available for diagnostics, but selection and calibration evidence for the
+changed predictor are absent. Planning therefore preserves the frozen policy.
 """
 
 from __future__ import annotations
@@ -80,6 +75,8 @@ class FaultlineOracleAdapter(nn.Module):
         self.audit_receipt: Optional[Dict[str, Any]] = None
         self.active_panel: List[int] = list(range(min(self.panel_size, self.n_members)))
         self.active_panel_ids: List[str] = [f"m{i+1}" for i in self.active_panel]
+        self.active_panel_source = "unvalidated_default_first_members"
+        self.register_buffer("is_calibrated", torch.tensor(False))
 
         # Initial benchmark audit
         self.run_calibration_audit(seed=self.seed)
@@ -89,7 +86,13 @@ class FaultlineOracleAdapter(nn.Module):
         dataset: Optional[Dict[str, Any]] = None,
         seed: int = 42,
     ) -> Dict[str, Any]:
-        """Run complete FAULTLINE discrete & continuous panel audit."""
+        """Audit an unbound dataset and synthetic continuous errors.
+
+        The historical method name does not mean it calibrates the panel
+        predictor. No audit here binds member IDs or forecasts to ORACLE.
+        """
+        self.panel_selection_scope = ("canonical_synthetic_fixture_not_oracle" if dataset is None
+                                      else "caller_supplied_dataset_unbound_to_oracle")
         if dataset is None:
             dataset = FaultlineEngine._create_canonical_dataset(seed=seed)
 
@@ -112,8 +115,10 @@ class FaultlineOracleAdapter(nn.Module):
         selected_res = next(p for p in analysis["policies"] if p["id"] == self.primary_policy)
         accuracy_res = next(p for p in analysis["policies"] if p["id"] == "accuracy")
 
-        self.active_panel = list(selected_res["panel_indices"])
-        self.active_panel_ids = list(selected_res["panel"])
+        if self.oracle is None:
+            self.active_panel = list(selected_res["panel_indices"])
+            self.active_panel_ids = list(selected_res["panel"])
+            self.active_panel_source = "synthetic_fixture_selection"
 
         # Compute joint advantage: accuracy worst-case error minus joint worst-case error
         acc_worst = accuracy_res["test"]["worst_group_error"]
@@ -130,6 +135,9 @@ class FaultlineOracleAdapter(nn.Module):
             "joint_advantage": float(joint_advantage),
             "worst_condition_error": float(joint_worst),
             "minimax_continuous_panel": cont_eval["selected_panel"],
+            "selection_scope": self.panel_selection_scope,
+            "continuous_evaluation_scope": "synthetic_conditioned_errors_not_oracle",
+            "applied_to_oracle": False,
         }
         receipt_str = json.dumps(audit_body, sort_keys=True)
         sha256 = hashlib.sha256(receipt_str.encode("utf-8")).hexdigest()
@@ -145,6 +153,9 @@ class FaultlineOracleAdapter(nn.Module):
             "joint_advantage": float(joint_advantage),
             "worst_condition_error": float(joint_worst),
             "accuracy_worst_condition_error": float(acc_worst),
+            "selection_scope": self.panel_selection_scope,
+            "continuous_evaluation_scope": "synthetic_conditioned_errors_not_oracle",
+            "applied_to_oracle": False,
         }
         return self.audit_receipt
 
@@ -157,6 +168,7 @@ class FaultlineOracleAdapter(nn.Module):
             raise ValueError(f"Panel size mismatch: expected {self.panel_size}, got {len(panel_indices)}")
         self.active_panel = list(panel_indices)
         self.active_panel_ids = [f"m{i+1}" for i in self.active_panel]
+        self.active_panel_source = "manual_unvalidated_selection"
 
     def status(self) -> Dict[str, Any]:
         """Telemetry and status report for FAULTLINE audit & active panel."""
@@ -165,6 +177,13 @@ class FaultlineOracleAdapter(nn.Module):
             base = self.oracle.status()
 
         base.update({
+            "trained": base.get("trained", False),
+            "underlying_artifact_bound": base.get("artifact_bound", False),
+            "artifact_bound": False,
+            "calibration_available": False,
+            "calibration_scope": "panel predictor uncalibrated; all-member intervals do not apply",
+            "failure_probability_calibrated": False,
+            "promoted": False,
             "faultline_enabled": True,
             "faultline_protocol": "faultline-oracle-panel-v1",
             "primary_policy": self.primary_policy,
@@ -172,6 +191,8 @@ class FaultlineOracleAdapter(nn.Module):
             "n_available_members": self.n_members,
             "active_panel": self.active_panel,
             "active_panel_ids": self.active_panel_ids,
+            "active_panel_source": self.active_panel_source,
+            "panel_selection_scope": self.panel_selection_scope,
             "joint_advantage": self.audit_receipt.get("joint_advantage", 0.0) if self.audit_receipt else 0.0,
             "worst_condition_error": self.audit_receipt.get("worst_condition_error", 0.0) if self.audit_receipt else 0.0,
             "sha256_receipt": self.audit_receipt.get("sha256") if self.audit_receipt else None,
@@ -179,13 +200,15 @@ class FaultlineOracleAdapter(nn.Module):
         return base
 
     def planning_support(self, observation: Sequence[float]) -> Tuple[bool, Optional[str]]:
-        """Verify planning support under active panel and downstream gate."""
-        if self.oracle is not None and hasattr(self.oracle, "planning_support"):
-            return self.oracle.planning_support(observation)
+        """Preserve the baseline until panel-specific calibration is supported."""
         obs = torch.as_tensor(observation, dtype=torch.float32).reshape(1, -1)
         if obs.shape[-1] != OBS_SIZE:
             return False, f"invalid_obs_size_{obs.shape[-1]}_expected_{OBS_SIZE}"
-        return True, None
+        if not bool(torch.isfinite(obs).all()) or bool(((obs < 0) | (obs > 1)).any()):
+            return False, "invalid_observation_values"
+        if self.oracle is None:
+            return False, "faultline_oracle_unavailable"
+        return False, "faultline_panel_calibration_unavailable"
 
     def slice_panel_predictions(
         self,
@@ -224,6 +247,11 @@ class FaultlineOracleAdapter(nn.Module):
                 panel_disagreement = (panel_diff ** 2).mean(dim=0).sum(dim=-1)
 
                 out = dict(raw_out)
+                # Equal-average calibration is tied to the original predictor.
+                # Neither panel selection nor re-averaging transfers its widths.
+                for interval in ("calibrated_uncertainty", "state_interval_half_width",
+                                 "reward_interval_half_width"):
+                    out.pop(interval, None)
                 out["mean_delta"] = mean_delta
                 if mean_reward is not None:
                     out["mean_reward"] = mean_reward

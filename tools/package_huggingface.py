@@ -97,6 +97,14 @@ tags:
 
 Version {version} packages a local experimental workbench around the frozen Tidal core, with a separate pretrained conversation backend, optional synthetic controllers, and mathematical research tools. Runtime availability, replay integrity, and measured model performance are separate checks. Additional modules do not imply that the selected core was retrained or that a candidate was promoted.
 
+The [30 October reliability upgrade](docs/PROJECT_UPGRADE_2026-10-30.md) adds
+independently generated reasoning checks, corrected controller adapters, explicit
+caller evidence for the opt-in coordinator, and bounded Poincare diagnostics.
+Changed ensemble predictors preserve the baseline until their own calibration
+is available. The two included 200-case audits are finite software checks, not
+general model accuracy or a statistical risk guarantee. Mean-curvature relaxation
+is a surrogate, separate from geometric Ricci flow or Perelman entropy.
+
 TRIDENT remains available as an opt-in identity-gated controller around the unchanged Tidal checkpoint. It corrects one-step predictions with recent observed prediction errors, admits directed travel only after enough local visits unless that transition has been observed, and requires an override to beat erased and time-shifted residual controls by configured margins. TRIDENT is experimental software for synthetic TidePool; it does not modify or train model weights.
 
 The six-arm paired benchmark compares the frozen core, TRIDENT, erased residual, shifted residual, directed-support-gate-off, and residual-gate-off controls on identical seeds. The receipt stores actions and transitions and independently replays controller decisions and world outcomes. Its four-seed results are descriptive synthetic evidence, not proof of a general performance gain; they do not promote a model.
@@ -117,7 +125,9 @@ Additional modules are software simulations or heuristics: Archimedes computes s
 | SmolLM2: 134,515,008 stored parameters | `models/language/model.safetensors` | Separate unchanged pretrained conversation backend |
 | LoRA: 61,440 parameters | `runs/language/adapter/` | Experimental candidate, inactive by default |
 | Poseidon-X | `poseidon/poseidon_x.py` | Experimental geometric and homeostatic controller; opt-in |
-| Problem Forge | `poseidon/problem_solver.py` | Bounded exact and numerical tools; 95 verified domains |
+| Problem Forge | `poseidon/problem_solver.py` | Parsed exact/numerical tools and synthetic demonstrations; evidence scope varies by domain |
+| Generated reasoning audit | `poseidon/research/reasoning_audit.py` | Independent numeric/structural checks, refusal controls, source binding and finite replay |
+| Poincare diagnostics | `poseidon/poincare_engine.py` | Five bounded numerical/synthetic diagnostics; no domain-count or controller-safety certification |
 | Project NEUROGRAFT-II | `poseidon/neurograft_engine.py`, `poseidon/research/successor_memory_adapter.py` | Successor representations (SR-TD), zero-shot reward revaluation, SWR reverse replay, Graph Laplacian spatial embeddings & trainable graph circuits |
 | Project CROSSWIRE | `poseidon/crosswire_engine.py`, `poseidon/research/crosswire_adapter.py` | Version space tracking, active diagnostic probing, all-hypothesis contract verification & closed-loop runtime shielding |
 | Project FAULTLINE | `poseidon/faultline_engine.py`, `poseidon/research/faultline_adapter.py` | Condition-stratified joint failure selection, 3-bit parity hyperedge audit, continuous error covariance & minimax panel triage |
@@ -183,6 +193,8 @@ hf download {REPO_ID} --revision v{version} --local-dir Poseidon-release
 cd Poseidon-release
 python -m pip install -e .
 python tools/verify_huggingface_release.py . --smoke
+python -m poseidon reasoning-audit --seed 20261030 --samples 32 --output outputs/reasoning-audit.json
+python -m poseidon verify-reasoning-audit outputs/reasoning-audit.json
 python -m poseidon serve --port 8787
 ```
 
@@ -300,7 +312,7 @@ to avoid relicensing upstream artifacts as MIT.
 def package(output: Path, repo_id: str = REPO_ID) -> dict:
     sys.path.insert(0, str(ROOT))
     from poseidon import __version__
-    from tools.verify_huggingface_release import BUILDABLE_RELEASE_VERSIONS
+    from tools.verify_huggingface_release import BUILDABLE_RELEASE_VERSIONS, REASONING_AUDIT_PATHS, verify_reasoning_audits
     if __version__ not in BUILDABLE_RELEASE_VERSIONS:
         raise ValueError(f"unsupported version {__version__}")
     if repo_id != REPO_ID:
@@ -405,6 +417,7 @@ def package(output: Path, repo_id: str = REPO_ID) -> dict:
         "RECEIPT.json": verify_trident_receipt(trident_receipt, core_path=core_path)
     }
     trident_receipt_hash = sha256(trident_receipt_path)
+    reasoning_audit_verification = verify_reasoning_audits(ROOT)
 
     experiment_verification = {name: load_and_verify(ROOT / "outputs/experiments" / name) for name in EXPERIMENTS}
     evidence_artifacts = load_artifacts(ROOT)
@@ -482,6 +495,7 @@ def package(output: Path, repo_id: str = REPO_ID) -> dict:
     artifacts += [f"outputs/horizon_experiments/{name}" for name in HORIZON_EXPERIMENTS]
     artifacts += [f"outputs/odyssey_experiments/{name}" for name in ODYSSEY_EXPERIMENTS]
     artifacts += [f"outputs/trajectory_audits/{name}" for name in TRAJECTORY_AUDITS]
+    artifacts += list(REASONING_AUDIT_PATHS)
     artifacts += [f"outputs/helm_experiments/{name}" for name in helm_names]
     artifacts += [f"outputs/odysseus_experiments/{name}" for name in ODYSSEUS_EXPERIMENTS]
     artifacts += [f"outputs/aura_experiments/{name}" for name in AURA_EXPERIMENTS]
@@ -599,6 +613,7 @@ See runs/language/report.json, data/language/SOURCE_CARD.md and the root model c
         "titan_experiment_verification": titan_experiment_verification,
         "trident_receipt_sha256": trident_receipt_hash,
         "trident_experiment_verification": trident_experiment_verification,
+        "reasoning_audit_verification": reasoning_audit_verification,
         "build_environment": {name: importlib.metadata.version(name) for name in
                               ("torch", "transformers", "peft", "safetensors", "numpy", "scipy", "huggingface-hub")},
         "activation": {"core": "existing-dagger-selection", "language": "unchanged-upstream-base",
@@ -622,7 +637,7 @@ See runs/language/report.json, data/language/SOURCE_CARD.md and the root model c
                        "hypergraph": "neural-symbolic-inductive-theorems",
                        "omniecosystem": "multi-agent-trophic-continuous-3d",
                        "tessera_prover": "ltl-invariant-safety-shield",
-                       "universal_reactive": "bytecode-hotpatching-and-decoupled-actors",
+                       "universal_reactive": "static-python-hooks-with-rollback-and-reactive-message-passing",
                        "active_inference": "expected-free-energy-minimization",
                        "morpheus": "simulated-transition-trace-and-replay",
                        "prometheus": "synthetic-entropy-and-drive-heuristics",
@@ -630,7 +645,9 @@ See runs/language/report.json, data/language/SOURCE_CARD.md and the root model c
                        "nexus_search": "federated-associative-vector-lattice-indexing",
                        "external_adapter": "typed-3d-simulation-telemetry-protocol",
                        "nexus_omega": "causal-epigenetic-self-experimenting-discovery-agent",
-                       "problem_forge_95": "verified-95-domain-zero-eval-symbolic-problem-solver",
+                       "problem_forge": "parsed-exact-numerical-tools-and-synthetic-demonstrations-with-scoped-evidence",
+                       "reasoning_audit": "finite-generated-suite-with-independent-checks-and-replay-no-statistical-guarantee",
+                       "poincare": "bounded-numerical-synthetic-diagnostics-no-safety-certification",
                        "neurograft_ii": "successor-representation-swr-reverse-replay-graph-laplacian-trainable-circuit-engine",
                        "crosswire": "crosswire-version-space-active-diagnostic-probing-runtime-shield",
                        "faultline": "faultline-joint-failure-condition-stratified-panel-selection-continuous-covariance",

@@ -31,6 +31,10 @@ SUPPORTED_RELEASE_VERSIONS = (
 HEX64 = re.compile(r"[0-9a-f]{64}\Z")
 HEX40 = re.compile(r"[0-9a-f]{40}\Z")
 RESERVED = {"manifest.json", "SHA256SUMS.txt"}
+REASONING_AUDIT_PATHS = (
+    "outputs/research/evidence-upgrade-20261030/reasoning-20261030.json",
+    "outputs/research/evidence-upgrade-20261030/reasoning-20261031.json",
+)
 IGNORED_INVENTORY_RULES = (
     ".cache/huggingface/ (Hub download metadata)",
     "*.egg-info/ at package root (editable install metadata)",
@@ -118,6 +122,36 @@ def _inventory(root: Path) -> tuple[set[str], dict]:
                     raise ValueError("Package contains a non-regular file: " + relative)
     return actual, {"rules": list(IGNORED_INVENTORY_RULES),
                     "directories": sorted(ignored_directories), "files_ignored": ignored_files}
+
+
+def verify_reasoning_audits(package_dir: str | Path, *, recorded: dict | None = None) -> dict:
+    """Replay the two explicit finite audits and bind their exact saved bytes.
+
+    Import the scientific runtime only for this requested replay operation, never
+    during hash-only package verification. Historical packages without this
+    optional metadata keep their existing verification behavior.
+    """
+    from poseidon.research.reasoning_audit import verify_audit
+
+    root = Path(package_dir).resolve()
+    if recorded is not None and (not isinstance(recorded, dict) or set(recorded) != set(REASONING_AUDIT_PATHS)):
+        raise ValueError("Packaged reasoning audit metadata must identify both allowlisted reports")
+    verified = {}
+    for relative in REASONING_AUDIT_PATHS:
+        path = _inside(root, relative)
+        if path.stat().st_size > 2_000_000:
+            raise ValueError("Packaged reasoning audit exceeds the 2 MB read budget")
+        raw = path.read_bytes()
+        if len(raw) > 2_000_000:
+            raise ValueError("Packaged reasoning audit exceeds the 2 MB read budget")
+        report = json.loads(raw)
+        checked = verify_audit(report, replay=True)
+        if path.read_bytes() != raw:
+            raise ValueError("Packaged reasoning audit changed during replay")
+        verified[relative] = {"file_sha256": hashlib.sha256(raw).hexdigest(), **checked}
+        if recorded is not None and recorded[relative] != verified[relative]:
+            raise ValueError("Packaged reasoning audit metadata differs from replay: " + relative)
+    return verified
 
 
 def verify_hashes(package_dir: str | Path) -> tuple[dict, dict]:
@@ -221,6 +255,18 @@ def verify_hashes(package_dir: str | Path) -> tuple[dict, dict]:
         recorded[relative] = match[1]
     if recorded != expected:
         raise ValueError("SHA256SUMS.txt does not match manifest files and manifest.json")
+    reasoning_audits = manifest.get("reasoning_audit_verification")
+    if reasoning_audits is not None:
+        if not isinstance(reasoning_audits, dict) or set(reasoning_audits) != set(REASONING_AUDIT_PATHS):
+            raise ValueError("Packaged reasoning audit metadata must identify both allowlisted reports")
+        for relative, record in reasoning_audits.items():
+            if (not isinstance(record, dict) or
+                    any(record.get(key) is not True for key in
+                        ("integrity_verified", "case_manifest_verified", "source_matches", "replay_verified")) or
+                    record.get("scope") != "finite_generated_suite" or
+                    not HEX64.fullmatch(str(record.get("report_sha256", ""))) or
+                    relative not in expected or record.get("file_sha256") != expected[relative]):
+                raise ValueError("Invalid or uninventoried reasoning audit evidence: " + relative)
     receipt = {
         "verified": True, "schema": SCHEMA, "repo_id": manifest["repo_id"],
         "source_revision": manifest["source_revision"], "version": manifest["version"],
@@ -579,6 +625,19 @@ if manifest["version"] in ("1.3.0", "2.0.0", *V3_RELEASE_VERSIONS):
         check_recorded(actual, recorded)
         trident_replays.append({"path": relative, **actual})
     assert len(trident_replays) >= 1, "Complete TRIDENT action and world replay evidence missing"
+reasoning_replays = {}
+poincare_diagnostics = {}
+if manifest.get("reasoning_audit_verification") is not None:
+    from tools.verify_huggingface_release import verify_reasoning_audits
+    reasoning_replays = verify_reasoning_audits(root, recorded=manifest["reasoning_audit_verification"])
+    from poseidon.poincare_engine import PoincareEngine
+    diagnostic = PoincareEngine(seed=42).synthesize(iterations=32)
+    assert diagnostic["total_domains_verified"] is None
+    assert diagnostic["diagnostics_checked"] == 5
+    assert diagnostic["ricci_flow_perelman"]["perelman_entropy_verified"] is False
+    finite(diagnostic)
+    poincare_diagnostics = {key: diagnostic[key] for key in
+                           ("evidence_scope", "diagnostics_checked", "diagnostics_passed")}
 print("POSEIDON_RELEASE_SMOKE=" + json.dumps({
     "verified": True, "package_source": str(pathlib.Path(poseidon.__file__).resolve()),
     "native_checkpoints_verified": len(native_checkpoints), "scene": {k:scene[k] for k in ("shape","color","motion","count","scale")},
@@ -606,6 +665,8 @@ print("POSEIDON_RELEASE_SMOKE=" + json.dumps({
     "hyperion_replays": hyperion_replays,
     "titan_replays": titan_replays,
     "trident_replays": trident_replays,
+    "reasoning_audit_replays": reasoning_replays,
+    "poincare_diagnostics": poincare_diagnostics,
 }, allow_nan=False, sort_keys=True))
 '''
 

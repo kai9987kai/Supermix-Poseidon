@@ -1,6 +1,7 @@
 """Model-free tests for the downloaded release's integrity boundary."""
 import hashlib
 import json
+from pathlib import Path
 
 import pytest
 
@@ -214,7 +215,7 @@ def test_isolated_smoke_script_is_valid_python():
     compile(release.SMOKE_SCRIPT, "packaged-release-smoke", "exec")
 
 
-@pytest.mark.parametrize("version", tuple(f"3.{minor}.0" for minor in range(8)))
+@pytest.mark.parametrize("version", release.V3_RELEASE_VERSIONS)
 def test_v3_releases_preserve_full_evidence_requirements(tmp_path, version):
     manifest = _package(tmp_path, "2.0.0")
     manifest["version"] = version
@@ -225,3 +226,70 @@ def test_v3_releases_preserve_full_evidence_requirements(tmp_path, version):
     _seal(tmp_path, manifest)
     with pytest.raises(ValueError, match="TRIDENT replay verification"):
         release.verify_hashes(tmp_path)
+
+
+def test_reasoning_metadata_cannot_claim_replay_of_missing_package_evidence(tmp_path):
+    manifest = _package(tmp_path, "2.0.0")
+    manifest["version"] = "3.13.0"
+    manifest["reasoning_audit_verification"] = {
+        "outputs/research/evidence-upgrade-20261030/reasoning-20261030.json": {
+            "integrity_verified": True, "case_manifest_verified": True,
+            "source_matches": True, "replay_verified": True,
+            "scope": "finite_generated_suite", "report_sha256": "b" * 64,
+            "file_sha256": "c" * 64}}
+    _seal(tmp_path, manifest)
+    with pytest.raises(ValueError, match="reasoning audit"):
+        release.verify_hashes(tmp_path)
+
+
+def _reasoning_evidence(root):
+    from poseidon.research.reasoning_audit import run_audit
+    for seed in (20261030, 20261031):
+        relative = f"outputs/research/evidence-upgrade-20261030/reasoning-{seed}.json"
+        path = root / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(run_audit(seed=seed, samples=1)), encoding="utf-8")
+
+
+def test_reasoning_release_evidence_replays_and_changed_metadata_is_rejected(tmp_path):
+    _reasoning_evidence(tmp_path)
+    records = release.verify_reasoning_audits(tmp_path)
+    assert len(records) == 2
+    assert all(record["replay_verified"] is True for record in records.values())
+    assert release.verify_reasoning_audits(tmp_path, recorded=records) == records
+    first_path = next(iter(records))
+    records[first_path]["replay_verified"] = False
+    with pytest.raises(ValueError, match="reasoning audit"):
+        release.verify_reasoning_audits(tmp_path, recorded=records)
+
+
+def test_reasoning_release_metadata_binds_inventoried_bytes(tmp_path):
+    manifest = _package(tmp_path, "2.0.0")
+    manifest["version"] = "3.13.0"
+    _reasoning_evidence(tmp_path)
+    records = release.verify_reasoning_audits(tmp_path)
+    for relative in records:
+        payload = (tmp_path / relative).read_bytes()
+        manifest["files"].append({"path": relative, "size": len(payload), "sha256": _digest(payload)})
+    manifest["reasoning_audit_verification"] = records
+    _seal(tmp_path, manifest)
+    assert release.verify_hashes(tmp_path)[1]["verified"] is True
+    first = next(iter(records))
+    records[first]["file_sha256"] = "d" * 64
+    _seal(tmp_path, manifest)
+    with pytest.raises(ValueError, match="reasoning audit"):
+        release.verify_hashes(tmp_path)
+
+
+def test_reasoning_release_rejects_saved_report_that_does_not_replay(tmp_path):
+    _reasoning_evidence(tmp_path)
+    first = tmp_path / "outputs/research/evidence-upgrade-20261030/reasoning-20261030.json"
+    report = json.loads(first.read_text(encoding="utf-8"))
+    report["rows"][0]["answer"] = "999999"
+    # A new fingerprint cannot make the changed answer agree with actual replay.
+    encoded = json.dumps({key: value for key, value in report.items() if key != "report_sha256"},
+                         sort_keys=True, separators=(",", ":"), ensure_ascii=True, allow_nan=False).encode()
+    report["report_sha256"] = _digest(encoded)
+    first.write_text(json.dumps(report), encoding="utf-8")
+    with pytest.raises(ValueError, match="replay"):
+        release.verify_reasoning_audits(tmp_path)

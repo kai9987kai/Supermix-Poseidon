@@ -1,10 +1,13 @@
-"""Ground-truth reasoning benchmark for Poseidon's symbolic tool stack.
+"""Historical display-token smoke checks for Poseidon's symbolic tool stack.
 
 Each case is a natural-language (or semi-formal) prompt with a known correct answer.
 The router mirrors ``Poseidon.respond(mode="chat")``: exact maths first, then the
 Problem Forge. A case scores only if a tool fires AND its answer contains every
 expected token (whitespace/case-insensitive). Unanswered cases are reported
 separately from wrong answers so routing gaps and solver errors stay distinguishable.
+Token matching can accept incorrect answers. Use ``poseidon reasoning-audit``
+for generated, independent numeric/structural checks; these smoke checks are not
+an accuracy benchmark or proof that every scientific domain is verified.
 
 Usage: python tools/reasoning_bench.py [--json] [--failures]
 """
@@ -129,6 +132,11 @@ CASES = [
     ("p80", "problem", "Run sharp-wave ripple reverse replay with sweeps=4, decay=0.8, and threshold=0.1", ["propagated value s0", "sweeps executed"]),
     ("p81", "problem", "Compute graph Laplacian spatial eigenvectors with num_states=5, tau=1.0, and seed=42", ["fiedler eigenvalue", "mean diffusion distance"]),
     ("p82", "problem", "Run trainable neural graft routing with num_sources=4, null_route_bias=0.5, and top_k=2", ["routing entropy", "mean null weight"]),
+    ("p83", "problem", "Compute Poincare return map Chirikov standard map with stochastic_k=0.85 and iterations=400", ["lambda_1", "lambda_2", "regime"]),
+    ("p84", "problem", "Compute hyperbolic Poincare disk geodesic distance with curvature c=1.0 for point u=[0.2, 0.3] and point v=[-0.4, 0.1]", ["geodesic distance", "mobius sum", "gromov delta"]),
+    ("p85", "problem", "Verify Poincare duality and Morse chain complex for surface=torus", ["betti numbers", "euler chi = 0", "poincare duality = true"]),
+    ("p86", "problem", "Run Hamilton-Perelman normalized Ricci flow with vertices=6, steps=30, and euler chi=2", ["k_bar", "variance reduction", "gauss-bonnet conserved = true"]),
+    ("p87", "problem", "Synthesize unified quartet cognitive synthesis with base_action=0, intended_action=1, and hazard_action=5", ["final action", "override admitted", "shield", "panel"]),
 ]
 
 
@@ -182,6 +190,7 @@ def run(cases=CASES):
     total = len(rows)
     correct = sum(r["status"] == "correct" for r in rows)
     return {
+        "scoring_scope": "legacy_display_token_smoke",
         "total": total,
         "correct": correct,
         "accuracy": round(correct / total, 4) if total else 0.0,
@@ -200,8 +209,8 @@ def main() -> int:
     report = run()
     if args.json:
         print(json.dumps(report, indent=2, ensure_ascii=False))
-        return 0
-    print(f"Accuracy: {report['correct']}/{report['total']} = {report['accuracy']:.1%}  "
+        return int(bool(report["wrong"] or report["unanswered"]))
+    print(f"Display checks: {report['correct']}/{report['total']} = {report['accuracy']:.1%}  "
           f"(wrong {report['wrong']}, unanswered {report['unanswered']})")
     for cat, c in report["by_category"].items():
         print(f"  {cat:12s} {c['correct']}/{c['total']}  wrong={c['wrong']} unanswered={c['unanswered']}")
@@ -210,7 +219,7 @@ def main() -> int:
             if r["status"] != "correct":
                 print(f"[{r['status'].upper():10s}] {r['id']} tool={r['tool']} expected={r['expected']} "
                       f"got={str(r['answer'])[:90]!r}\n             prompt={r['prompt']!r}")
-    return 0
+    return int(bool(report["wrong"] or report["unanswered"]))
 
 
 if __name__ == "__main__":

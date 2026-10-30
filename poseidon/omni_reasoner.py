@@ -119,6 +119,7 @@ class OmniReasoner:
         "creative_bisociation_synthesis",
         "scientific_hypothesis_falsification",
         "neurograft_connectome",
+        "poincare_dynamical_topology",
         "general_hyper_reasoning",
     )
 
@@ -135,6 +136,8 @@ class OmniReasoner:
     def classify_intent(self, query: str) -> str:
         """Classifies the semantic intent of the query to select domain co-processors."""
         q = query.lower()
+        if any(k in q for k in ("poincare", "chirikov", "standard map", "lyapunov spectrum", "kam torus", "kam invariant", "mobius gyrovector", "gromov delta", "poincare duality", "morse complex", "ricci flow", "perelman entropy", "unified quartet")):
+            return "poincare_dynamical_topology"
         if any(k in q for k in ("crosswire", "version space", "diagnostic prob", "runtime shield", "unfamiliar protocol", "interface contract", "hypothesis pruning", "interoperability verification")):
             return "crosswire_interoperability"
         if any(k in q for k in ("faultline", "joint failure", "joint-failure", "co-failure", "cofailure", "hyperedge failure", "parity benchmark", "continuous joint error", "minimax panel", "ensemble triage")):
@@ -742,6 +745,23 @@ class OmniReasoner:
             "verdict": "PROVEN_SAFE" if receipt.is_safe else "SHIELD_INTERVENTION",
         }
 
+    def _simulate_poincare(self, seed: int) -> Dict[str, Any]:
+        """Runs Project POINCARÉ 5-pillar mathematical and cognitive synthesis."""
+        from .poincare_engine import PoincareEngine
+        p_res = PoincareEngine(seed=seed).synthesize()
+        return {
+            "simulation_type": "Stage 32 Project POINCARÉ & 100-Domain Unified Quartet Cognitive Synthesis",
+            "poincare_receipt": p_res,
+            "lambda_1": p_res["poincare_return_map"]["lambda_1"],
+            "pairing_residual": p_res["poincare_return_map"]["pairing_residual"],
+            "gromov_delta": p_res["hyperbolic_poincare_disk"]["delta_hyperbolicity"],
+            "poincare_duality_verified": p_res["poincare_duality_morse"]["poincare_duality_verified"],
+            "gauss_bonnet_conserved": p_res["ricci_flow_perelman"]["gauss_bonnet_conserved"],
+            "centurion_action": p_res["unified_quartet_cognitive"]["final_dispatched_action"],
+            "receipt_sha256": p_res["receipt_sha256"],
+            "conclusion": p_res["text"],
+        }
+
     def reason(
         self,
         prompt: str,
@@ -880,6 +900,14 @@ class OmniReasoner:
                 "will maintain causal foliation topology, preserve operator spectral distances, "
                 "and bound infinite-horizon stochastic trace divergence via optimal transport."
             )
+        elif intent == "poincare_dynamical_topology":
+            hypo_text = (
+                "Hypothesis H1: Symplectic Poincaré return maps (Chirikov standard map) combined with "
+                "hyperbolic Poincaré disk Möbius gyrovector geometry, algebraic topology Poincaré duality (beta_k = beta_{n-k}), "
+                "Hamilton-Perelman normalized Ricci flow, and the Unified Quartet cognitive coordinator "
+                "will conserve Liouville phase space area (det J = 1), satisfy Gromov delta-hyperbolicity, "
+                "guarantee chain boundary nilpotency (d^2 = 0), and preserve Gauss-Bonnet curvature under monotonic Perelman entropy."
+            )
         else:
             hypo_text = (
                 "Check whether a supported tool can model the query. Fixed synthetic demonstrations "
@@ -951,6 +979,8 @@ class OmniReasoner:
             sim_result = self._simulate_noether(seed)
         elif intent == "chronos_quantum_geometry":
             sim_result = self._simulate_chronos(seed)
+        elif intent == "poincare_dynamical_topology":
+            sim_result = self._simulate_poincare(seed)
         else:
             sim_result = {
                 "simulation_type": "Unsupported query" if intent == "general_hyper_reasoning" else "Synthetic safety demonstration",

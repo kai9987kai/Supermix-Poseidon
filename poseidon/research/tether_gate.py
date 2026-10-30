@@ -207,9 +207,10 @@ class TetherOracleAdapter(ResearchOracleAdapter):
     """Tether-gated ORACLE adapter that wraps an existing OracleEnsemble artifact.
 
     - Replaces equal averaging with learned continuous reliability weighting.
-    - Evaluates epistemic trust tau before allowing planner action selection.
-    - If tau < threshold, planning_support returns (False, 'tether_epistemic_abstain'),
-      ensuring the agent safely preserves the frozen Tidal action.
+    - Reports weighted forecasts and heuristic epistemic trust for diagnostics.
+    - The ORACLE artifact calibrates equal averaging, not this changed predictor.
+      Planning therefore preserves the frozen policy until weighted-predictor
+      calibration evidence is supported.
     """
 
     def __init__(
@@ -231,6 +232,7 @@ class TetherOracleAdapter(ResearchOracleAdapter):
                 epistemic_threshold=self.epistemic_threshold,
             )
         self.tether_enabled = True
+        self.is_calibrated.fill_(False)
         self.eval()
 
     def status(self) -> Dict[str, Any]:
@@ -240,7 +242,10 @@ class TetherOracleAdapter(ResearchOracleAdapter):
             "tether_protocol": "tether-v2-continuous-reliability",
             "epistemic_threshold": self.epistemic_threshold,
             "gate_parameters": sum(p.numel() for p in self.gate.parameters()),
-            "corrupted_member_defense": True,
+            "calibration_available": False,
+            "calibration_scope": "weighted predictor uncalibrated; inherited quantiles give diagnostic widths only",
+            "gate_artifact_bound": False,
+            "corrupted_member_defense": False,
         })
         return base_status
 
@@ -250,21 +255,9 @@ class TetherOracleAdapter(ResearchOracleAdapter):
         if any(count < 8 for count in self.action_counts):
             return False, "insufficient_training_action_exposure"
 
-        # Check epistemic trust under the baseline action (action 0 / default)
-        dummy_action = torch.zeros(1, dtype=torch.long)
-        raw_out = self.model(obs, dummy_action)
-        gated = self.gate(
-            obs=obs,
-            action=dummy_action,
-            deltas=raw_out["delta_mean"],
-            delta_log_vars=raw_out["delta_log_variance"],
-            rewards=raw_out["reward_mean"],
-            deaths=raw_out["death_logit"],
-        )
-        trust = float(gated["epistemic_trust"][0].item())
-        if trust < self.epistemic_threshold:
-            return False, f"tether_epistemic_abstain_trust_{trust:.3f}_below_{self.epistemic_threshold:.3f}"
-        return True, None
+        # Agreement and a low threshold cannot supply missing calibration for
+        # the weighted predictor or bind this gate's parameters to the artifact.
+        return False, "tether_weighted_calibration_unavailable"
 
     @torch.inference_mode()
     def forward(
@@ -287,8 +280,9 @@ class TetherOracleAdapter(ResearchOracleAdapter):
         )
 
         state_half_width = self.state_quantile * gated["total_variance"].sqrt()
-        reward_epistemic = (gated["weights"] * (raw_out["reward_mean"] - gated["gated_reward"].unsqueeze(0)) ** 2).sum(dim=0)
-        reward_aleatoric = (gated["weights"] * raw_out["reward_log_variance"].exp()).sum(dim=0)
+        member_weights = gated["weights"].transpose(0, 1)  # [members, batch]
+        reward_epistemic = (member_weights * (raw_out["reward_mean"] - gated["gated_reward"].unsqueeze(0)) ** 2).sum(dim=0)
+        reward_aleatoric = (member_weights * raw_out["reward_log_variance"].exp()).sum(dim=0)
         reward_total_var = (reward_epistemic + reward_aleatoric).clamp_min(1e-8)
         reward_half_width = self.reward_quantile * reward_total_var.sqrt()
 
@@ -297,6 +291,8 @@ class TetherOracleAdapter(ResearchOracleAdapter):
             "mean_reward": gated["gated_reward"],
             "mean_failure": gated["gated_death_prob"],
             "raw_disagreement": gated["epistemic_variance"].sum(-1),
+            # Legacy compatibility names; status explicitly marks these
+            # inherited-quantile widths as uncalibrated for this predictor.
             "calibrated_uncertainty": state_half_width.mean(-1),
             "state_interval_half_width": state_half_width,
             "reward_interval_half_width": reward_half_width,
@@ -308,6 +304,8 @@ class TetherOracleAdapter(ResearchOracleAdapter):
             "epistemic_trust": gated["epistemic_trust"],
             "tether_abstain": gated["abstain"],
         }
+        if any(not bool(torch.isfinite(value).all()) for value in result.values()):
+            raise FloatingPointError("TETHER produced nonfinite predictions or diagnostic widths")
         self.member_forward_calls += len(self.model.members)
         self.prediction_rows += obs.shape[0]
         return result

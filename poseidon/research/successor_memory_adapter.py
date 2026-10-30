@@ -22,7 +22,7 @@ from ..neurograft_engine import (
     SharpWaveRippleReplay,
     SuccessorRepresentationEngine,
 )
-from ..world import N_ACTIONS, OBS_SIZE
+from ..world import ACTIONS, N_ACTIONS, OBSERVATION_NAMES, OBS_SIZE
 
 
 def discretize_obs_to_spatial_state(
@@ -32,17 +32,18 @@ def discretize_obs_to_spatial_state(
 ) -> int:
     """Discretizes continuous 16-D TidePool observation into discrete spatial state index.
 
-    Uses terrain roughness (obs[12]), shelter (obs[8]), and depth (obs[1]).
+    Uses terrain difficulty, shelter quality, and local resource scent. This
+    feature hash aliases locations; it is not a measured position identifier.
     """
     n_states = num_spatial_states if num_spatial_states is not None else num_bins
-    if len(obs) < 13:
+    if len(obs) < OBS_SIZE:
         return 0
-    t = max(0.0, min(1.0, float(obs[12])))
-    s = max(0.0, min(1.0, float(obs[8])))
-    d = max(0.0, min(1.0, float(obs[1])))
+    t = max(0.0, min(1.0, float(obs[OBSERVATION_NAMES.index("terrain_difficulty")])))
+    s = max(0.0, min(1.0, float(obs[OBSERVATION_NAMES.index("shelter_quality")])))
+    scent = max(0.0, min(1.0, float(obs[OBSERVATION_NAMES.index("resource_scent")])))
 
     # Compute a deterministic spatial hash index in 0..n_states-1
-    val = (t * 7.0 + s * 13.0 + d * 5.0)
+    val = (t * 7.0 + s * 13.0 + scent * 5.0)
     return int(val) % n_states
 
 
@@ -100,7 +101,7 @@ class SuccessorMemoryAdapter:
 
         # Check if SWR reverse replay should trigger (high surprise or rest action)
         swr_triggered = False
-        if surprise >= self.surprise_threshold or a == 5:  # action 5 is REST/shelter
+        if surprise >= self.surprise_threshold or a == ACTIONS.index("rest"):
             swr_info = self.replay_buffer.trigger_swr_reverse_replay(self.sr_engine, num_sweeps=4)
             self.total_swr_triggers += 1
             swr_triggered = True

@@ -161,11 +161,16 @@ def test_problem_solver_unknown():
         solve_problem("What is the capital of France?")
 
 
-def test_problem_solver_95_capabilities():
+def test_problem_solver_100_capabilities():
     solver = ProblemSolver()
     caps = solver.capabilities()
-    assert len(caps) == 95
+    assert len(caps) == 100
     domains = [c["domain"] for c in caps]
+    assert "poincare_return_map_chaos" in domains
+    assert "hyperbolic_poincare_disk_geodesic" in domains
+    assert "poincare_duality_morse_complex" in domains
+    assert "ricci_flow_perelman_entropy" in domains
+    assert "unified_quartet_cognitive_synthesis" in domains
     assert "successor_representation_td_learning" in domains
     assert "successor_reward_revaluation" in domains
     assert "sharp_wave_ripple_reverse_replay" in domains
@@ -1242,5 +1247,48 @@ def test_trainable_neural_graft_routing():
     assert res["num_parameters"] > 0
 
 
+def test_poincare_return_map_chaos():
+    prompt = "Compute Poincare return map Chirikov standard map with stochastic_k=0.85 and iterations=400"
+    res = solve_problem(prompt)
+    assert res["domain"] == "poincare_return_map_chaos"
+    assert res["verified"] is True
+    assert res["area_preserving_verified"] is True
+    assert abs(res["pairing_sum"]) < 1e-4
+    assert res["regime"] == "kam_invariant_torus"
 
 
+def test_hyperbolic_poincare_disk_geodesic():
+    prompt = "Compute hyperbolic Poincare disk geodesic distance with curvature c=1.0 for point u=[0.2, 0.3] and point v=[-0.4, 0.1]"
+    res = solve_problem(prompt)
+    assert res["domain"] == "hyperbolic_poincare_disk_geodesic"
+    assert res["verified"] is True
+    assert res["geodesic_distance"] > 1.0
+    assert res["is_delta_hyperbolic"] is True
+
+
+def test_poincare_duality_morse_complex():
+    prompt = "Verify Poincare duality and Morse chain complex for surface=torus"
+    res = solve_problem(prompt)
+    assert res["domain"] == "poincare_duality_morse_complex"
+    assert res["verified"] is True
+    assert res["betti_numbers"] == [1, 2, 1]
+    assert res["euler_characteristic"] == 0
+    assert res["poincare_duality_verified"] is True
+
+
+def test_ricci_flow_perelman_entropy():
+    prompt = "Run Hamilton-Perelman normalized Ricci flow with vertices=6, steps=30, and euler chi=2"
+    res = solve_problem(prompt)
+    assert res["domain"] == "ricci_flow_perelman_entropy"
+    assert res["verified"] is True
+    assert res["gauss_bonnet_conserved"] is True
+    assert res["variance_reduction"] > 0.0
+
+
+def test_unified_quartet_cognitive_synthesis():
+    prompt = "Synthesize unified quartet cognitive synthesis with base_action=0, intended_action=1, and hazard_action=5"
+    res = solve_problem(prompt)
+    assert res["domain"] == "unified_quartet_cognitive_synthesis"
+    assert res["verified"] is True
+    assert res["final_action"] in (0, 1)
+    assert len(res["panel"]) == 3

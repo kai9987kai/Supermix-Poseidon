@@ -895,3 +895,41 @@ def test_neurograft_server_endpoints(server):
     assert resp["verified"] is True
 
 
+def test_poincare_server_endpoints(server):
+    url, _ = server
+
+    # 1. GET /api/poincare/status
+    stat = json.load(urlopen(url + "/api/poincare/status"))
+    assert stat["ready"] is True
+    assert stat["version"] == "v3.13.0-POINCARE-100"
+    assert stat["stage"] == 32
+    assert stat["subsystems"]["poincare_return_map_chaos"] is True
+    assert stat["subsystems"]["hyperbolic_poincare_disk_geodesic"] is True
+    assert stat["subsystems"]["poincare_duality_morse_complex"] is True
+    assert stat["subsystems"]["ricci_flow_perelman_entropy"] is True
+    assert stat["subsystems"]["unified_quartet_cognitive_synthesis"] is True
+    assert stat["total_verified_domains"] is None
+    assert stat["evidence_scope"] == "five_synthetic_diagnostics"
+
+    # 2. POST /api/poincare/synthesize
+    res_poi = json.load(post(url + "/api/poincare/synthesize", {
+        "seed": 42,
+        "stochastic_k": 0.85,
+        "surface_type": "torus",
+    }))
+    assert res_poi["project"] == "POINCARE"
+    assert res_poi["verified"] is True
+    assert "receipt_sha256" in res_poi
+    assert "poincare_return_map" in res_poi
+    assert "hyperbolic_poincare_disk" in res_poi
+    assert "poincare_duality_morse" in res_poi
+    assert "ricci_flow_perelman" in res_poi
+    assert "unified_quartet_coordinator" in res_poi
+
+    # 3. POST /api/respond with mode="poincare"
+    resp = json.load(post(url + "/api/respond", {
+        "prompt": "Synthesize Project POINCARE",
+        "mode": "poincare",
+    }))
+    assert resp["project"] == "POINCARE"
+    assert resp["verified"] is True

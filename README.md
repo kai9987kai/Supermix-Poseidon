@@ -1,9 +1,9 @@
-# Supermix Poseidon v3.12.0: Local Research Workbench
+# Supermix Poseidon v3.13.0: Local Research Workbench
 
 [![Hugging Face](https://img.shields.io/badge/Hugging%20Face-Supermix--Poseidon-yellow)](https://huggingface.co/Kai9987kai/Supermix-Poseidon)
 [![GitHub](https://img.shields.io/badge/GitHub-Supermix--Poseidon-blue)](https://github.com/kai9987kai/Supermix-Poseidon)
 
-Poseidon is an experimental **cognitive AI workbench** combining a trained Tidal core with optional prediction, memory, planning, adaptation, exact reasoning, and synthetic research tools. It runs locally on a conventional CPU. Version 3.12.0 is the current source identity; a source version or a passing local check does not establish a published model release.
+Poseidon is an experimental **cognitive AI workbench** combining a trained Tidal core with optional prediction, memory, planning, adaptation, exact reasoning, and synthetic research tools. It runs locally on a conventional CPU. Version 3.13.0 is the current source identity; a source version or a passing local check does not establish a published model release.
 
 Use the CLI or browser workbench to inspect available artifacts, run seeded synthetic episodes, compare experimental controllers, and replay recorded evidence. The [learning foundation report](docs/research/learning-foundation-2026-10-12.md) records the trained-predictor integration and its measured limitations. The [research index](docs/research/README.md) links subsequent experiments; the [11 October architecture audit](docs/research/architecture-audit-2026-10-11.md) preserves the earlier baseline findings.
 
@@ -22,7 +22,7 @@ The cognitive coordinator combines six experimental subsystems around the frozen
 5. **NEURO (`poseidon/neuro.py`)**: Sparse routing with graph masks and gain scaling. The v2 coordinator reports its outputs as telemetry; they do not currently alter the planner input.
 6. **WORLDLAB (`poseidon/worldlab.py`)**: Synthetic partially observed TidePool with fog, sensor noise, tidal effects and an external simulation bridge contract. It is not a validated physical or biological model.
 
-See the [subsystem documentation](docs/POSEIDON_V2_RESEARCH.md), [24-project source review](docs/research/portfolio-refresh-2026-10-11.md) and [learning and transfer design](docs/superpowers/specs/2026-10-11-learning-transfer-design.md). Cognitive v3 receipts replay environment transitions and controller decisions, including noisy sensor RNG, and bind core/model/source identities. Parameter search uses isolated copies and retains inactive candidates. Later modules, including Project NEUROGRAFT-II, Project CROSSWIRE, Project FAULTLINE, Project TETHER, NEXUS-Ω, CHRONOS, NOETHER, and CARTAN, expose successor representations (SR-TD), instant zero-shot reward revaluation, sharp-wave ripple reverse replay, Graph Laplacian topological embeddings, trainable graph circuit routing, unfamiliar interface version space tracking, active diagnostic probing, all-hypothesis contract verification, closed-loop runtime shielding, condition-stratified joint failure selection, continuous reliability gating, 4-view causal invariance across 7 arms, synthetic experiments, and 95 verified problem domains. Their names and status telemetry do not establish general learning or scientific discovery capabilities.
+See the [subsystem documentation](docs/POSEIDON_V2_RESEARCH.md), [24-project source review](docs/research/portfolio-refresh-2026-10-11.md) and [learning and transfer design](docs/superpowers/specs/2026-10-11-learning-transfer-design.md). Cognitive v3 receipts replay environment transitions and controller decisions, including noisy sensor RNG, and bind core/model/source identities. Parameter search uses isolated copies and retains inactive candidates. Later modules, including Project NEUROGRAFT-II, Project CROSSWIRE, Project FAULTLINE, Project TETHER, NEXUS-Ω, CHRONOS, NOETHER, and CARTAN, expose successor representations (SR-TD), instant zero-shot reward revaluation, sharp-wave ripple reverse replay, Graph Laplacian topological embeddings, trainable graph circuit routing, unfamiliar interface version space tracking, active diagnostic probing, all-hypothesis contract verification, closed-loop runtime shielding, condition-stratified joint failure selection, continuous reliability gating, 4-view causal invariance across 7 arms, synthetic experiments, and parsed problem-solving tools with domain-specific evidence scopes. Their names and status telemetry do not establish general learning or scientific discovery capabilities.
 
 ## Run locally
 
@@ -67,16 +67,35 @@ python -m pytest -q
 
 The packaging checks generate metadata in a temporary project and verify that the distribution version matches `poseidon.__version__` without importing the runtime. Release integrity tests require no model download. The full suite also exercises synthetic controllers, protocol validation, and local server behavior; passing tests establish the checked software behavior rather than new model performance.
 
+The [30 October research-grounded upgrade](docs/PROJECT_UPGRADE_2026-10-30.md)
+adds independent generated reasoning checks, repairs controller adapters, and
+requires actual supplied evidence for the opt-in coordinator. Changed ensemble
+predictors preserve the baseline until their own calibration is available.
+
+Run the browser's **Independent reasoning audit** or save and replay a generated
+suite without model weights:
+
+```powershell
+python -m poseidon reasoning-audit --seed 20261030 --samples 32 --output outputs/reasoning-audit.json
+python -m poseidon verify-reasoning-audit outputs/reasoning-audit.json
+```
+
+The audit independently checks arithmetic, equations, determinants, gcd, Hanoi
+moves and edit distance, plus invalid and unsupported controls. It reports errors,
+refusals and accepted-answer error separately. These finite checks do not establish
+general model accuracy or statistical risk guarantees. `--skip-replay` checks
+report integrity only.
+
 ## Model components and boundaries
 
 | Component | Role | Release status |
 |---|---|---|
 | Tidal | Compact locally trained scene, action, and dynamics policy | Existing selected checkpoint; unchanged in this upgrade |
 | SmolLM2 | Pretrained conversation model | Separate backend with its own upstream license |
-| Project CROSSWIRE | Unfamiliar interface permutation version space tracking, active diagnostic probing, all-hypothesis contract verification, and closed-loop runtime shielding | Stage 30 research foundation; verified multi-system interoperability |
-| Project FAULTLINE | Condition-stratified joint failure selection, 3-bit parity hyperedge audit, continuous error covariance minimization, and minimax specialist panel triage | Stage 29 research foundation; joint failure reduction |
+| Project CROSSWIRE | Interface permutation hypotheses, diagnostic probing, finite contract checks and runtime shielding | Synthetic interface experiments; TidePool abstraction is heuristic |
+| Project FAULTLINE | Condition-stratified joint failure selection, parity audit, covariance and panel triage | Synthetic audits; changed ORACLE panels require their own calibration |
 | Project TETHER | Continuous aleatoric-epistemic reliability gating, 4-view causal invariance (7 arms), and evidence-calibrated frozen Tidal fallback gate | Stage 28 research foundation; no uncalibrated overrides |
-| Problem Forge | 90 verified mathematical, physical, and engineering domains with zero eval and deterministic AST verification | 100% verified (99/99 benchmark) |
+| Problem Forge | Parsed mathematical, physical, and engineering tools, including synthetic demonstrations | Scope varies by domain; display-token smoke checks are not accuracy certificates |
 | TITAN, TRIDENT, and other planners | Optional controllers for TidePool | Experimental; no default-policy promotion |
 | Image, video, and mesh tools | Bounded procedural outputs | Separate software paths |
 | Math and carrier memory | Exact solver and external retrieval | Separate tools; not weights in Tidal |

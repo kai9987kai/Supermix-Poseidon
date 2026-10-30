@@ -31,7 +31,7 @@ def main():
         "nexus-omega-discovery", "verify-nexus-omega-discovery",
         "verify-3d-replay",
         "discovery-lab",
-        "reason",
+        "reason", "reasoning-audit", "verify-reasoning-audit",
         "problem",
         "pantheon",
         "creative",
@@ -49,6 +49,7 @@ def main():
         "tether",
         "faultline",
         "crosswire",
+        "poincare",
     ])
     p.add_argument("prompt", nargs="?", default="")
     p.add_argument("--root", default=".")
@@ -70,6 +71,7 @@ def main():
     p.add_argument("--horizon", type=int, default=16, help="trajectory-audit return horizon")
     p.add_argument("--max-anchors", type=int, default=256, help="trajectory-audit anchor budget")
     p.add_argument("--output", help="optional output directory for ORACLE fit/evaluation")
+    p.add_argument("--samples", type=int, default=8, help="generated checks per reasoning family (1-32)")
     p.add_argument("--oracle-train-episodes", type=int, default=32)
     p.add_argument("--oracle-selection-episodes", type=int, default=8)
     p.add_argument("--oracle-calibration-episodes", type=int, default=12)
@@ -86,6 +88,30 @@ def main():
     p.add_argument("--skip-replay", action="store_true", help="verify receipt hashes without regenerating episodes")
     p.add_argument("--max-new-tokens", type=int, default=None, help="maximum new generation tokens for language model")
     args = p.parse_args()
+    if args.command in ("reasoning-audit", "verify-reasoning-audit"):
+        from pathlib import Path
+        from .research.reasoning_audit import run_audit, verify_audit
+        try:
+            if args.command == "verify-reasoning-audit":
+                if not args.prompt:
+                    p.error("verify-reasoning-audit requires a report JSON path")
+                target = Path(args.prompt)
+                if target.stat().st_size > 2_000_000:
+                    p.error("reasoning audit report exceeds 2 MB")
+                report = json.loads(target.read_text(encoding="utf-8"))
+                print(json.dumps(verify_audit(report, replay=not args.skip_replay), indent=2))
+            else:
+                report = run_audit(seed=args.seed if args.seed is not None else 20261030, samples=args.samples)
+                if args.output:
+                    target = Path(args.output)
+                    target.parent.mkdir(parents=True, exist_ok=True)
+                    target.write_text(json.dumps(report, indent=2, allow_nan=False) + "\n", encoding="utf-8")
+                print(json.dumps(report, indent=2, allow_nan=False))
+                if report["metrics"]["wrong"] or report["metrics"]["missed_answerable"] or report["metrics"]["errors"]:
+                    raise SystemExit(1)
+        except (ValueError, OSError, KeyError, TypeError) as error:
+            p.error(str(error))
+        return
     if args.oracle_architecture != "mlp-v1" and args.command != "oracle-fit":
         p.error("--oracle-architecture is only supported by oracle-fit")
     if args.command == "oracle-screen" and args.skip_replay:

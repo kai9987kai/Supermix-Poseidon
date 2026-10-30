@@ -1611,7 +1611,7 @@ class Poseidon:
             "atlas", "contrast", "horizon", "odyssey", "helm", "odysseus", "mco", "aura", "tessera",
             "mnemorph", "metamorph", "chimera", "hyperion", "titan", "trident", "hyper_agent",
             "ecosystem", "poseidon_x", "nexus_omega", "discovery_lab", "omni_reasoner", "pantheon",
-            "athenaeum", "hephaestus", "hyperborea", "neurograft", "aether", "chronos", "noether", "cartan", "tether", "faultline", "crosswire")}
+            "athenaeum", "hephaestus", "hyperborea", "neurograft", "aether", "chronos", "noether", "cartan", "tether", "faultline", "crosswire", "poincare")}
         components.update(external_adapter="external_adapter_status", noosphere="creative_status")
         for name, method in components.items():
             try:
@@ -1666,6 +1666,7 @@ class Poseidon:
                 "tether_reliability_gating",
                 "faultline_joint_failure",
                 "crosswire_interoperability",
+                "poincare_dynamical_topology",
                 "general_hyper_reasoning",
             ],
         }
@@ -1953,6 +1954,47 @@ class Poseidon:
             engine = NeurograftEngine()
             return engine.synthesize(seed=seed, discount=discount, learning_rate=learning_rate)
 
+    def reasoning_audit(self, seed=20261030, samples=8):
+        """Run bounded independent solver checks without loading model weights."""
+        from .research.reasoning_audit import run_audit
+        with self.lock:
+            return run_audit(seed=seed, samples=samples)
+
+    def poincare_status(self):
+        return {
+            "ready": True,
+            "version": "v3.13.0-POINCARE-100",
+            "stage": 32,
+            "subsystems": {
+                "poincare_return_map_chaos": True,
+                "hyperbolic_poincare_disk_geodesic": True,
+                "poincare_duality_morse_complex": True,
+                "ricci_flow_perelman_entropy": True,
+                "unified_quartet_cognitive_synthesis": True,
+            },
+            "total_verified_domains": None,
+            "evidence_scope": "five_synthetic_diagnostics",
+            "live_policy_activated": False,
+        }
+
+    def poincare_synthesize(
+        self,
+        seed: int = 42,
+        **kwargs,
+    ):
+        with self.lock:
+            from .poincare_engine import PoincareEngine
+            engine = PoincareEngine(seed=seed)
+            return engine.synthesize(
+                stochastic_k=kwargs.get("stochastic_k", 0.85),
+                iterations=kwargs.get("iterations", 400),
+                curvature_c=kwargs.get("curvature_c", 1.0),
+                surface_type=kwargs.get("surface_type", "torus"),
+                ricci_vertices=kwargs.get("ricci_vertices", 6),
+                ricci_steps=kwargs.get("ricci_steps", 30),
+                observation_16d=kwargs.get("observation_16d"),
+            )
+
     def aether_status(self):
         from .aether import AetherEngine
         return AetherEngine().status()
@@ -2140,6 +2182,8 @@ class Poseidon:
         if type(seed) is not int or not 0 <= seed < 2**63:
             raise ValueError("Seed must be a nonnegative integer below 2^63.")
         with self.lock:
+            if mode == "poincare":
+                return self.poincare_synthesize(seed=seed)
             if mode == "crosswire":
                 return self.crosswire_synthesize(seed=seed)
             if mode == "faultline":

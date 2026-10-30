@@ -4,6 +4,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
+const {execFileSync} = require('node:child_process');
 const {test} = require('node:test');
 
 const web = path.join(__dirname, '..', 'poseidon', 'web');
@@ -37,6 +38,9 @@ class Element {
 
 async function workbench(route) {
   const elements = new Map([...html.matchAll(/<([\w-]+)\b[^>]*\bid="([^"]+)"/g)].map(match => [match[2], new Element(match[1])]));
+  for (const match of html.matchAll(/<([\w-]+)\b[^>]*\bid="([^"]+)"[^>]*>([^<]*)<\/\1>/g)) {
+    elements.get(match[2]).textContent = match[3];
+  }
   const calls = [], timers = new Map();
   let timerId = 0;
   const document = {
@@ -67,6 +71,36 @@ async function workbench(route) {
     buttons() {return elements.get('jobHistory').children.flatMap(item => item.children).filter(item => item.tagName === 'BUTTON');},
   };
 }
+
+test('generated reasoning audit displays undefined risk for zero accepted answers', async () => {
+  const metrics={total:14,correct:0,wrong:0,errors:0,correct_refusals:8,missed_answerable:6,coverage:0,selective_risk:null};
+  const ui=await workbench(({url,body})=>url==='/api/reasoning/audit'?{status:200,data:{
+    config:body,metrics,by_family:{unsupported:metrics},report_sha256:'abc',source_hashes:{},limits:[],rows:[]}}:null);
+  await ui.elements.get('runReasoningAudit').onclick();await ui.flush();
+  assert.equal(ui.elements.get('reasoningAuditResults').hidden,false);
+  assert.match(ui.elements.get('reasoningAuditFamilies').children[0].children[5].textContent,/Undefined/);
+  assert.match(ui.elements.get('reasoningAuditStatus').textContent,/6 missed answerable/);
+  assert.match(ui.elements.get('reasoningAuditScope').textContent,/No calibrated risk guarantee/);
+  assert.deepEqual(ui.calls.find(call=>call.url==='/api/reasoning/audit').body,{seed:20261030,samples:8});
+  assert.equal(ui.elements.get('runReasoningAudit').disabled,false);
+});
+
+test('reasoning audit errors hide stale results and allow retry', async () => {
+  const ui=await workbench(({url})=>url==='/api/reasoning/audit'?{status:409,data:{error:'Restart needed'}}:null);
+  ui.elements.get('reasoningAuditResults').hidden=false;
+  await ui.elements.get('runReasoningAudit').onclick();await ui.flush();
+  assert.equal(ui.elements.get('reasoningAuditResults').hidden,true);
+  assert.match(ui.elements.get('reasoningAuditStatus').textContent,/Restart needed/);
+  assert.equal(ui.elements.get('runReasoningAudit').disabled,false);
+});
+
+test('reasoning audit validates the requested budget before sending', async () => {
+  const ui=await workbench(()=>null);
+  ui.elements.get('reasoningAuditSamples').value='33';
+  await ui.elements.get('runReasoningAudit').onclick();await ui.flush();
+  assert.equal(ui.calls.filter(call=>call.url==='/api/reasoning/audit').length,0);
+  assert.match(ui.elements.get('reasoningAuditStatus').textContent,/1–32/);
+});
 
 test('completed history fetches its full result only when opened after reload', async () => {
   const ui = await workbench(({url}) => url === '/api/jobs' ? {status: 200, data: {jobs: [listedJob('completed')]}}
@@ -255,6 +289,79 @@ for (const kind of ['cognitive', 'titan', 'trident', 'hyperion', 'chimera', 'met
 function renderedText(element) {
   return [element.textContent, element.innerHTML || '', ...element.children.filter(item => typeof item !== 'string').map(renderedText)].join(' ');
 }
+
+let failedPoincareReceipt;
+function realFailedPoincareReceipt() {
+  if (!failedPoincareReceipt) failedPoincareReceipt = JSON.parse(execFileSync(process.env.PYTHON || 'python', ['-c',
+    'import json; from poseidon.poincare_engine import PoincareEngine; print(json.dumps(PoincareEngine().synthesize(iterations=17, observation_16d=[0.0]*16)))'],
+    {cwd: path.join(__dirname, '..'), encoding: 'utf8'}));
+  return failedPoincareReceipt;
+}
+
+test('POINCARE chat renders the actual failed numerical diagnostics without certifying them', async () => {
+  const result = realFailedPoincareReceipt();
+  assert.equal(result.verified, false);
+  const ui = await workbench(() => null);
+  ui.context.result = result;
+  vm.runInContext("message('assistant','Bounded diagnostic result','POINCARE',result)", ui.context);
+  const text = renderedText(ui.elements.get('messages'));
+  assert.match(text, /DIAGNOSTICS FAILED/);
+  assert.ok(text.includes('Lyapunov λ1: ' + result.poincare_return_map.lambda_1.toFixed(4)));
+  assert.ok(text.includes('Gromov δ: ' + result.hyperbolic_poincare_disk.delta_hyperbolicity.toFixed(4)));
+  assert.ok(text.includes('Synthetic quartet action: ' + result.unified_quartet_coordinator.final_dispatched_action));
+  assert.match(text, /finite orbit.*curvature relaxation surrogate.*synthetic fixtures/i);
+  assert.doesNotMatch(text, /POINCARÉ Certified|undefined|Geodesic d: 0/);
+});
+
+test('POINCARE missing diagnostics remain unavailable instead of becoming zero or a chaotic regime', async () => {
+  const ui = await workbench(() => null);
+  ui.context.result = {project: 'POINCARE', verified: false};
+  vm.runInContext("message('assistant','Incomplete diagnostic result','POINCARE',result)", ui.context);
+  const text = renderedText(ui.elements.get('messages'));
+  assert.match(text, /Lyapunov λ1: Unavailable/);
+  assert.match(text, /Gromov δ: Unavailable/);
+  assert.match(text, /Synthetic quartet action: Unavailable/);
+  assert.doesNotMatch(text, /undefined|chaotic|λ1: 0\.0000|δ: 0\.0000/);
+});
+
+test('POINCARE synthesis button preserves failed diagnostics when readiness is later polled', async () => {
+  const result = realFailedPoincareReceipt();
+  const ui = await workbench(({url}) => url === '/api/poincare/synthesize' ? {status: 200, data: result}
+    : url === '/api/telemetry/memory-influence' ? {status: 200, data: {}}
+      : url === '/api/poincare/status' ? {status: 200, data: {ready: true, total_verified_domains: null}}
+        : null);
+  await ui.elements.get('synthesizePoincareBtn').onclick();
+  assert.equal(ui.elements.get('poincareTelemetryStatus').textContent, 'DIAGNOSTICS FAILED');
+  assert.ok(ui.elements.get('poincareTelemetryText').textContent.includes('Lyapunov λ1: ' + result.poincare_return_map.lambda_1.toFixed(4)));
+  assert.ok(ui.elements.get('poincareTelemetryText').textContent.includes('Synthetic quartet action: ' + result.unified_quartet_coordinator.final_dispatched_action));
+  await ui.elements.get('pollTelemetryBtn').onclick();
+  assert.equal(ui.elements.get('poincareTelemetryStatus').textContent, 'DIAGNOSTICS FAILED');
+});
+
+test('POINCARE readiness polling reports availability without inventing numerical evidence', async () => {
+  const ui = await workbench(({url}) => url === '/api/telemetry/memory-influence' ? {status: 200, data: {}}
+    : url === '/api/poincare/status' ? {status: 200, data: {ready: true, total_verified_domains: 100,
+      telemetry_summary: {sample_lyapunov: .124, sample_gromov_delta: .052, poincare_duality_satisfied: true, ricci_entropy_monotonic: true}}}
+      : url === '/api/status' ? {status: 200, data: {poincare: {ready: true}}} : null);
+  await ui.elements.get('pollTelemetryBtn').onclick();
+  assert.match(ui.elements.get('poincareTelemetryStatus').textContent, /AVAILABLE.*NOT RUN/);
+  assert.match(ui.elements.get('poincareState').textContent, /AVAILABLE/);
+  assert.match(ui.elements.get('poincareTelemetryText').textContent, /Not run/i);
+  assert.doesNotMatch(ui.elements.get('poincareTelemetryText').textContent, /0\.124|100\/100/);
+  assert.match(ui.elements.get('poincareNote').textContent, /finite orbit.*curvature relaxation surrogate.*synthetic fixtures/i);
+});
+
+test('initial telemetry cards show not-run placeholders rather than fabricated metrics or certifications', async () => {
+  const ui = await workbench(() => null);
+  const grid = html.split('id="telemetryGrid"')[1].split('</section>')[0];
+  const ids = [...grid.matchAll(/\bid="([^"]+)"/g)].map(match => match[1]);
+  assert.ok(ids.length > 40);
+  for (const id of ids) {
+    const value = ui.elements.get(id).textContent;
+    if (id.endsWith('Status')) assert.equal(value, 'NOT RUN', id);
+    else assert.match(value, /Not run|No .*recorded/i, id);
+  }
+});
 
 test('an unsupported Omni answer labels its fixed safety proof as a demonstration', async () => {
   const ui = await workbench(() => null);

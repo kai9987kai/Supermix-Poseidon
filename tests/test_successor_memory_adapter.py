@@ -12,23 +12,43 @@ from poseidon.research.successor_memory_adapter import (
     SuccessorMemoryAdapter,
     discretize_obs_to_spatial_state,
 )
+from poseidon.world import ACTIONS, OBSERVATION_NAMES
 
 
 def test_discretize_obs_to_spatial_state():
     # 16-D continuous TidePool vector
-    # Indices: [0:energy, 1:hydration, 2:stamina, 3:temperature, 4:health, 5:tide, 6:predator,
-    #           7:depth, 8:shelter, 9:drift, 10:clarity, 11:terrain, 12:salinity, 13:current_x, 14:current_y, 15:time]
     obs = np.zeros(16, dtype=np.float32)
     s0 = discretize_obs_to_spatial_state(obs, num_spatial_states=16)
     assert 0 <= s0 < 16
 
-    obs[11] = 0.9  # High terrain
+    obs[12] = 0.9  # High terrain difficulty
     s_high_terrain = discretize_obs_to_spatial_state(obs, num_spatial_states=16)
     assert 0 <= s_high_terrain < 16
 
     obs[8] = 0.8  # High shelter
     s_shelter = discretize_obs_to_spatial_state(obs, num_spatial_states=16)
     assert 0 <= s_shelter < 16
+
+
+def test_successor_spatial_state_uses_local_patch_features_not_energy():
+    observation = [0.0] * 16
+    state = discretize_obs_to_spatial_state(observation)
+    observation[OBSERVATION_NAMES.index("energy")] = 1.0
+    assert discretize_obs_to_spatial_state(observation) == state
+    observation[OBSERVATION_NAMES.index("resource_scent")] = 1.0
+    assert discretize_obs_to_spatial_state(observation) == 5
+
+
+@pytest.mark.parametrize("action_name, surprise, expected_replay", [
+    ("rest", 0.0, True), ("flee", 0.0, False), ("forage", 0.8, True),
+])
+def test_successor_replay_triggers_on_rest_or_surprise(action_name, surprise, expected_replay):
+    adapter = SuccessorMemoryAdapter()
+    observation = [0.5] * 16
+    result = adapter.record_step(observation, ACTIONS.index(action_name), observation,
+                                 surprise=surprise)
+    assert result["swr_triggered"] is expected_replay
+    assert adapter.total_swr_triggers == int(expected_replay)
 
 
 def test_successor_memory_adapter_workflow():

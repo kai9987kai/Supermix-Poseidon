@@ -230,6 +230,12 @@ def make_handler(runtime, port):
                 except Exception as error:
                     self.send_json(500, {"error": str(error), "type": type(error).__name__})
                 return
+            if path == "/api/poincare/status":
+                try:
+                    self.send_json(200, runtime.poincare_status())
+                except Exception as error:
+                    self.send_json(500, {"error": str(error), "type": type(error).__name__})
+                return
             if path == "/api/aether/status":
                 try:
                     self.send_json(200, runtime.aether_status())
@@ -308,6 +314,18 @@ def make_handler(runtime, port):
             except (ValueError, UnicodeDecodeError) as error:
                 self.send_json(400, {"error": str(error)}); return
             path = unquote(urlsplit(self.path).path)
+            if path == "/api/reasoning/audit":
+                try:
+                    if set(payload) - {"seed", "samples"}:
+                        raise ValueError("Unknown reasoning audit setting.")
+                    assert_source_current()
+                    self.send_json(200, runtime.reasoning_audit(
+                        seed=payload.get("seed", 20261030), samples=payload.get("samples", 8)))
+                except StaleSourceError as error:
+                    self.send_json(409, {"error": str(error)} | source_status())
+                except (ValueError, TypeError) as error:
+                    self.send_json(400, {"error": str(error)})
+                return
             if path == "/api/jobs" or (path.startswith("/api/jobs/") and path.endswith("/cancel") and path.count("/") == 4):
                 try:
                     if path == "/api/jobs":
@@ -720,6 +738,20 @@ def make_handler(runtime, port):
                     seed = int(payload.get("seed", 42))
                     res = runtime.cartan_synthesize(seed=seed)
                     self.send_json(200, res)
+                except Exception as error:
+                    self.send_json(500, {"error": str(error), "type": type(error).__name__})
+                return
+            if path == "/api/poincare/synthesize":
+                try:
+                    seed = payload.get("seed", 42)
+                    stochastic_k = payload.get("stochastic_k", 0.85)
+                    surface_type = str(payload.get("surface_type", "torus"))
+                    res = runtime.poincare_synthesize(seed=seed, stochastic_k=stochastic_k, surface_type=surface_type,
+                        iterations=payload.get("iterations", 400), curvature_c=payload.get("curvature_c", 1.0),
+                        ricci_vertices=payload.get("ricci_vertices", 6), ricci_steps=payload.get("ricci_steps", 30))
+                    self.send_json(200, res)
+                except (ValueError, TypeError) as error:
+                    self.send_json(400, {"error": str(error), "type": type(error).__name__})
                 except Exception as error:
                     self.send_json(500, {"error": str(error), "type": type(error).__name__})
                 return

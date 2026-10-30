@@ -33,33 +33,41 @@ from ..external_adapter import (
     ExternalAdapterIdentity,
     ExternalTickMessage,
 )
-from ..world import N_ACTIONS, OBS_SIZE
+from ..world import N_ACTIONS, OBSERVATION_NAMES, OBS_SIZE
 
 
 # Observation Discretization Predicates
 STATE_READY = 0
 STATE_NOMINAL = 1
-STATE_GOAL = 2
-STATE_HAZARD = 3
+# Match the owning CrosswireEngine canonical transition model.
+STATE_GOAL = 3
+STATE_HAZARD = 4
 
 
 def discretize_tidepool_obs_16d(obs: Sequence[float]) -> int:
-    """Discretizes continuous 16-D TidePool observation into semantic discrete states."""
-    if len(obs) < 16:
-        return STATE_NOMINAL
-    vitality = float(obs[0])
-    depth = float(obs[1])
-    salinity = float(obs[2])
-    dist_goal = float(obs[3])
+    """Return a heuristic category using TidePool's actual observation contract.
 
-    # Hazard checks: depleted vital, crushing depth, toxic salinity
-    if vitality <= 0.15 or depth >= 0.90 or salinity >= 0.85:
+    ``STATE_GOAL`` is the legacy name for a healthy, well-resourced category;
+    TidePool observations contain no goal distance or terminal-success sensor.
+    These predicates do not validate the separate synthetic transition model.
+    """
+    if len(obs) != OBS_SIZE:
+        raise ValueError(f"observation must contain {OBS_SIZE} values")
+    values = [float(value) for value in obs]
+    if any(not math.isfinite(value) or not 0.0 <= value <= 1.0 for value in values):
+        raise ValueError("observation values must be finite and in [0, 1]")
+    state = dict(zip(OBSERVATION_NAMES, values))
+
+    # The reserve/exposure/threat cutoffs match TidePool's damage conditions.
+    # Low health is an additional conservative categorization heuristic.
+    if (state["health"] <= 0.15 or state["energy"] < 0.08
+            or state["hydration"] < 0.08 or state["stamina"] < 0.04
+            or state["exposure"] > 0.85 or state["threat"] > 0.68):
         return STATE_HAZARD
-    # Goal check: close to resource and healthy
-    if dist_goal <= 0.25 and vitality >= 0.60:
+    if (min(state[name] for name in ("health", "energy", "hydration", "stamina")) >= 0.60
+            and min(state["food"], state["water"]) >= 0.25):
         return STATE_GOAL
-    # Ready check: initial state
-    if dist_goal >= 0.70 and vitality >= 0.85 and 0.20 <= depth <= 0.50:
+    if state["episode_progress"] == 0.0:
         return STATE_READY
     return STATE_NOMINAL
 
