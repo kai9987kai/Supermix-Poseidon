@@ -22,6 +22,23 @@ def test_exact_answer_checker_ignores_answer_in_explanatory_prose():
     assert audit.check_answer(case, {'answer': 'NaN', 'verified': True}) is False
 
 
+@pytest.mark.parametrize("raw", ["1e1000000000", "1e-1000000000", "0e1000000000",
+                                 "NaN", "Infinity", "1/0", "9" * 81])
+def test_numeric_answer_budget_is_checked_before_fraction_conversion(monkeypatch, raw):
+    def forbidden_conversion(*args, **kwargs):
+        pytest.fail("oversized or invalid answer reached Fraction conversion")
+    monkeypatch.setattr(audit, "Fraction", forbidden_conversion)
+    case = {"answerable": True, "family": "arithmetic", "expected": "1"}
+    assert audit.check_answer(case, {"answer": raw, "verified": True}) is False
+
+
+@pytest.mark.parametrize("raw,expected", [("1.25e2", "125"), ("-5e-3", "-1/200"),
+                                          (".5", "1/2"), ("3/12", "1/4"),
+                                          ("0.00000000000000001", "1/100000000000000000")])
+def test_bounded_fraction_helper_preserves_small_exact_formats(raw, expected):
+    assert str(audit._bounded_answer_fraction(raw)) == expected
+
+
 def test_hanoi_checker_replays_moves_and_checks_requested_disk_count():
     case = next(c for c in audit.generate_cases(101, 1) if c['family'] == 'hanoi')
     from poseidon.problem_solver import solve_problem

@@ -215,13 +215,43 @@ def test_isolated_smoke_script_is_valid_python():
     compile(release.SMOKE_SCRIPT, "packaged-release-smoke", "exec")
 
 
+def test_v314_requires_its_new_reasoning_and_robustness_evidence(tmp_path):
+    manifest = _package(tmp_path, "2.0.0")
+    manifest["version"] = "3.14.0"
+    _seal(tmp_path, manifest)
+    with pytest.raises(ValueError, match="reasoning audit"):
+        release.verify_hashes(tmp_path)
+
+
+def test_v314_reasoning_paths_preserve_historical_evidence_names():
+    paths = getattr(release, "reasoning_audit_paths", lambda version: ())
+    assert paths("3.14.0") == (
+        "outputs/research/robustness-upgrade-20261031/reasoning-20261031.json",
+        "outputs/research/robustness-upgrade-20261031/reasoning-20261101.json",
+    )
+    assert paths("3.13.0") == release.REASONING_AUDIT_PATHS
+
+
+def test_v314_model_card_identifies_new_tools_without_promoting_a_controller():
+    from tools.package_huggingface import model_card
+    card = model_card("1" * 40, *("2" * 64 for _ in range(5)), version="3.14.0")
+    assert "31 October robustness upgrade" in card
+    assert "metamorphic-audit" in card
+    assert "episode-risk" in card
+    assert "synthetic episode fixture" in card
+
+
 @pytest.mark.parametrize("version", release.V3_RELEASE_VERSIONS)
 def test_v3_releases_preserve_full_evidence_requirements(tmp_path, version):
     manifest = _package(tmp_path, "2.0.0")
     manifest["version"] = version
     _seal(tmp_path, manifest)
-    _, receipt = release.verify_hashes(tmp_path)
-    assert receipt["version"] == version
+    if version == "3.14.0":
+        with pytest.raises(ValueError, match="reasoning audit"):
+            release.verify_hashes(tmp_path)
+    else:
+        _, receipt = release.verify_hashes(tmp_path)
+        assert receipt["version"] == version
     manifest.pop("trident_experiment_verification")
     _seal(tmp_path, manifest)
     with pytest.raises(ValueError, match="TRIDENT replay verification"):
@@ -293,3 +323,71 @@ def test_reasoning_release_rejects_saved_report_that_does_not_replay(tmp_path):
     first.write_text(json.dumps(report), encoding="utf-8")
     with pytest.raises(ValueError, match="replay"):
         release.verify_reasoning_audits(tmp_path)
+
+
+@pytest.fixture
+def robustness_package(tmp_path):
+    from poseidon.research.reasoning_audit import run_audit as reasoning
+    from poseidon.research.metamorphic_audit import run_audit as metamorphic
+    from poseidon.research.episode_risk import make_episode_risk_protocol, audit_episode_risk
+    manifest = _package(tmp_path, "2.0.0")
+    manifest["version"] = "3.14.0"
+    for seed, relative in zip((20261031, 20261101), release.ROBUSTNESS_REASONING_AUDIT_PATHS):
+        path = tmp_path / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(reasoning(seed=seed, samples=32)), encoding="utf-8")
+    for seed, relative in zip((20261031, 20261101), release.METAMORPHIC_AUDIT_PATHS):
+        (tmp_path / relative).write_text(json.dumps(metamorphic(seed=seed, samples=32)), encoding="utf-8")
+    ids = list(range(100, 120))
+    protocol = make_episode_risk_protocol(
+        policy_sha256="a" * 64, predictor_sha256="b" * 64, panel_sha256="c" * 64,
+        thresholds={"margin": 0.1}, required_conditions=["id"], fit_episode_ids=[1],
+        selection_episode_ids=[2], calibration_episode_ids=ids, max_episode_risk=0.1)
+    fixture = audit_episode_risk(protocol, {"id": [{"episode_id": number, "adverse_event": False} for number in ids]})
+    (tmp_path / release.EPISODE_RISK_FIXTURE_PATH).write_text(json.dumps(fixture), encoding="utf-8")
+    manifest["reasoning_audit_verification"] = release.verify_reasoning_audits(tmp_path, version="3.14.0")
+    manifest["robustness_audit_verification"] = release.verify_robustness_audits(tmp_path)
+    for relative in (*release.ROBUSTNESS_REASONING_AUDIT_PATHS, *release.ROBUSTNESS_AUDIT_PATHS):
+        payload = (tmp_path / relative).read_bytes()
+        manifest["files"].append({"path": relative, "size": len(payload), "sha256": _digest(payload)})
+    _seal(tmp_path, manifest)
+    return tmp_path, manifest
+
+
+def test_v314_new_evidence_replays_and_is_bound_to_package_inventory(robustness_package):
+    root, manifest = robustness_package
+    records = manifest["robustness_audit_verification"]
+    assert release.verify_robustness_audits(root, recorded=records) == records
+    assert release.verify_hashes(root)[1]["version"] == "3.14.0"
+    assert records[release.EPISODE_RISK_FIXTURE_PATH]["eligible"] is False
+    assert records[release.EPISODE_RISK_FIXTURE_PATH]["evidence_role"] == "synthetic_episode_software_fixture"
+    assert all(records[path]["replay_verified"] is True for path in release.METAMORPHIC_AUDIT_PATHS)
+
+
+@pytest.mark.parametrize("mutation", ["missing", "missing_report", "file_hash", "false_replay", "promoted", "authenticity", "performance_claim"])
+def test_v314_incomplete_or_misleading_robustness_metadata_fails_closed(robustness_package, mutation):
+    root, manifest = robustness_package
+    records = manifest["robustness_audit_verification"]
+    if mutation == "missing":
+        del manifest["robustness_audit_verification"]
+    elif mutation == "missing_report":
+        del records[release.METAMORPHIC_AUDIT_PATHS[0]]
+    elif mutation == "file_hash":
+        records[release.METAMORPHIC_AUDIT_PATHS[0]]["file_sha256"] = "d" * 64
+    elif mutation == "false_replay":
+        records[release.METAMORPHIC_AUDIT_PATHS[0]]["replay_verified"] = False
+    else:
+        key, value = {"promoted": ("promoted", True), "authenticity": ("outcome_authenticity_verified", True),
+                      "performance_claim": ("evidence_role", "controller_performance")}[mutation]
+        records[release.EPISODE_RISK_FIXTURE_PATH][key] = value
+    _seal(root, manifest)
+    with pytest.raises(ValueError, match="robustness|metamorphic|synthetic episode"):
+        release.verify_hashes(root)
+
+
+def test_v314_new_replay_metadata_cannot_be_changed_without_recomputation(robustness_package):
+    root, manifest = robustness_package
+    records = manifest["robustness_audit_verification"]
+    records[release.EPISODE_RISK_FIXTURE_PATH]["eligible"] = True
+    with pytest.raises(ValueError, match="metadata differs"):
+        release.verify_robustness_audits(root, recorded=records)

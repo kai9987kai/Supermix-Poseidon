@@ -47,12 +47,12 @@ function safetyEvidenceBadge(proof){
   badge.textContent=label+': '+String(proof.verdict||'No verdict')+(queryBound?'':' · this does not verify the answer.')+(proof.certificate_sha256?' · certificate '+String(proof.certificate_sha256).slice(0,16)+'…':'');
   return badge;
 }
-async function apiJSON(url,options={}){
+async function apiJSON(url,options={},retainSource=false){
   const response=await fetch(url,options);
-  let data;
-  try{data=await response.json();}catch{throw Error('The server returned an unreadable response (HTTP '+response.status+').');}
+  let data,raw;
+  try{if(retainSource){raw=await response.text();data=JSON.parse(raw);}else{data=await response.json();}}catch{throw Error('The server returned an unreadable response (HTTP '+response.status+').');}
   if(!response.ok){const error=Error(typeof data?.error==='string'?data.error:response.statusText||'HTTP '+response.status);error.status=response.status;throw error;}
-  return data;
+  return retainSource?{data,raw}:data;
 }
 async function request(url,payload){return apiJSON(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});}
 function excluded(){return [...document.querySelectorAll('.ablations input:checked')].map(x=>x.value);}
@@ -790,6 +790,87 @@ if($('#runReasoningAudit'))$('#runReasoningAudit').onclick=async()=>{
     $('#reasoningAuditStatus').textContent=`Complete · seed ${data.config.seed} · ${data.metrics.total} cases · ${data.metrics.wrong} wrong accepted · ${data.metrics.missed_answerable} missed answerable · ${data.metrics.errors} errors`;
   }catch(error){$('#reasoningAuditStatus').textContent='Audit failed: '+error.message;}
   finally{button.disabled=false;}
+};
+function auditTableRows(selector, rows){
+  const body=$(selector);body.replaceChildren();
+  for(const values of rows){
+    const row=document.createElement('tr');
+    for(const value of values){const cell=document.createElement('td');cell.textContent=String(value);row.append(cell);}
+    body.append(row);
+  }
+}
+function auditCards(selector, values){
+  const container=$(selector);container.replaceChildren();
+  for(const [label,value] of values){
+    const card=document.createElement('div'),name=document.createElement('span'),number=document.createElement('strong');
+    name.textContent=label;number.textContent=String(value);card.append(name,number);container.append(card);
+  }
+}
+function exportAuditReport(raw, name){
+  const url=URL.createObjectURL(new Blob([raw+'\n'],{type:'application/json'}));
+  const link=document.createElement('a');link.href=url;link.download=name;link.click();
+  setTimeout(()=>URL.revokeObjectURL(url),0);
+}
+let lastMetamorphicAudit=null,lastEpisodeRisk=null;
+function renderMetamorphicAudit(data){
+  const m=data.metrics;
+  auditCards('#metamorphicAuditMetrics',[
+    ['Checked answers',m.total],['Correct answers',m.correct],['Wrong accepted',m.wrong],
+    ['Jointly correct pairs',`${m.joint_correct_groups} / ${m.groups}`],
+    ['Relation violations',m.relation_violations],['Unavailable relations',m.relation_unavailable],
+    ['Refusals',m.refusals],['Solver errors',m.errors]]);
+  auditTableRows('#metamorphicAuditFamilies',Object.entries(data.by_family).map(([family,v])=>
+    [family,v.correct,v.wrong,v.relation_violations,v.relation_unavailable,`${v.joint_correct_groups} / ${v.groups}`]));
+  $('#metamorphicAuditScope').textContent='Consistent answers can both be wrong. Jointly correct pairs require independent correctness and a valid relation. Finite local tool checks; no general model accuracy or statistical risk guarantee.';
+  $('#metamorphicAuditDetails').textContent=JSON.stringify(data,null,2);
+  $('#metamorphicAuditResults').hidden=false;
+}
+if($('#runMetamorphicAudit'))$('#runMetamorphicAudit').onclick=async()=>{
+  const button=$('#runMetamorphicAudit');button.disabled=true;lastMetamorphicAudit=null;
+  $('#exportMetamorphicAudit').disabled=true;$('#metamorphicAuditResults').hidden=true;
+  $('#metamorphicAuditStatus').textContent='Checking related inputs…';
+  try{
+    const seed=Number($('#metamorphicAuditSeed').value||'20261031'),samples=Number($('#metamorphicAuditSamples').value||'8');
+    if(!Number.isSafeInteger(seed)||seed<0||!Number.isInteger(samples)||samples<1||samples>32)throw Error('Use a nonnegative integer seed and 1–32 pairs per family.');
+    const response=await apiJSON('/api/reasoning/metamorphic-audit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({seed,samples})},true);
+    const data=response.data;
+    renderMetamorphicAudit(data);$('#metamorphicAuditDetails').textContent=response.raw;
+    lastMetamorphicAudit=response;$('#exportMetamorphicAudit').disabled=false;
+    const m=data.metrics;
+    $('#metamorphicAuditStatus').textContent=`Complete · ${m.joint_correct_groups} / ${m.groups} jointly correct pairs · ${m.wrong} wrong accepted · ${m.relation_violations} relation violations · ${m.refusals} refusals · ${m.errors} errors`;
+  }catch(error){$('#metamorphicAuditStatus').textContent='Audit failed: '+error.message;}
+  finally{button.disabled=false;}
+};
+if($('#exportMetamorphicAudit'))$('#exportMetamorphicAudit').onclick=()=>{
+  if(lastMetamorphicAudit)exportAuditReport(lastMetamorphicAudit.raw,'poseidon-metamorphic-audit.json');
+};
+function renderEpisodeRisk(data){
+  const percent=value=>(100*value).toFixed(2)+'%';
+  auditTableRows('#episodeRiskConditions',Object.entries(data.conditions).map(([condition,v])=>
+    [condition,v.episodes,v.adverse_episodes,percent(v.observed_risk),percent(v.risk_upper_bound),v.passed?'Meets limit':'Insufficient evidence']));
+  $('#episodeRiskScope').textContent=`${percent(data.protocol.confidence)} simultaneous confidence; episode risk limit ${percent(data.protocol.max_episode_risk)}. Bounds assume independent identically distributed episodes for a policy fixed before collection. Supplied identities and outcomes are not authenticated. This is not per-action risk and does not activate a controller.`;
+  $('#episodeRiskDetails').textContent=JSON.stringify(data,null,2);$('#episodeRiskResults').hidden=false;
+}
+if($('#runEpisodeRisk'))$('#runEpisodeRisk').onclick=async()=>{
+  const button=$('#runEpisodeRisk');button.disabled=true;lastEpisodeRisk=null;
+  $('#exportEpisodeRisk').disabled=true;$('#episodeRiskResults').hidden=true;
+  $('#episodeRiskStatus').textContent='Checking supplied episode evidence…';
+  try{
+    const file=$('#episodeRiskFile').files?.[0];
+    if(!file)throw Error('Choose a protocol and outcomes JSON file.');
+    if(file.size>65536)throw Error('Use a file of at most 64 KiB, or run episode-risk in the CLI.');
+    const raw=await file.text();
+    // Send the original JSON so the server can reject duplicate keys and nonfinite numbers.
+    const response=await apiJSON('/api/research/episode-risk',{method:'POST',headers:{'Content-Type':'application/json'},body:raw},true);
+    const data=response.data;
+    renderEpisodeRisk(data);$('#episodeRiskDetails').textContent=response.raw;
+    lastEpisodeRisk=response;$('#exportEpisodeRisk').disabled=false;
+    $('#episodeRiskStatus').textContent=data.eligible?'Meets declared episode risk limit · offline screen only':'Insufficient evidence for the declared episode risk limit';
+  }catch(error){$('#episodeRiskStatus').textContent='Screen failed: '+error.message;}
+  finally{button.disabled=false;}
+};
+if($('#exportEpisodeRisk'))$('#exportEpisodeRisk').onclick=()=>{
+  if(lastEpisodeRisk)exportAuditReport(lastEpisodeRisk.raw,'poseidon-episode-risk.json');
 };
 if($('#synthesizePoincareBtn'))$('#synthesizePoincareBtn').onclick=async()=>{
   try{

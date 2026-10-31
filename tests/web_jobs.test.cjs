@@ -41,7 +41,7 @@ async function workbench(route) {
   for (const match of html.matchAll(/<([\w-]+)\b[^>]*\bid="([^"]+)"[^>]*>([^<]*)<\/\1>/g)) {
     elements.get(match[2]).textContent = match[3];
   }
-  const calls = [], timers = new Map();
+  const calls = [], timers = new Map(), downloads=[];
   let timerId = 0;
   const document = {
     querySelector(selector) {return selector.startsWith('#') ? elements.get(selector.slice(1)) || null : null;},
@@ -51,7 +51,11 @@ async function workbench(route) {
   elements.get('experimentSeed').value = '90000000';
   elements.get('episodes').value = '1'; elements.get('maxSteps').value = '32'; elements.get('scarcity').value = '2.5';
   elements.get('experimentForm').querySelectorAll = () => ['experimentType', 'experimentSeed', 'episodes', 'maxSteps', 'scarcity'].map(id => elements.get(id));
-  const context = vm.createContext({document, console, URL, location: {href: 'http://127.0.0.1:8787/'},
+  class BrowserURL extends URL {}
+  BrowserURL.createObjectURL=blob=>{downloads.push(blob);return 'blob:test';};
+  BrowserURL.revokeObjectURL=()=>{};
+  Element.prototype.click=function(){};
+  const context = vm.createContext({document, console, URL:BrowserURL, Blob, setTimeout:fn=>{fn();return 0;}, location: {href: 'http://127.0.0.1:8787/'},
     matchMedia: () => ({matches: true}), requestAnimationFrame: () => 0, cancelAnimationFrame() {},
     setInterval(fn, ms) {const id = ++timerId; timers.set(id, {fn, ms}); return id;},
     clearInterval(id) {timers.delete(id);},
@@ -60,13 +64,14 @@ async function workbench(route) {
       calls.push(call);
       const response = await route(call);
       return {ok: response?.status >= 200 && response.status < 300, status: response?.status || 404,
-        statusText: response?.statusText || 'Unavailable', json: async () => response?.data || {error: 'Unavailable'}};
+        statusText: response?.statusText || 'Unavailable', json: async () => response?.data || {error: 'Unavailable'},
+        text:async()=>response?.raw || JSON.stringify(response?.data || {error:'Unavailable'})};
     },
   });
   vm.runInContext(source, context, {filename: 'app.js'});
   const flush = async () => {for (let i = 0; i < 20; i++) await Promise.resolve();};
   await flush();
-  return {elements, calls, context, flush,
+  return {elements, calls, context, flush, downloads,
     async tick() {for (const {fn, ms} of [...timers.values()]) if (ms < 15000) await fn(); await flush();},
     buttons() {return elements.get('jobHistory').children.flatMap(item => item.children).filter(item => item.tagName === 'BUTTON');},
   };
@@ -100,6 +105,46 @@ test('reasoning audit validates the requested budget before sending', async () =
   await ui.elements.get('runReasoningAudit').onclick();await ui.flush();
   assert.equal(ui.calls.filter(call=>call.url==='/api/reasoning/audit').length,0);
   assert.match(ui.elements.get('reasoningAuditStatus').textContent,/1–32/);
+});
+
+test('metamorphic audit separates consistent relations from correct answers', async () => {
+  const metrics={groups:5,total:10,accepted:10,correct:0,wrong:10,errors:0,refusals:0,coverage:1,selective_risk:1,relation_checked:5,relation_passed:5,relation_violations:0,relation_unavailable:0,joint_correct_groups:0};
+  const ui=await workbench(({url,body})=>url==='/api/reasoning/metamorphic-audit'?{status:200,data:{config:body,metrics,by_family:{arithmetic:metrics},groups:[],limits:[]}}:null);
+  await ui.elements.get('runMetamorphicAudit').onclick();await ui.flush();
+  assert.equal(ui.elements.get('metamorphicAuditResults').hidden,false);
+  assert.match(ui.elements.get('metamorphicAuditStatus').textContent,/0.*5.*correct/);
+  assert.match(ui.elements.get('metamorphicAuditScope').textContent,/both be wrong/);
+  assert.equal(ui.elements.get('runMetamorphicAudit').disabled,false);
+});
+
+test('episode risk upload errors clear old results and permit retry', async () => {
+  const ui=await workbench(()=>null);
+  ui.elements.get('episodeRiskResults').hidden=false;
+  ui.elements.get('episodeRiskFile').files=[];
+  await ui.elements.get('runEpisodeRisk').onclick();await ui.flush();
+  assert.equal(ui.elements.get('episodeRiskResults').hidden,true);
+  assert.match(ui.elements.get('episodeRiskStatus').textContent,/Choose/);
+  assert.equal(ui.elements.get('runEpisodeRisk').disabled,false);
+});
+
+test('episode risk displays per-condition bounds without controller promotion', async () => {
+  const ui=await workbench(({url})=>url==='/api/research/episode-risk'?{status:200,data:{eligible:false,conditions:{scarcity:{episodes:10,adverse_episodes:0,observed_risk:0,risk_upper_bound:0.31,passed:false}},protocol:{max_episode_risk:0.1,confidence:0.95}}}:null);
+  ui.elements.get('episodeRiskFile').files=[{size:100,text:async()=>'{"protocol":{},"outcomes_by_condition":{}}'}];
+  await ui.elements.get('runEpisodeRisk').onclick();await ui.flush();
+  assert.equal(ui.elements.get('episodeRiskResults').hidden,false);
+  assert.match(ui.elements.get('episodeRiskStatus').textContent,/Insufficient/);
+  assert.match(ui.elements.get('episodeRiskScope').textContent,/independent/);
+  assert.match(ui.elements.get('episodeRiskScope').textContent,/per-action/);
+});
+
+test('audit export preserves original float forms and 64-bit episode identifiers', async () => {
+  const raw='{"eligible":true,"conditions":{"id":{"episodes":1,"adverse_episodes":0,"observed_risk":0.0,"risk_upper_bound":0.5,"passed":true}},"protocol":{"max_episode_risk":0.5,"confidence":0.95,"calibration_episode_ids":[9007199254740993]}}';
+  const ui=await workbench(({url})=>url==='/api/research/episode-risk'?{status:200,raw}:null);
+  ui.elements.get('episodeRiskFile').files=[{size:2,text:async()=>'{}'}];
+  await ui.elements.get('runEpisodeRisk').onclick();await ui.flush();
+  ui.elements.get('exportEpisodeRisk').onclick();
+  assert.equal(await ui.downloads[0].text(),raw+'\n');
+  assert.match(ui.elements.get('episodeRiskDetails').textContent,/9007199254740993/);
 });
 
 test('completed history fetches its full result only when opened after reload', async () => {

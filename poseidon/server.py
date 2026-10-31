@@ -4,12 +4,29 @@ from pathlib import Path
 from urllib.parse import unquote, urlsplit
 import argparse
 import json
+import math
 import mimetypes
 import threading
 from .runtime import Poseidon
 from .provenance import StaleSourceError, assert_source_current, source_status
 
 WEB = Path(__file__).parent/"web"
+
+def _json_object(pairs):
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError(f"Duplicate JSON field: {key}")
+        result[key] = value
+    return result
+
+
+def _json_float(value):
+    number = float(value)
+    if not math.isfinite(number):
+        raise ValueError("JSON numbers must be finite.")
+    return number
+
 
 def make_handler(runtime, port):
     busy = threading.Lock()
@@ -308,22 +325,37 @@ def make_handler(runtime, port):
                 length = int(self.headers.get("Content-Length", "0"))
                 if not 0 < length <= 65536:
                     raise ValueError("Request body must be 1–65536 bytes.")
-                payload = json.loads(self.rfile.read(length))
+                payload = json.loads(self.rfile.read(length), object_pairs_hook=_json_object,
+                                     parse_float=_json_float, parse_constant=_json_float)
                 if not isinstance(payload, dict):
                     raise ValueError("Expected a JSON object.")
             except (ValueError, UnicodeDecodeError) as error:
                 self.send_json(400, {"error": str(error)}); return
             path = unquote(urlsplit(self.path).path)
-            if path == "/api/reasoning/audit":
+            if path in ("/api/reasoning/audit", "/api/reasoning/metamorphic-audit"):
                 try:
                     if set(payload) - {"seed", "samples"}:
                         raise ValueError("Unknown reasoning audit setting.")
                     assert_source_current()
-                    self.send_json(200, runtime.reasoning_audit(
-                        seed=payload.get("seed", 20261030), samples=payload.get("samples", 8)))
+                    metamorphic = path.endswith("metamorphic-audit")
+                    run = runtime.metamorphic_audit if metamorphic else runtime.reasoning_audit
+                    self.send_json(200, run(
+                        seed=payload.get("seed", 20261031 if metamorphic else 20261030),
+                        samples=payload.get("samples", 8)))
                 except StaleSourceError as error:
                     self.send_json(409, {"error": str(error)} | source_status())
                 except (ValueError, TypeError) as error:
+                    self.send_json(400, {"error": str(error)})
+                return
+            if path == "/api/research/episode-risk":
+                try:
+                    if set(payload) != {"protocol", "outcomes_by_condition"}:
+                        raise ValueError("Provide protocol and outcomes_by_condition only.")
+                    assert_source_current()
+                    self.send_json(200, runtime.episode_risk_audit(**payload))
+                except StaleSourceError as error:
+                    self.send_json(409, {"error": str(error)} | source_status())
+                except (ValueError, TypeError, KeyError) as error:
                     self.send_json(400, {"error": str(error)})
                 return
             if path == "/api/jobs" or (path.startswith("/api/jobs/") and path.endswith("/cancel") and path.count("/") == 4):

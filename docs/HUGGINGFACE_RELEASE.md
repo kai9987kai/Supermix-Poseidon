@@ -1,8 +1,8 @@
 # Hugging Face release procedure
 
-Poseidon is a custom PyTorch runtime package hosted at [Kai9987kai/Supermix-Poseidon](https://huggingface.co/Kai9987kai/Supermix-Poseidon). The repository root is not a Transformers `AutoModel` checkpoint. The current source identifies itself as **3.13.0**, with independently checked generated reasoning audits, corrected controller adapters, explicit evidence requirements for the opt-in coordinator, and bounded Poincare numerical diagnostics around the unchanged selected Tidal core. The [30 October upgrade report](PROJECT_UPGRADE_2026-10-30.md) records the implementation, research sources and finite validation scope. This guide describes release preparation; it does not assert that a v3.13.0 Hub tag has been published.
+Poseidon is a custom PyTorch runtime package hosted at [Kai9987kai/Supermix-Poseidon](https://huggingface.co/Kai9987kai/Supermix-Poseidon). The repository root is not a Transformers `AutoModel` checkpoint. The current source identifies itself as **3.14.0**, with exact decimal/scientific parsing, related-input reasoning audits, and offline held-out episode screening around the unchanged selected Tidal core. The [31 October upgrade report](PROJECT_UPGRADE_2026-10-31.md) records the implementation, research sources and finite validation scope. This guide describes release preparation; it does not assert that a v3.14.0 Hub tag has been published.
 
-`poseidon.__version__` is the version source for both runtime and distribution metadata. The release builder and verifier share the supported version list, including historical v3.0.0 through v3.13.0 profiles. New v3 profiles retain the required artifact digests and replay evidence from v2.0.0.
+`poseidon.__version__` is the version source for both runtime and distribution metadata. The release builder and verifier share the supported version list, including historical v3.0.0 through v3.14.0 profiles. New v3 profiles retain the required artifact digests and replay evidence from v2.0.0.
 
 ## Download and run
 
@@ -34,12 +34,12 @@ The receipt is bound to the active Tidal checkpoint and TidePool source bytes. I
 Start with a clean Git checkout and a completed `outputs/trident_experiments/RECEIPT.json`. The packager checks the active checkpoints, pinned upstream language files, existing experiment evidence, and the TRIDENT receipt. It rejects dirty source so the manifest can bind a commit. A source checkout, wheel build, or passing unit suite alone does not satisfy these model-release requirements. The build may download pinned historical release assets when they are absent from the local Hub cache.
 
 ```powershell
-python tools/package_huggingface.py --output outputs/releases/poseidon-v3.13.0
-python tools/verify_huggingface_release.py outputs/releases/poseidon-v3.13.0 --smoke --timeout 1800
-hf upload Kai9987kai/Supermix-Poseidon outputs/releases/poseidon-v3.13.0 . --commit-message "Release Poseidon v3.13.0: evidence reliability and numerical diagnostics"
+python tools/package_huggingface.py --output outputs/releases/poseidon-v3.14.0
+python tools/verify_huggingface_release.py outputs/releases/poseidon-v3.14.0 --smoke --timeout 1800
+hf upload Kai9987kai/Supermix-Poseidon outputs/releases/poseidon-v3.14.0 . --commit-message "Release Poseidon v3.14.0: exact reasoning and research robustness"
 ```
 
-The v3.13.0 package includes the two generated audit reports under `outputs/research/evidence-upgrade-20261030/`; packaging and isolated smoke verification replay them. These finite checks do not establish general model accuracy or a statistical risk guarantee.
+The v3.14.0 package includes fresh independent and metamorphic reasoning audits under `outputs/research/robustness-upgrade-20261031/`; packaging and isolated smoke verification replay them and recompute the synthetic episode fixture. Historical v3.13.0 audit bytes remain preserved at their original paths. These finite tool checks do not establish general model accuracy; the episode fixture tests the screening software and is not controller-performance evidence.
 
 After upload, verify the Hub's new commit SHA, intended version tag, model card, manifest, file inventory, and remote file hashes against the local release package. Upload does not itself create a version tag. A local package or successful CLI upload alone is not proof that publication completed. Preserve the existing Hub history and release assets; do not force-push.
 

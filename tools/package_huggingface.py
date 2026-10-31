@@ -58,6 +58,19 @@ def git(*args: str) -> str:
 
 
 def model_card(revision: str, core_hash: str, atlas_hash: str, horizon_hash: str, contrast_hash: str, odyssey_hash: str, version: str, helm_hash: str = "", odysseus_hash: str = "", titan_hash: str = "", trident_hash: str = "") -> str:
+    robustness_upgrade = """
+The [31 October robustness upgrade](docs/PROJECT_UPGRADE_2026-10-31.md) repairs
+exact decimal and scientific-notation input across the solvers and adds the
+`metamorphic-audit` related-input tool and offline `episode-risk` screen. Two
+fresh 200-case reasoning reports and two 320-answer related-input reports replay
+against this release's source. The synthetic episode fixture recomputes supplied
+labels to test the software; it is not controller performance evidence.
+Historical v3.13 reasoning reports remain under their original paths and retain
+their original bytes. Their old source identities are historical evidence and
+are not claimed to replay against the current solver. Episode bounds require
+the declared fixed-policy and sampling assumptions, do not estimate conditional
+per-action risk, and do not activate or promote a controller.
+""" if version == "3.14.0" else ""
     return fr"""---
 language:
 - en
@@ -96,12 +109,13 @@ tags:
 # Supermix Poseidon v{version}: Local Research Workbench
 
 Version {version} packages a local experimental workbench around the frozen Tidal core, with a separate pretrained conversation backend, optional synthetic controllers, and mathematical research tools. Runtime availability, replay integrity, and measured model performance are separate checks. Additional modules do not imply that the selected core was retrained or that a candidate was promoted.
+{robustness_upgrade}
 
 The [30 October reliability upgrade](docs/PROJECT_UPGRADE_2026-10-30.md) adds
 independently generated reasoning checks, corrected controller adapters, explicit
 caller evidence for the opt-in coordinator, and bounded Poincare diagnostics.
 Changed ensemble predictors preserve the baseline until their own calibration
-is available. The two included 200-case audits are finite software checks, not
+is available. Generated audit reports are finite software checks, not
 general model accuracy or a statistical risk guarantee. Mean-curvature relaxation
 is a surrogate, separate from geometric Ricci flow or Perelman entropy.
 
@@ -127,6 +141,8 @@ Additional modules are software simulations or heuristics: Archimedes computes s
 | Poseidon-X | `poseidon/poseidon_x.py` | Experimental geometric and homeostatic controller; opt-in |
 | Problem Forge | `poseidon/problem_solver.py` | Parsed exact/numerical tools and synthetic demonstrations; evidence scope varies by domain |
 | Generated reasoning audit | `poseidon/research/reasoning_audit.py` | Independent numeric/structural checks, refusal controls, source binding and finite replay |
+| Related-input reasoning audit | `poseidon/research/metamorphic_audit.py` | Independent answer checks and related-input consistency; replayable finite tools, not general model accuracy |
+| Offline episode risk screen | `poseidon/research/episode_risk.py` | Fixed-policy complete-episode binary bounds under declared sampling assumptions; no activation or per-action risk claim |
 | Poincare diagnostics | `poseidon/poincare_engine.py` | Five bounded numerical/synthetic diagnostics; no domain-count or controller-safety certification |
 | Project NEUROGRAFT-II | `poseidon/neurograft_engine.py`, `poseidon/research/successor_memory_adapter.py` | Successor representations (SR-TD), zero-shot reward revaluation, SWR reverse replay, Graph Laplacian spatial embeddings & trainable graph circuits |
 | Project CROSSWIRE | `poseidon/crosswire_engine.py`, `poseidon/research/crosswire_adapter.py` | Version space tracking, active diagnostic probing, all-hypothesis contract verification & closed-loop runtime shielding |
@@ -195,6 +211,10 @@ python -m pip install -e .
 python tools/verify_huggingface_release.py . --smoke
 python -m poseidon reasoning-audit --seed 20261030 --samples 32 --output outputs/reasoning-audit.json
 python -m poseidon verify-reasoning-audit outputs/reasoning-audit.json
+python -m poseidon metamorphic-audit --seed 20261031 --samples 32 --output outputs/metamorphic.json
+python -m poseidon verify-metamorphic-audit outputs/metamorphic.json
+python -m poseidon episode-risk study.json --output outputs/episode-risk.json
+python -m poseidon verify-episode-risk outputs/episode-risk.json
 python -m poseidon serve --port 8787
 ```
 
@@ -312,7 +332,10 @@ to avoid relicensing upstream artifacts as MIT.
 def package(output: Path, repo_id: str = REPO_ID) -> dict:
     sys.path.insert(0, str(ROOT))
     from poseidon import __version__
-    from tools.verify_huggingface_release import BUILDABLE_RELEASE_VERSIONS, REASONING_AUDIT_PATHS, verify_reasoning_audits
+    from tools.verify_huggingface_release import (
+        BUILDABLE_RELEASE_VERSIONS, REASONING_AUDIT_PATHS, ROBUSTNESS_AUDIT_PATHS,
+        reasoning_audit_paths, verify_reasoning_audits, verify_robustness_audits,
+    )
     if __version__ not in BUILDABLE_RELEASE_VERSIONS:
         raise ValueError(f"unsupported version {__version__}")
     if repo_id != REPO_ID:
@@ -417,7 +440,8 @@ def package(output: Path, repo_id: str = REPO_ID) -> dict:
         "RECEIPT.json": verify_trident_receipt(trident_receipt, core_path=core_path)
     }
     trident_receipt_hash = sha256(trident_receipt_path)
-    reasoning_audit_verification = verify_reasoning_audits(ROOT)
+    reasoning_audit_verification = verify_reasoning_audits(ROOT, version=__version__)
+    robustness_audit_verification = verify_robustness_audits(ROOT) if __version__ == "3.14.0" else None
 
     experiment_verification = {name: load_and_verify(ROOT / "outputs/experiments" / name) for name in EXPERIMENTS}
     evidence_artifacts = load_artifacts(ROOT)
@@ -495,7 +519,11 @@ def package(output: Path, repo_id: str = REPO_ID) -> dict:
     artifacts += [f"outputs/horizon_experiments/{name}" for name in HORIZON_EXPERIMENTS]
     artifacts += [f"outputs/odyssey_experiments/{name}" for name in ODYSSEY_EXPERIMENTS]
     artifacts += [f"outputs/trajectory_audits/{name}" for name in TRAJECTORY_AUDITS]
-    artifacts += list(REASONING_AUDIT_PATHS)
+    # Historical v3.13 report bytes remain available, but their old sources are
+    # not represented as replaying against the new version's exact solvers.
+    artifacts += list(dict.fromkeys((*REASONING_AUDIT_PATHS, *reasoning_audit_paths(__version__))))
+    if robustness_audit_verification is not None:
+        artifacts += list(ROBUSTNESS_AUDIT_PATHS)
     artifacts += [f"outputs/helm_experiments/{name}" for name in helm_names]
     artifacts += [f"outputs/odysseus_experiments/{name}" for name in ODYSSEUS_EXPERIMENTS]
     artifacts += [f"outputs/aura_experiments/{name}" for name in AURA_EXPERIMENTS]
@@ -614,6 +642,7 @@ See runs/language/report.json, data/language/SOURCE_CARD.md and the root model c
         "trident_receipt_sha256": trident_receipt_hash,
         "trident_experiment_verification": trident_experiment_verification,
         "reasoning_audit_verification": reasoning_audit_verification,
+        "robustness_audit_verification": robustness_audit_verification,
         "build_environment": {name: importlib.metadata.version(name) for name in
                               ("torch", "transformers", "peft", "safetensors", "numpy", "scipy", "huggingface-hub")},
         "activation": {"core": "existing-dagger-selection", "language": "unchanged-upstream-base",
@@ -647,6 +676,8 @@ See runs/language/report.json, data/language/SOURCE_CARD.md and the root model c
                        "nexus_omega": "causal-epigenetic-self-experimenting-discovery-agent",
                        "problem_forge": "parsed-exact-numerical-tools-and-synthetic-demonstrations-with-scoped-evidence",
                        "reasoning_audit": "finite-generated-suite-with-independent-checks-and-replay-no-statistical-guarantee",
+                       "metamorphic_audit": "finite-related-input-tool-audit-with-independent-correctness-no-general-model-claim",
+                       "episode_risk": "offline-complete-episode-screen-of-supplied-labels-no-action-risk-or-promotion",
                        "poincare": "bounded-numerical-synthetic-diagnostics-no-safety-certification",
                        "neurograft_ii": "successor-representation-swr-reverse-replay-graph-laplacian-trainable-circuit-engine",
                        "crosswire": "crosswire-version-space-active-diagnostic-probing-runtime-shield",

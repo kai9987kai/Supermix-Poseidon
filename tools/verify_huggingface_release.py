@@ -35,6 +35,21 @@ REASONING_AUDIT_PATHS = (
     "outputs/research/evidence-upgrade-20261030/reasoning-20261030.json",
     "outputs/research/evidence-upgrade-20261030/reasoning-20261031.json",
 )
+ROBUSTNESS_REASONING_AUDIT_PATHS = (
+    "outputs/research/robustness-upgrade-20261031/reasoning-20261031.json",
+    "outputs/research/robustness-upgrade-20261031/reasoning-20261101.json",
+)
+METAMORPHIC_AUDIT_PATHS = (
+    "outputs/research/robustness-upgrade-20261031/metamorphic-20261031.json",
+    "outputs/research/robustness-upgrade-20261031/metamorphic-20261101.json",
+)
+EPISODE_RISK_FIXTURE_PATH = "outputs/research/robustness-upgrade-20261031/browser-episode-risk.json"
+ROBUSTNESS_AUDIT_PATHS = (*METAMORPHIC_AUDIT_PATHS, EPISODE_RISK_FIXTURE_PATH)
+
+
+def reasoning_audit_paths(version: str = "3.13.0") -> tuple[str, ...]:
+    return ROBUSTNESS_REASONING_AUDIT_PATHS if version == "3.14.0" else REASONING_AUDIT_PATHS
+
 IGNORED_INVENTORY_RULES = (
     ".cache/huggingface/ (Hub download metadata)",
     "*.egg-info/ at package root (editable install metadata)",
@@ -124,7 +139,8 @@ def _inventory(root: Path) -> tuple[set[str], dict]:
                     "directories": sorted(ignored_directories), "files_ignored": ignored_files}
 
 
-def verify_reasoning_audits(package_dir: str | Path, *, recorded: dict | None = None) -> dict:
+def verify_reasoning_audits(package_dir: str | Path, *, recorded: dict | None = None,
+                          version: str = "3.13.0") -> dict:
     """Replay the two explicit finite audits and bind their exact saved bytes.
 
     Import the scientific runtime only for this requested replay operation, never
@@ -134,10 +150,11 @@ def verify_reasoning_audits(package_dir: str | Path, *, recorded: dict | None = 
     from poseidon.research.reasoning_audit import verify_audit
 
     root = Path(package_dir).resolve()
-    if recorded is not None and (not isinstance(recorded, dict) or set(recorded) != set(REASONING_AUDIT_PATHS)):
+    paths = reasoning_audit_paths(version)
+    if recorded is not None and (not isinstance(recorded, dict) or set(recorded) != set(paths)):
         raise ValueError("Packaged reasoning audit metadata must identify both allowlisted reports")
     verified = {}
-    for relative in REASONING_AUDIT_PATHS:
+    for relative in paths:
         path = _inside(root, relative)
         if path.stat().st_size > 2_000_000:
             raise ValueError("Packaged reasoning audit exceeds the 2 MB read budget")
@@ -146,11 +163,60 @@ def verify_reasoning_audits(package_dir: str | Path, *, recorded: dict | None = 
             raise ValueError("Packaged reasoning audit exceeds the 2 MB read budget")
         report = json.loads(raw)
         checked = verify_audit(report, replay=True)
+        if version == "3.14.0":
+            expected_seed = int(Path(relative).stem.rsplit("-", 1)[1])
+            if (report.get("config") != {"seed": expected_seed, "samples": 32}
+                    or any(report["metrics"][key] for key in ("wrong", "errors", "missed_answerable"))):
+                raise ValueError("Packaged reasoning audit must pass its declared 200-case suite")
         if path.read_bytes() != raw:
             raise ValueError("Packaged reasoning audit changed during replay")
         verified[relative] = {"file_sha256": hashlib.sha256(raw).hexdigest(), **checked}
         if recorded is not None and recorded[relative] != verified[relative]:
             raise ValueError("Packaged reasoning audit metadata differs from replay: " + relative)
+    return verified
+
+
+def verify_robustness_audits(package_dir: str | Path, *, recorded: dict | None = None) -> dict:
+    """Replay finite tool audits and recompute a declared synthetic episode fixture.
+
+    The episode report is software evidence only. Its supplied event labels are
+    never promoted to controller performance evidence or authenticated outcomes.
+    """
+    from poseidon.research.metamorphic_audit import verify_audit
+    from poseidon.research.episode_risk import read_episode_risk_json, verify_episode_risk_report
+
+    root = Path(package_dir).resolve()
+    if recorded is not None and (not isinstance(recorded, dict) or set(recorded) != set(ROBUSTNESS_AUDIT_PATHS)):
+        raise ValueError("Packaged robustness audit metadata must identify all three allowlisted reports")
+    verified = {}
+    for relative in ROBUSTNESS_AUDIT_PATHS:
+        path = _inside(root, relative)
+        if path.stat().st_size > 2_000_000:
+            raise ValueError("Packaged robustness audit exceeds the 2 MB read budget")
+        raw = path.read_bytes()
+        if len(raw) > 2_000_000:
+            raise ValueError("Packaged robustness audit exceeds the 2 MB read budget")
+        report = read_episode_risk_json(path)
+        if relative in METAMORPHIC_AUDIT_PATHS:
+            checked = verify_audit(report, replay=True)
+            expected_seed = int(Path(relative).stem.rsplit("-", 1)[1])
+            metrics = report["metrics"]
+            if (report.get("config") != {"seed": expected_seed, "samples": 32}
+                    or metrics["joint_correct_groups"] != 160 or metrics["correct"] != 320
+                    or any(metrics[key] for key in ("wrong", "errors", "refusals", "relation_violations", "relation_unavailable"))):
+                raise ValueError("Packaged metamorphic audit must pass its declared 320-answer suite")
+            role = "finite_generated_tool_audit"
+        else:
+            checked = verify_episode_risk_report(report)
+            if checked.get("valid") is not True or checked.get("recomputed") is not True:
+                raise ValueError("Packaged synthetic episode fixture does not recompute")
+            role = "synthetic_episode_software_fixture"
+        if path.read_bytes() != raw:
+            raise ValueError("Packaged robustness audit changed during verification")
+        verified[relative] = {"file_sha256": hashlib.sha256(raw).hexdigest(),
+                              "evidence_role": role, **checked}
+        if recorded is not None and recorded[relative] != verified[relative]:
+            raise ValueError("Packaged robustness audit metadata differs from replay: " + relative)
     return verified
 
 
@@ -256,8 +322,10 @@ def verify_hashes(package_dir: str | Path) -> tuple[dict, dict]:
     if recorded != expected:
         raise ValueError("SHA256SUMS.txt does not match manifest files and manifest.json")
     reasoning_audits = manifest.get("reasoning_audit_verification")
+    if manifest["version"] == "3.14.0" and reasoning_audits is None:
+        raise ValueError("Packaged reasoning audit verification is required for v3.14.0")
     if reasoning_audits is not None:
-        if not isinstance(reasoning_audits, dict) or set(reasoning_audits) != set(REASONING_AUDIT_PATHS):
+        if not isinstance(reasoning_audits, dict) or set(reasoning_audits) != set(reasoning_audit_paths(manifest["version"])):
             raise ValueError("Packaged reasoning audit metadata must identify both allowlisted reports")
         for relative, record in reasoning_audits.items():
             if (not isinstance(record, dict) or
@@ -267,6 +335,28 @@ def verify_hashes(package_dir: str | Path) -> tuple[dict, dict]:
                     not HEX64.fullmatch(str(record.get("report_sha256", ""))) or
                     relative not in expected or record.get("file_sha256") != expected[relative]):
                 raise ValueError("Invalid or uninventoried reasoning audit evidence: " + relative)
+    robustness_audits = manifest.get("robustness_audit_verification")
+    if manifest["version"] == "3.14.0" and robustness_audits is None:
+        raise ValueError("Packaged robustness audit verification is required for v3.14.0")
+    if robustness_audits is not None:
+        if not isinstance(robustness_audits, dict) or set(robustness_audits) != set(ROBUSTNESS_AUDIT_PATHS):
+            raise ValueError("Packaged robustness audit metadata must identify all three allowlisted reports")
+        for relative, record in robustness_audits.items():
+            if (not isinstance(record, dict) or relative not in expected
+                    or record.get("file_sha256") != expected[relative]
+                    or not HEX64.fullmatch(str(record.get("report_sha256", "")))):
+                raise ValueError("Invalid or uninventoried robustness audit evidence: " + relative)
+            if relative in METAMORPHIC_AUDIT_PATHS:
+                if (record.get("evidence_role") != "finite_generated_tool_audit"
+                        or record.get("scope") != "finite_generated_metamorphic_suite"
+                        or any(record.get(key) is not True for key in
+                               ("integrity_verified", "case_manifest_verified", "source_matches", "replay_verified"))):
+                    raise ValueError("Invalid metamorphic audit replay metadata: " + relative)
+            elif (record.get("evidence_role") != "synthetic_episode_software_fixture"
+                    or record.get("valid") is not True or record.get("recomputed") is not True
+                    or record.get("promoted") is not False or record.get("outcome_authenticity_verified") is not False
+                    or not HEX64.fullmatch(str(record.get("protocol_sha256", "")))):
+                raise ValueError("Invalid synthetic episode fixture metadata: " + relative)
     receipt = {
         "verified": True, "schema": SCHEMA, "repo_id": manifest["repo_id"],
         "source_revision": manifest["source_revision"], "version": manifest["version"],
@@ -626,10 +716,11 @@ if manifest["version"] in ("1.3.0", "2.0.0", *V3_RELEASE_VERSIONS):
         trident_replays.append({"path": relative, **actual})
     assert len(trident_replays) >= 1, "Complete TRIDENT action and world replay evidence missing"
 reasoning_replays = {}
+robustness_replays = {}
 poincare_diagnostics = {}
 if manifest.get("reasoning_audit_verification") is not None:
     from tools.verify_huggingface_release import verify_reasoning_audits
-    reasoning_replays = verify_reasoning_audits(root, recorded=manifest["reasoning_audit_verification"])
+    reasoning_replays = verify_reasoning_audits(root, recorded=manifest["reasoning_audit_verification"], version=manifest["version"])
     from poseidon.poincare_engine import PoincareEngine
     diagnostic = PoincareEngine(seed=42).synthesize(iterations=32)
     assert diagnostic["total_domains_verified"] is None
@@ -638,6 +729,11 @@ if manifest.get("reasoning_audit_verification") is not None:
     finite(diagnostic)
     poincare_diagnostics = {key: diagnostic[key] for key in
                            ("evidence_scope", "diagnostics_checked", "diagnostics_passed")}
+if manifest.get("robustness_audit_verification") is not None:
+    from tools.verify_huggingface_release import verify_robustness_audits
+    robustness_replays = verify_robustness_audits(root, recorded=manifest["robustness_audit_verification"])
+    from poseidon.reasoning import solve
+    assert solve("9007199254740993.0 - 9007199254740992.0")["answer"] == "1"
 print("POSEIDON_RELEASE_SMOKE=" + json.dumps({
     "verified": True, "package_source": str(pathlib.Path(poseidon.__file__).resolve()),
     "native_checkpoints_verified": len(native_checkpoints), "scene": {k:scene[k] for k in ("shape","color","motion","count","scale")},
@@ -666,6 +762,7 @@ print("POSEIDON_RELEASE_SMOKE=" + json.dumps({
     "titan_replays": titan_replays,
     "trident_replays": trident_replays,
     "reasoning_audit_replays": reasoning_replays,
+    "robustness_audit_replays": robustness_replays,
     "poincare_diagnostics": poincare_diagnostics,
 }, allow_nan=False, sort_keys=True))
 '''

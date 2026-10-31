@@ -32,6 +32,7 @@ def main():
         "verify-3d-replay",
         "discovery-lab",
         "reason", "reasoning-audit", "verify-reasoning-audit",
+        "metamorphic-audit", "verify-metamorphic-audit", "episode-risk", "verify-episode-risk",
         "problem",
         "pantheon",
         "creative",
@@ -88,26 +89,60 @@ def main():
     p.add_argument("--skip-replay", action="store_true", help="verify receipt hashes without regenerating episodes")
     p.add_argument("--max-new-tokens", type=int, default=None, help="maximum new generation tokens for language model")
     args = p.parse_args()
-    if args.command in ("reasoning-audit", "verify-reasoning-audit"):
-        from pathlib import Path
-        from .research.reasoning_audit import run_audit, verify_audit
+    if args.command in ("episode-risk", "verify-episode-risk"):
+        from .research.episode_risk import (
+            audit_episode_risk, read_episode_risk_json, verify_episode_risk_report,
+            write_episode_risk_report,
+        )
         try:
-            if args.command == "verify-reasoning-audit":
+            if not args.prompt:
+                p.error(f"{args.command} requires a JSON path")
+            if args.skip_replay:
+                p.error("Episode risk reports always recompute bounds; --skip-replay is unsupported")
+            data = read_episode_risk_json(args.prompt)
+            if args.command == "verify-episode-risk":
+                report = verify_episode_risk_report(data)
+            else:
+                if not isinstance(data, dict) or set(data) != {"protocol", "outcomes_by_condition"}:
+                    p.error("Provide protocol and outcomes_by_condition only")
+                report = audit_episode_risk(**data)
+                if args.output:
+                    write_episode_risk_report(args.output, report)
+            print(json.dumps(report, indent=2, allow_nan=False))
+            if (args.command == "verify-episode-risk" and not report["valid"]) or (
+                    args.command == "episode-risk" and not report["eligible"]):
+                raise SystemExit(1)
+        except (ValueError, OSError, KeyError, TypeError) as error:
+            p.error(str(error))
+        return
+    if args.command in ("reasoning-audit", "verify-reasoning-audit", "metamorphic-audit", "verify-metamorphic-audit"):
+        from pathlib import Path
+        metamorphic = "metamorphic" in args.command
+        if metamorphic:
+            from .research.metamorphic_audit import run_audit, verify_audit
+        else:
+            from .research.reasoning_audit import run_audit, verify_audit
+        try:
+            if args.command.startswith("verify-"):
                 if not args.prompt:
-                    p.error("verify-reasoning-audit requires a report JSON path")
+                    p.error(f"{args.command} requires a report JSON path")
                 target = Path(args.prompt)
                 if target.stat().st_size > 2_000_000:
                     p.error("reasoning audit report exceeds 2 MB")
                 report = json.loads(target.read_text(encoding="utf-8"))
                 print(json.dumps(verify_audit(report, replay=not args.skip_replay), indent=2))
             else:
-                report = run_audit(seed=args.seed if args.seed is not None else 20261030, samples=args.samples)
+                report = run_audit(seed=args.seed if args.seed is not None else (20261031 if metamorphic else 20261030), samples=args.samples)
                 if args.output:
                     target = Path(args.output)
                     target.parent.mkdir(parents=True, exist_ok=True)
                     target.write_text(json.dumps(report, indent=2, allow_nan=False) + "\n", encoding="utf-8")
                 print(json.dumps(report, indent=2, allow_nan=False))
-                if report["metrics"]["wrong"] or report["metrics"]["missed_answerable"] or report["metrics"]["errors"]:
+                metrics = report["metrics"]
+                failed = (metrics["wrong"] or metrics["errors"] or
+                          (metrics["refusals"] or metrics["relation_violations"] if metamorphic
+                           else metrics["missed_answerable"]))
+                if failed:
                     raise SystemExit(1)
         except (ValueError, OSError, KeyError, TypeError) as error:
             p.error(str(error))

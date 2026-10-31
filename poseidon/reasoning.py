@@ -50,7 +50,7 @@ def _parse(expression):
         raise MathError("Expression is too long (250 characters maximum).")
     expression = _normalize_implicit_mult(expression)
     expression = expression.replace("^", "**").replace("×", "*").replace("÷", "/")
-    if not re.fullmatch(r"[0-9xXyYzZwWuUvV+*/().%\s-]+", expression):
+    if not re.fullmatch(r"[0-9eExXyYzZwWuUvV+*/().%\s-]+", expression):
         raise MathError("Use numbers, x, y (z, w, u, v in systems), parentheses, and + - * / ** % only.")
     try:
         tree = ast.parse(expression.strip(), mode="eval")
@@ -58,6 +58,7 @@ def _parse(expression):
         raise MathError("Invalid expression; use explicit multiplication such as 3*x.") from e
     if sum(1 for _ in ast.walk(tree)) > _MAX_NODES:
         raise MathError("Expression is too complex.")
+    _bind_numeric_literals(tree, expression.strip())
     return tree.body
 
 def _bounded(value):
@@ -68,10 +69,42 @@ def _bounded(value):
 def _constant(node):
     return isinstance(node, ast.Constant) and type(node.value) in (int, float)
 
+
+def _bind_numeric_literals(tree, source):
+    # Python's AST rounds decimal tokens to binary floats. Keep their original
+    # spelling on the node so every downstream exact evaluator sees the input.
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Constant) and type(node.value) is float:
+            node._source_literal = ast.get_source_segment(source, node)
+
+
+def _literal_fraction(node):
+    if type(node.value) is int:
+        return _bounded(Fraction(node.value))
+    literal = getattr(node, "_source_literal", None)
+    if not isinstance(literal, str):
+        raise MathError("Numeric literal is missing its source text.")
+    literal = literal.replace("_", "").lower()
+    mantissa, separator, exponent = literal.partition("e")
+    whole, _, fractional = mantissa.partition(".")
+    digits = (whole + fractional).lstrip("0")
+    if not digits:
+        return Fraction(0)
+    scale = (int(exponent) if separator else 0) - len(fractional)
+    # Bound before exponentiation, including exponents too large for a float.
+    # For a denominator, cancellation cannot remove more than the numerator.
+    if scale > 80 or -scale > 80 + len(digits):
+        raise MathError("Result exceeds the numeric budget.")
+    numerator = int(digits)
+    value = (Fraction(numerator * 10**scale) if scale >= 0
+             else Fraction(numerator, 10**(-scale)))
+    return _bounded(value)
+
+
 def _linear(node):
     # Return coefficient and constant for ax+b, maintaining exact rational arithmetic.
     if _constant(node):
-        return Fraction(0), _bounded(Fraction(str(node.value)))
+        return Fraction(0), _literal_fraction(node)
     if isinstance(node, ast.Name) and node.id.lower() == "x":
         return Fraction(1), Fraction(0)
     if isinstance(node, ast.UnaryOp) and isinstance(node.op, (ast.UAdd, ast.USub)):
@@ -117,7 +150,7 @@ def _format(value):
 def _quadratic_poly(node):
     """Return coefficients (a, b, c) for a*x^2 + b*x + c with exact rational arithmetic."""
     if isinstance(node, ast.Constant) and type(node.value) in (int, float):
-        return Fraction(0), Fraction(0), _bounded(Fraction(str(node.value)))
+        return Fraction(0), Fraction(0), _literal_fraction(node)
     if isinstance(node, ast.Name) and node.id.lower() == "x":
         return Fraction(0), Fraction(1), Fraction(0)
     if isinstance(node, ast.UnaryOp) and isinstance(node.op, (ast.UAdd, ast.USub)):
@@ -162,7 +195,7 @@ def _quadratic_poly(node):
 def _linear_2var(node):
     """Return coefficients (a, b, c) for a*x + b*y + c with exact rational arithmetic."""
     if isinstance(node, ast.Constant) and type(node.value) in (int, float):
-        return Fraction(0), Fraction(0), _bounded(Fraction(str(node.value)))
+        return Fraction(0), Fraction(0), _literal_fraction(node)
     if isinstance(node, ast.Name):
         if node.id.lower() == "x":
             return Fraction(1), Fraction(0), Fraction(0)
@@ -228,7 +261,7 @@ def _poly_constant_value(poly):
 def _poly(node):
     """Parse an AST node into an exact sparse polynomial in x (degree <= 8)."""
     if _constant(node):
-        return _poly_clean({0: Fraction(str(node.value))})
+        return _poly_clean({0: _literal_fraction(node)})
     if isinstance(node, ast.Name):
         if node.id.lower() == "x":
             return {1: Fraction(1)}
@@ -810,7 +843,7 @@ def _is_const(form):
 def _linear_multi(node):
     """Return {variable: coefficient, "": constant} for a linear form in x, y, z, w, u, v."""
     if _constant(node):
-        return {"": _bounded(Fraction(str(node.value)))}
+        return {"": _literal_fraction(node)}
     if isinstance(node, ast.Name):
         name = node.id.lower()
         if name not in SYSTEM_VARIABLES:
@@ -997,6 +1030,7 @@ def _parse_call_ast(expression, allowed_names):
         raise MathError("Invalid function call syntax.") from e
     if sum(1 for _ in ast.walk(tree)) > _MAX_NODES:
         raise MathError("Expression is too complex.")
+    _bind_numeric_literals(tree, norm)
     body = tree.body
     if not isinstance(body, ast.Call) or not isinstance(body.func, ast.Name):
         raise MathError("Expected a top-level mathematical function call.")
@@ -1736,7 +1770,7 @@ def _extract_special_call(text):
                     inner = text[open_idx + 1:idx]
                     if (
                         inner.strip()
-                        and re.fullmatch(r"[0-9xX+*/().^\s×÷-]+", inner)
+                        and re.fullmatch(r"[0-9eExX+*/().^\s×÷-]+", inner)
                         and any(c.isdigit() or c in "xX" for c in inner)
                     ):
                         return text[m_ddx.start():idx + 1]
@@ -1772,7 +1806,8 @@ def _extract_special_call(text):
             continue
         if not re.fullmatch(r"[0-9a-zA-Z_+*/().%=,\[\]\s^×÷-]+", inner):
             continue
-        words = [w.lower() for w in re.findall(r"[A-Za-z_]+", inner)]
+        identifiers = re.sub(r"(?<![\w.])(?:\d+(?:\.\d*)?|\.\d+)[eE][+-]?\d+", "0", inner)
+        words = [w.lower() for w in re.findall(r"[A-Za-z_]+", identifiers)]
         if any(w not in ("x", "at", "order") for w in words):
             continue
         if not (any(c.isdigit() for c in inner) or "x" in words):
@@ -1825,7 +1860,7 @@ def extract_math(prompt):
         poly_str = _normalize_implicit_mult(m_diff.group(1).strip())
         var = m_diff.group(2) or "x"
         at_val = m_diff.group(3)
-        if re.fullmatch(r"[0-9xX+*/().^\s×÷-]+", poly_str) and any(c.isdigit() or c in "xX" for c in poly_str):
+        if re.fullmatch(r"[0-9eExX+*/().^\s×÷-]+", poly_str) and any(c.isdigit() or c in "xX" for c in poly_str):
             if at_val:
                 return f"diff({poly_str}, {var}, at={at_val})"
             return f"diff({poly_str}, {var})"
@@ -1840,7 +1875,7 @@ def extract_math(prompt):
         poly_str = _normalize_implicit_mult(m_int_def.group(1).strip())
         low = m_int_def.group(2).strip()
         high = m_int_def.group(3).strip()
-        if re.fullmatch(r"[0-9xX+*/().^\s×÷-]+", poly_str) and any(c.isdigit() or c in "xX" for c in poly_str):
+        if re.fullmatch(r"[0-9eExX+*/().^\s×÷-]+", poly_str) and any(c.isdigit() or c in "xX" for c in poly_str):
             return f"integrate({poly_str}, x, {low}, {high})"
 
     m_int_indef = re.match(
@@ -1851,7 +1886,7 @@ def extract_math(prompt):
     if m_int_indef:
         poly_str = _normalize_implicit_mult(m_int_indef.group(1).strip())
         var = m_int_indef.group(2) or "x"
-        if re.fullmatch(r"[0-9xX+*/().^\s×÷-]+", poly_str) and any(c.isdigit() or c in "xX" for c in poly_str):
+        if re.fullmatch(r"[0-9eExX+*/().^\s×÷-]+", poly_str) and any(c.isdigit() or c in "xX" for c in poly_str):
             return f"integrate({poly_str}, {var})"
 
     # 6. Greatest common divisor: "What is the greatest common divisor of 84 and 36?"
@@ -1929,19 +1964,19 @@ def extract_math(prompt):
     )
     if m_if and "=" in m_if.group(1):
         cand = _normalize_implicit_mult(m_if.group(1).strip())
-        if re.fullmatch(r"[0-9xXyYzZwWuUvV+*/().%=,;\s^×÷-]+", cand) and any(c.isdigit() for c in cand):
+        if re.fullmatch(r"[0-9eExXyYzZwWuUvV+*/().%=,;\s^×÷-]+", cand) and any(c.isdigit() for c in cand):
             return cand
 
     # 12. System equations joined by "and" (e.g. "Solve x + y = 10 and x - y = 2")
     m_sys_and = re.sub(r"\s+and\s+(?=[^=]+=[^=]+)", ", ", cleaned_arith, flags=re.I)
     m_sys_and = _normalize_implicit_mult(m_sys_and.strip())
     if "," in m_sys_and and "=" in m_sys_and:
-        if re.fullmatch(r"[0-9xXyYzZwWuUvV+*/().%=,;\s^×÷-]+", m_sys_and) and any(c.isdigit() for c in m_sys_and):
+        if re.fullmatch(r"[0-9eExXyYzZwWuUvV+*/().%=,;\s^×÷-]+", m_sys_and) and any(c.isdigit() for c in m_sys_and):
             return m_sys_and
 
     # 13. Fall back to standard extraction
     cand_text = _normalize_implicit_mult(cleaned_arith.strip())
-    if not re.fullmatch(r"[0-9xXyYzZwWuUvV+*/().%=,;\s^×÷-]+", cand_text) or not any(c.isdigit() for c in cand_text):
+    if not re.fullmatch(r"[0-9eExXyYzZwWuUvV+*/().%=,;\s^×÷-]+", cand_text) or not any(c.isdigit() for c in cand_text):
         return None
     if re.search(r"[zZwWuUvV]", cand_text):
         if "=" not in cand_text:

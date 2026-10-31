@@ -12,7 +12,7 @@
     <div class="stats"><div><span>CORE</span><strong id="coreState">Awaiting checkpoint</strong></div><div><span>TRAINING EXPOSURES</span><strong id="exposures">—</strong></div><div><span>LANGUAGE CORPUS</span><strong id="corpus">—</strong></div><div><span>COMPUTE</span><strong>Local CPU <small>only</small></strong></div></div>
     <div class="workspace">
       <section class="studio panel">
-        <div class="panel-title"><span>01 / WORKSPACE</span><span id="buildTag" class="tag">POSEIDON / v3.13.0-POINCARE-100</span></div>
+        <div class="panel-title"><span>01 / WORKSPACE</span><span id="buildTag" class="tag">POSEIDON / v3.14.0-POINCARE-100</span></div>
         <div class="modes" role="tablist" aria-label="Capabilities">
           <button class="selected" data-mode="chat" role="tab" aria-selected="true">Conversation</button><button data-mode="poincare" role="tab" aria-selected="false">POINCARÉ (ReturnMap/Hyperbolic/Morse/Ricci/Quartet)</button><button data-mode="neurograft" role="tab" aria-selected="false">NEUROGRAFT (SR-TD/Replay/Laplacian/GraftCircuit)</button><button data-mode="crosswire" role="tab" aria-selected="false">CROSSWIRE (Interoperability/Probing/Contract/Shield)</button><button data-mode="faultline" role="tab" aria-selected="false">FAULTLINE (Joint-Failure/Cofailure/Hyperedge/Minimax)</button><button data-mode="tether" role="tab" aria-selected="false">TETHER (Reliability/Causal/Attribution/Consensus/Fallback)</button><button data-mode="cartan" role="tab" aria-selected="false">CARTAN (Exterior/PT/Albert/Holo/Turing)</button><button data-mode="noether" role="tab" aria-selected="false">NOETHER (Symmetry/MTC/STA/BV/ActiveMatter)</button><button data-mode="chronos" role="tab" aria-selected="false">CHRONOS (CDT/Noncommutative/Tropical/Stiefel/Bisimulation)</button><button data-mode="aether" role="tab" aria-selected="false">AETHER (Gauge/Thermo/Fisher/Symplectic/Optics)</button><button data-mode="hyperborea" role="tab" aria-selected="false">Hyperborea (Sheaf/Port-Hamiltonian/RG/Anyon)</button><button data-mode="hephaestus" role="tab" aria-selected="false">Hephaestus (Stitch/GFlowNet/Koopman)</button><button data-mode="athenaeum" role="tab" aria-selected="false">Athenaeum (E-Graph/MCTS)</button><button data-mode="proof" role="tab" aria-selected="false">Archimedes Proof</button><button data-mode="invent" role="tab" aria-selected="false">Da Vinci Invention</button><button data-mode="hypothesis" role="tab" aria-selected="false">Olympus Hypothesis</button><button data-mode="creative" role="tab" aria-selected="false">Noosphere Creative</button><button data-mode="pantheon" role="tab" aria-selected="false">Pantheon (24-Pillar)</button><button data-mode="reason" role="tab" aria-selected="false">Hyper-Reasoning</button><button data-mode="problem" role="tab" aria-selected="false">Problem Forge (100)</button><button data-mode="river" role="tab" aria-selected="false">RiverWorld & Discovery</button><button data-mode="math" role="tab" aria-selected="false">Maths</button><button data-mode="image" role="tab" aria-selected="false">Image</button><button data-mode="video" role="tab" aria-selected="false">Motion</button><button data-mode="mesh" role="tab" aria-selected="false">3D</button><button data-mode="world" role="tab" aria-selected="false">Survival</button>
         </div>
@@ -96,6 +96,30 @@
           <div class="table-scroll"><table><thead><tr><th>Family</th><th>Correct answers</th><th>Wrong accepted</th><th>Correct refusals</th><th>Coverage</th><th>Accepted error</th></tr></thead><tbody id="reasoningAuditFamilies"></tbody></table></div>
           <p id="reasoningAuditScope" class="micro"></p>
           <details><summary>Cases and report fingerprint</summary><pre id="reasoningAuditDetails"></pre></details>
+        </div>
+      </section>
+      <section id="metamorphicAuditPanel" class="job-panel" aria-labelledby="metamorphicAuditHeading">
+        <div class="job-heading"><h3 id="metamorphicAuditHeading">Reasoning robustness</h3><div class="job-actions"><button id="runMetamorphicAudit" type="button">Check equivalent problems</button><button id="exportMetamorphicAudit" type="button" disabled>Export report</button></div></div>
+        <p class="micro">Five pairs of related inputs: precise decimals, scaled equations, determinant row swaps, gcd and edit symmetry. Each answer is checked independently.</p>
+        <div class="job-actions"><label for="metamorphicAuditSeed">Seed</label><input id="metamorphicAuditSeed" type="number" min="0" step="1" value="20261031"><label for="metamorphicAuditSamples">Pairs per family</label><input id="metamorphicAuditSamples" type="number" min="1" max="32" step="1" value="8"></div>
+        <p id="metamorphicAuditStatus" class="micro" role="status" aria-live="polite">Ready · runs locally without model weights</p>
+        <div id="metamorphicAuditResults" hidden>
+          <div id="metamorphicAuditMetrics" class="decision-evidence"></div>
+          <div class="table-scroll"><table><thead><tr><th>Family</th><th>Correct answers</th><th>Wrong accepted</th><th>Relation violations</th><th>Unavailable relations</th><th>Jointly correct pairs</th></tr></thead><tbody id="metamorphicAuditFamilies"></tbody></table></div>
+          <p id="metamorphicAuditScope" class="micro"></p>
+          <details><summary>Related cases and report fingerprint</summary><pre id="metamorphicAuditDetails"></pre></details>
+        </div>
+      </section>
+      <section id="episodeRiskPanel" class="job-panel" aria-labelledby="episodeRiskHeading">
+        <div class="job-heading"><h3 id="episodeRiskHeading">Held-out episode risk screen</h3><div class="job-actions"><button id="runEpisodeRisk" type="button">Screen supplied episodes</button><button id="exportEpisodeRisk" type="button" disabled>Export report</button></div></div>
+        <p class="micro">Import a fixed protocol and complete episode outcomes. Checks separate fit, selection and calibration IDs; computes an upper risk bound for every declared condition.</p>
+        <label for="episodeRiskFile">Protocol and outcomes JSON (64 KiB maximum)</label><input id="episodeRiskFile" type="file" accept="application/json,.json">
+        <p class="micro">File fields: <code>protocol</code> and <code>outcomes_by_condition</code>. Create the protocol with <code>make_episode_risk_protocol</code>; use the CLI for larger studies.</p>
+        <p id="episodeRiskStatus" class="micro" role="status" aria-live="polite">No episode evidence loaded.</p>
+        <div id="episodeRiskResults" hidden>
+          <div class="table-scroll"><table><thead><tr><th>Condition</th><th>Episodes</th><th>Adverse episodes</th><th>Observed risk</th><th>Upper bound</th><th>Screen</th></tr></thead><tbody id="episodeRiskConditions"></tbody></table></div>
+          <p id="episodeRiskScope" class="micro"></p>
+          <details><summary>Protocol, assumptions and supplied outcomes</summary><pre id="episodeRiskDetails"></pre></details>
         </div>
       </section>
       <section id="telemetrySection" class="job-panel" aria-labelledby="telemetryHeading">

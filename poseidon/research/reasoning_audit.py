@@ -11,6 +11,7 @@ from fractions import Fraction
 from functools import lru_cache
 import hashlib
 import json
+import math
 from pathlib import Path
 import random
 import re
@@ -24,6 +25,8 @@ DEFAULT_SEED = 20261030
 _ROOT = Path(__file__).resolve().parents[2]
 _SOURCES = ("poseidon/research/reasoning_audit.py", "poseidon/reasoning.py",
             "poseidon/problem_solver.py")
+_ANSWER_LIMIT = 10**80
+_ANSWER_TEXT_LIMIT = 192  # also accommodates normalized 80-digit numerator/denominator pairs
 
 
 def _hash(value: Any) -> str:
@@ -102,6 +105,46 @@ def route(prompt: str) -> tuple[str | None, dict | None]:
     return None, None
 
 
+def _bounded_answer_fraction(raw: Any) -> Fraction:
+    """Parse bounded exact answers without exponentiating an untrusted exponent."""
+    if not isinstance(raw, str) or len(raw) > _ANSWER_TEXT_LIMIT:
+        raise ValueError("numeric answer exceeds its text budget")
+    text = raw.strip()
+    rational = re.fullmatch(r"([+-]?[0-9]+)\s*/\s*([0-9]+)", text)
+    if rational:
+        numerator, denominator = map(int, rational.groups())
+        if denominator == 0:
+            raise ValueError("numeric answer has a zero denominator")
+    else:
+        decimal = re.fullmatch(r"([+-]?)([0-9]*)(?:\.([0-9]*))?(?:[eE]([+-]?[0-9]+))?", text)
+        if decimal is None:
+            raise ValueError("numeric answer is not a finite rational")
+        sign, whole, fractional, exponent = decimal.groups()
+        fractional = fractional or ""
+        if not whole and not fractional:
+            raise ValueError("numeric answer has no digits")
+        exponent = int(exponent or "0")
+        # The text has at most 192 digits. Larger exponents cannot produce a
+        # nonzero value within the 80-digit budget, even after cancellation.
+        if abs(exponent) > _ANSWER_TEXT_LIMIT + 80:
+            raise ValueError("numeric answer exponent exceeds its budget")
+        digits = (whole + fractional).lstrip("0")
+        scale = exponent - len(fractional)
+        if not digits:
+            numerator, denominator = 0, 1
+        else:
+            if scale > 80 or -scale > 80 + len(digits):
+                raise ValueError("numeric answer exceeds its numeric budget")
+            numerator = int(digits) * (-1 if sign == "-" else 1)
+            numerator, denominator = ((numerator * 10**scale, 1) if scale >= 0
+                                      else (numerator, 10**(-scale)))
+    divisor = math.gcd(numerator, denominator)
+    numerator, denominator = numerator // divisor, denominator // divisor
+    if abs(numerator) > _ANSWER_LIMIT or denominator > _ANSWER_LIMIT:
+        raise ValueError("numeric answer exceeds its numeric budget")
+    return Fraction(numerator, denominator)
+
+
 def check_answer(case: dict, result: dict | None) -> bool:
     """Never accept a token match in prose or the solver's own verification flag."""
     if not case["answerable"] or not isinstance(result, dict):
@@ -132,7 +175,7 @@ def check_answer(case: dict, result: dict | None) -> bool:
         raw = result.get("answer")
         if not isinstance(raw, str) or len(raw) > 128:
             return False
-        if Fraction(raw) != Fraction(case["expected"]):
+        if _bounded_answer_fraction(raw) != _bounded_answer_fraction(case["expected"]):
             return False
         if case["family"] != "hanoi":
             return True

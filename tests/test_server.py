@@ -7,6 +7,7 @@ from http.server import ThreadingHTTPServer
 import pytest
 from poseidon.server import make_handler
 from poseidon.runtime import Poseidon
+from poseidon import __version__
 
 @pytest.fixture
 def server(tmp_path):
@@ -901,7 +902,7 @@ def test_poincare_server_endpoints(server):
     # 1. GET /api/poincare/status
     stat = json.load(urlopen(url + "/api/poincare/status"))
     assert stat["ready"] is True
-    assert stat["version"] == "v3.13.0-POINCARE-100"
+    assert stat["version"] == f"v{__version__}-POINCARE-100"
     assert stat["stage"] == 32
     assert stat["subsystems"]["poincare_return_map_chaos"] is True
     assert stat["subsystems"]["hyperbolic_poincare_disk_geodesic"] is True

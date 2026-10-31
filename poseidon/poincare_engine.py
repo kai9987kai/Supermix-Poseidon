@@ -738,7 +738,7 @@ class PoincareEngine:
         receipt = {
             "project": "POINCARE",
             "stage": 32,
-            "version": "v3.13.0-POINCARE-100",
+            "version": "v3.14.0-POINCARE-100",
             "status": "completed",
             "schema": "poseidon-poincare-synthesis-v1",
             "poincare_return_map": p1,

@@ -1960,10 +1960,22 @@ class Poseidon:
         with self.lock:
             return run_audit(seed=seed, samples=samples)
 
+    def metamorphic_audit(self, seed=20261031, samples=8):
+        """Check related inputs and independent correctness without model weights."""
+        from .research.metamorphic_audit import run_audit
+        with self.lock:
+            return run_audit(seed=seed, samples=samples)
+
+    def episode_risk_audit(self, protocol, outcomes_by_condition):
+        """Screen supplied complete episodes; never activates a controller."""
+        from .research.episode_risk import audit_episode_risk
+        with self.lock:
+            return audit_episode_risk(protocol, outcomes_by_condition)
+
     def poincare_status(self):
         return {
             "ready": True,
-            "version": "v3.13.0-POINCARE-100",
+            "version": "v3.14.0-POINCARE-100",
             "stage": 32,
             "subsystems": {
                 "poincare_return_map_chaos": True,

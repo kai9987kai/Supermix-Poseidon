@@ -1,5 +1,5 @@
 """Supermix Poseidon: explicitly bounded, locally trained research system."""
-__version__ = "3.13.0"
+__version__ = "3.14.0"
 
 from .provenance import capture_sources as _capture_sources
 from .cognitive_agent import CognitiveAgent, CognitiveDecision

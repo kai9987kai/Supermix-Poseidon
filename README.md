@@ -1,9 +1,9 @@
-# Supermix Poseidon v3.13.0: Local Research Workbench
+# Supermix Poseidon v3.14.0: Local Research Workbench
 
 [![Hugging Face](https://img.shields.io/badge/Hugging%20Face-Supermix--Poseidon-yellow)](https://huggingface.co/Kai9987kai/Supermix-Poseidon)
 [![GitHub](https://img.shields.io/badge/GitHub-Supermix--Poseidon-blue)](https://github.com/kai9987kai/Supermix-Poseidon)
 
-Poseidon is an experimental **cognitive AI workbench** combining a trained Tidal core with optional prediction, memory, planning, adaptation, exact reasoning, and synthetic research tools. It runs locally on a conventional CPU. Version 3.13.0 is the current source identity; a source version or a passing local check does not establish a published model release.
+Poseidon is an experimental **cognitive AI workbench** combining a trained Tidal core with optional prediction, memory, planning, adaptation, exact reasoning, and synthetic research tools. It runs locally on a conventional CPU. Version 3.14.0 is the current source identity; a source version or a passing local check does not establish a published model release.
 
 Use the CLI or browser workbench to inspect available artifacts, run seeded synthetic episodes, compare experimental controllers, and replay recorded evidence. The [learning foundation report](docs/research/learning-foundation-2026-10-12.md) records the trained-predictor integration and its measured limitations. The [research index](docs/research/README.md) links subsequent experiments; the [11 October architecture audit](docs/research/architecture-audit-2026-10-11.md) preserves the earlier baseline findings.
 
@@ -85,6 +85,22 @@ moves and edit distance, plus invalid and unsupported controls. It reports error
 refusals and accepted-answer error separately. These finite checks do not establish
 general model accuracy or statistical risk guarantees. `--skip-replay` checks
 report integrity only.
+
+The [31 October robustness upgrade](docs/PROJECT_UPGRADE_2026-10-31.md) preserves
+exact decimal input across the solvers, adds paired related-input reasoning
+checks, and screens supplied held-out episode outcomes for a fixed policy:
+
+```powershell
+python -m poseidon metamorphic-audit --seed 20261031 --samples 32 --output outputs/metamorphic.json
+python -m poseidon verify-metamorphic-audit outputs/metamorphic.json
+python -m poseidon episode-risk study.json --output outputs/episode-risk.json
+python -m poseidon verify-episode-risk outputs/episode-risk.json
+```
+
+Both tools are available in the browser. Consistency is measured separately from
+independent correctness. Episode risk bounds require the stated sampling and
+fixed-policy assumptions; they do not establish per-action risk or activate a
+controller. See the upgrade document for the study JSON protocol.
 
 ## Model components and boundaries
 
